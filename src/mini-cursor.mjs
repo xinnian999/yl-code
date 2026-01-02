@@ -4,20 +4,23 @@ import {
   HumanMessage,
   SystemMessage,
   ToolMessage,
+  AIMessage,
 } from "@langchain/core/messages";
+import chalk from "chalk";
 import {
   executeCommandTool,
   listDirectoryTool,
   readFileTool,
   writeFileTool,
 } from "./all-tools.mjs";
+import readline from "readline";
 
 const model = new ChatOpenAI({
-  modelName: "qwen-plus",
-  apiKey: process.env.OPENAI_API_KEY,
+  modelName: process.env.MODEL_NAME,
+  apiKey: process.env.API_KEY,
   temperature: 0,
   configuration: {
-    baseURL: process.env.OPENAI_BASE_URL,
+    baseURL: process.env.BASE_URL,
   },
 });
 
@@ -36,7 +39,7 @@ async function runAgentWithTools(query, maxIterations = 30) {
   const messages = [
     new SystemMessage(`你是一个项目管理助手，使用工具完成任务。
     
-    当前工作目录: ${process.cwd()}
+    当前工作目录: ${process.cwd()}
     
     工具：
     1. read_file: 读取文件
@@ -52,6 +55,11 @@ async function runAgentWithTools(query, maxIterations = 30) {
 - 正确示例: { command: "pnpm install", workingDirectory: "react-todo-app" }
 这样就对了！workingDirectory 已经切换到 react-todo-app，直接执行命令即可
 
+⚠️ 交互式命令处理：
+- 对于 pnpm create vite，必须使用非交互式参数：
+  * ✅ 正确: { command: "pnpm create vite vue-todo-app --template vue-ts --no-rolldown --no-interactive" }
+  * ❌ 错误: { command: "pnpm create vite vue-todo-app --template vue-ts" }（会卡住）
+
 回复要简洁，只说做了什么`),
     new HumanMessage(query),
   ];
@@ -59,17 +67,37 @@ async function runAgentWithTools(query, maxIterations = 30) {
   for (let i = 0; i < maxIterations; i++) {
     console.log(`⏳ 正在等待 AI 思考...`);
     const response = await modelWithTools.invoke(messages);
-    messages.push(response); // 检查是否有工具调用
+    // console.log(response);
+
+    // 如果 content 为空且有工具调用，创建一个新的 AIMessage 确保 content 不为空
+    let messageToAdd = response;
+    if (
+      (!response.content || response.content.trim() === "") &&
+      response.tool_calls &&
+      response.tool_calls.length > 0
+    ) {
+      messageToAdd = new AIMessage({
+        content: "正在执行工具...",
+        tool_calls: response.tool_calls,
+        additional_kwargs: response.additional_kwargs,
+        response_metadata: response.response_metadata,
+      });
+    }
+
+    messages.push(messageToAdd); // 检查是否有工具调用
 
     if (!response.tool_calls || response.tool_calls.length === 0) {
-      console.log(`\n✨ AI 最终回复:\n${response.content}\n`);
-      return response.content;
+      console.log(`\n✨ AI 最终回复:\n${response.content || ""}\n`);
+      return response.content || "";
     } // 执行工具调用
 
     for (const toolCall of response.tool_calls) {
       const foundTool = tools.find((t) => t.name === toolCall.name);
       if (foundTool) {
         const toolResult = await foundTool.invoke(toolCall.args);
+
+        console.log('🔧 ' + chalk.bgGreenBright(toolResult + "\n"));
+
         messages.push(
           new ToolMessage({
             content: toolResult,
@@ -83,32 +111,44 @@ async function runAgentWithTools(query, maxIterations = 30) {
   return messages[messages.length - 1].content;
 }
 
-const case1 = `创建一个功能丰富的 Vue TodoList 应用：
+// 交互式对话
+async function interactiveMode() {
+  console.log("🤖 你好！我是mini-cursor！有什么吩咐？\n");
 
-1. 创建项目：echo -e "n\nn" | pnpm create vite vue-todo-app --template vue-ts
-2. 修改 src/App.vue，实现完整功能的 TodoList：
- - 添加、删除、编辑、标记完成
- - 分类筛选（全部/进行中/已完成）
- - 统计信息显示
- - localStorage 数据持久化
-3. 添加复杂样式：
- - 渐变背景（蓝到紫）
- - 卡片阴影、圆角
- - 悬停效果
-4. 添加动画：
- - 添加/删除时的过渡动画
- - 使用 CSS transitions
-5. 列出目录确认
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
 
-注意：使用 pnpm，功能要完整，样式要美观，要有动画效果
+  rl.prompt();
 
-之后在 vue-todo-app 项目中：
-1. 使用 pnpm install 安装依赖
-2. 使用 pnpm run dev 启动服务器
-`;
+  rl.on("line", async (input) => {
+    const trimmedInput = input.trim();
 
-try {
-  await runAgentWithTools(case1);
-} catch (error) {
-  console.error(`\n❌ 错误: ${error.message}\n`);
+    // 检查退出命令
+    if (
+      trimmedInput.toLowerCase() === "exit" ||
+      trimmedInput.toLowerCase() === "quit"
+    ) {
+      console.log("👋 再见！");
+      rl.close();
+      return;
+    }
+
+    // 跳过空输入
+    if (!trimmedInput) {
+      rl.prompt();
+      return;
+    }
+
+    try {
+      await runAgentWithTools(trimmedInput);
+
+      rl.prompt();
+    } catch (error) {
+      console.error(`\n❌ 错误: ${error.message}\n`);
+    }
+  });
 }
+
+interactiveMode();
