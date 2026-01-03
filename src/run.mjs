@@ -6,7 +6,7 @@ import {
   ToolMessage,
   AIMessage,
 } from "@langchain/core/messages";
-// import chalk from "chalk";
+import chalk from "chalk";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -43,9 +43,12 @@ async function run(query, maxIterations = 30) {
   messages.push(new HumanMessage(query));
 
   for (let i = 0; i < maxIterations; i++) {
-    console.log(`⏳ 正在等待 AI 思考...`);
+    process.stdout.write(`\n⏳ 正在等待 AI 思考...`);
     const response = await model.invoke(messages);
     // console.log(response);
+
+    // 清除"正在等待 AI 思考..."这一行
+    process.stdout.write(`\r\x1b[K`);
 
     // 如果 content 为空且有工具调用，创建一个新的 AIMessage 确保 content 不为空
     let messageToAdd = response;
@@ -64,11 +67,13 @@ async function run(query, maxIterations = 30) {
 
     messages.push(messageToAdd); // 检查是否有工具调用
 
+    // 如果没有工具调用，直接返回内容
     if (!response.tool_calls || response.tool_calls.length === 0) {
-      console.log(`\n✨ AI 最终回复:\n${response.content || ""}\n`);
+      console.log(`🤖 ${chalk.greenBright(response.content || "")}\n`);
       return response.content || "";
-    } // 执行工具调用
+    } 
 
+    // 执行工具调用
     for (const toolCall of response.tool_calls) {
       const foundTool = tools.find((t) => t.name === toolCall.name);
       if (foundTool) {
