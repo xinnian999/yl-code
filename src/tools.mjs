@@ -59,17 +59,36 @@ const writeFileTool = tool(
 
 // 3. 执行命令工具（带实时输出）
 const executeCommandTool = tool(
-  async ({ command, workingDirectory }) => {
+  async ({ command, workingDirectory, background = false }) => {
     const cwd = workingDirectory || process.cwd();
     console.log(
       `  [工具调用] execute_command("${command}")${
         workingDirectory ? ` - 工作目录: ${workingDirectory}` : ""
-      }`
+      }${background ? " - 后台运行" : ""}`
     );
 
     return new Promise((resolve, reject) => {
       // 解析命令和参数
       const [cmd, ...args] = command.split(" ");
+
+      if (background) {
+        const child = spawn(cmd, args, {
+          cwd,
+          stdio: "ignore", // 完全忽略输入输出
+          shell: true,
+          detached: true,
+        });
+
+        child.unref();
+
+        const cwdInfo = workingDirectory
+          ? `\n\n重要提示：命令在目录 "${workingDirectory}" 中后台运行。`
+          : "";
+        resolve(
+          `命令已在后台启动: ${command}${cwdInfo}\n提示：开发服务器正在运行，你可以继续对话。`
+        );
+        return;
+      }
 
       const child = spawn(cmd, args, {
         cwd,
@@ -109,6 +128,7 @@ const executeCommandTool = tool(
     schema: z.object({
       command: z.string().describe("要执行的命令"),
       workingDirectory: z.string().optional().describe("工作目录（推荐指定）"),
+      background: z.boolean().optional().describe("是否在后台运行"),
     }),
   }
 );
@@ -138,4 +158,4 @@ const listDirectoryTool = tool(
   }
 );
 
-export { readFileTool, writeFileTool, executeCommandTool, listDirectoryTool };
+export default [readFileTool, writeFileTool, executeCommandTool, listDirectoryTool];

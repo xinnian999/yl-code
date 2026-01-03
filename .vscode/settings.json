@@ -1,0 +1,7 @@
+{
+  "python.defaultInterpreterPath": "/usr/local/opt/python@3.14/bin/python3.14",
+  "python.pythonPath": "/usr/local/opt/python@3.14/bin/python3.14",
+  "aider-composer.pythonPath": "/usr/local/opt/python@3.14/bin/python3.14",
+  "aider.pythonPath": "/usr/local/opt/python@3.14/bin/python3.14"
+}
+
