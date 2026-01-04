@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { z } from "zod";
+import { registerBackgroundProcess } from "./process-manager.mjs";
 
 // 1. 读取文件工具
 const readFileTool = tool(
@@ -76,10 +77,17 @@ const executeCommandTool = tool(
           cwd,
           stdio: "ignore", // 完全忽略输入输出
           shell: true,
-          detached: true,
+          // 不使用 detached: true，保持对进程的引用以便清理
         });
 
-        child.unref();
+        // 跟踪后台进程
+        const processInfo = {
+          pid: child.pid,
+          command,
+          workingDirectory: cwd,
+          process: child,
+        };
+        registerBackgroundProcess(processInfo);
 
         const cwdInfo = workingDirectory
           ? `\n\n重要提示：命令在目录 "${workingDirectory}" 中后台运行。`

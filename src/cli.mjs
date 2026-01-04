@@ -1,6 +1,7 @@
 import run from "./run.mjs";
 import readline from "readline";
 import chalk from "chalk";
+import { cleanup } from "./process-manager.mjs";
 
 // 交互式对话
 async function interactiveMode() {
@@ -9,6 +10,16 @@ async function interactiveMode() {
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
+  });
+
+  // 监听退出信号
+  process.on("SIGINT", () => {
+    console.log("\n");
+    cleanup();
+  });
+
+  process.on("SIGTERM", () => {
+    cleanup();
   });
 
   rl.prompt();
@@ -22,7 +33,7 @@ async function interactiveMode() {
       trimmedInput.toLowerCase() === "quit"
     ) {
       console.log("👋 再见！");
-      rl.close();
+      cleanup();
       return;
     }
 
