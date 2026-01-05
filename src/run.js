@@ -28,11 +28,11 @@ const systemPrompt = systemPromptTemplate.replace(
 );
 
 const model = new ChatOpenAI({
-  modelName: process.env.MODEL_NAME,
-  apiKey: process.env.API_KEY,
+  modelName: process.env.NIUMA_MODEL_NAME,
+  apiKey: process.env.NIUMA_API_KEY,
   temperature: 0,
   configuration: {
-    baseURL: process.env.BASE_URL,
+    baseURL: process.env.NIUMA_BASE_URL,
   },
 }).bindTools(tools);
 
@@ -46,7 +46,7 @@ async function run(query, maxIterations = 30) {
     const response = await logger.withLoading({
       promise: model.invoke(messages),
       message: "玩命思考中，稍安勿躁...🐂🐎🐂",
-      interval: 100
+      interval: 100,
     });
 
     // 如果 content 为空且有工具调用，创建一个新的 AIMessage 确保 content 不为空
@@ -70,12 +70,12 @@ async function run(query, maxIterations = 30) {
     if (!response.tool_calls || response.tool_calls.length === 0) {
       logger.ai(response.content || "");
       return response.content || "";
-    } 
+    }
 
     // 执行工具调用
     for (const toolCall of response.tool_calls) {
       const foundTool = tools.find((t) => t.name === toolCall.name);
-      
+
       if (foundTool) {
         const toolResult = await foundTool.invoke(toolCall.args);
 
@@ -93,4 +93,3 @@ async function run(query, maxIterations = 30) {
 }
 
 export default run;
-

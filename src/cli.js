@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import run from "./run.js";
 import readline from "readline";
 import { cleanup } from "./utils/process-manager.js";
