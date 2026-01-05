@@ -6,11 +6,11 @@ import {
   ToolMessage,
   AIMessage,
 } from "@langchain/core/messages";
-import chalk from "chalk";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import tools from "./tools.mjs";
+import tools from "./tools.js";
+import logger from "./utils/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -43,12 +43,11 @@ async function run(query, maxIterations = 30) {
   messages.push(new HumanMessage(query));
 
   for (let i = 0; i < maxIterations; i++) {
-    process.stdout.write(`\n⏳ 正在等待 AI 思考...`);
-    const response = await model.invoke(messages);
-    // console.log(response);
-
-    // 清除"正在等待 AI 思考..."这一行
-    process.stdout.write(`\r\x1b[K`);
+    const response = await logger.withLoading({
+      promise: model.invoke(messages),
+      message: "玩命思考中，稍安勿躁...🐂🐎🐂",
+      interval: 100
+    });
 
     // 如果 content 为空且有工具调用，创建一个新的 AIMessage 确保 content 不为空
     let messageToAdd = response;
@@ -69,17 +68,16 @@ async function run(query, maxIterations = 30) {
 
     // 如果没有工具调用，直接返回内容
     if (!response.tool_calls || response.tool_calls.length === 0) {
-      console.log(`🤖 ${chalk.greenBright(response.content || "")}\n`);
+      logger.ai(response.content || "");
       return response.content || "";
     } 
 
     // 执行工具调用
     for (const toolCall of response.tool_calls) {
       const foundTool = tools.find((t) => t.name === toolCall.name);
+      
       if (foundTool) {
         const toolResult = await foundTool.invoke(toolCall.args);
-
-        // console.log("🔧 " + chalk.bgGreenBright(toolResult + "\n"));
 
         messages.push(
           new ToolMessage({
@@ -95,3 +93,4 @@ async function run(query, maxIterations = 30) {
 }
 
 export default run;
+

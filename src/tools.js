@@ -3,22 +3,22 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { z } from "zod";
-import { registerBackgroundProcess } from "./process-manager.mjs";
+import { registerBackgroundProcess } from "./utils/process-manager.js";
+import logger from "./utils/logger.js";
 
 // 1. 读取文件工具
 const readFileTool = tool(
   async ({ filePath }) => {
     try {
       const content = await fs.readFile(filePath, "utf-8");
-      console.log(
-        `  [工具调用] read_file("${filePath}") - 成功读取 ${content.length} 字节`
-      );
+
+      logger.toolCall(`阅读代码: ${filePath}`);
+
       return `文件内容:\n${content}`;
     } catch (error) {
-      console.log(
-        `  [工具调用] read_file("${filePath}") - 错误: ${error.message}`
-      );
-      return `读取文件失败: ${error.message}`;
+      logger.error(`阅读代码失败: ${filePath}`);
+
+      return `读取文件失败: ${error.message}`;
     }
   },
   {
@@ -35,17 +35,18 @@ const writeFileTool = tool(
   async ({ filePath, content }) => {
     try {
       const dir = path.dirname(filePath);
+
       await fs.mkdir(dir, { recursive: true });
+
       await fs.writeFile(filePath, content, "utf-8");
-      console.log(
-        `  [工具调用] write_file("${filePath}") - 成功写入 ${content.length} 字节`
-      );
-      return `文件写入成功: ${filePath}`;
+
+      logger.toolCall(`写入代码: ${filePath}`);
+
+      return `文件写入成功: ${filePath}`;
     } catch (error) {
-      console.log(
-        `  [工具调用] write_file("${filePath}") - 错误: ${error.message}`
-      );
-      return `写入文件失败: ${error.message}`;
+      logger.error(`写入代码失败: ${filePath}`);
+
+      return `写入文件失败: ${error.message}`;
     }
   },
   {
@@ -62,11 +63,7 @@ const writeFileTool = tool(
 const executeCommandTool = tool(
   async ({ command, workingDirectory, background = false }) => {
     const cwd = workingDirectory || process.cwd();
-    console.log(
-      `  [工具调用] execute_command("${command}")${
-        workingDirectory ? ` - 工作目录: ${workingDirectory}` : ""
-      }${background ? " - 后台运行" : ""}`
-    );
+    logger.toolCall(`执行命令: ${command}，工作目录: ${cwd}`);
 
     return new Promise((resolve, reject) => {
       // 解析命令和参数
@@ -112,17 +109,18 @@ const executeCommandTool = tool(
 
       child.on("close", (code) => {
         if (code === 0) {
-          console.log(`  [工具调用] execute_command("${command}") - 执行成功`);
+          logger.toolCall(`执行命令成功: ${command}`);
+
           const cwdInfo = workingDirectory
             ? `\n\n重要提示：命令在目录 "${workingDirectory}" 中执行成功。如果需要在这个项目目录中继续执行命令，请使用 workingDirectory: "${workingDirectory}" 参数，不要使用 cd 命令。`
             : "";
-          resolve(`命令执行成功: ${command}${cwdInfo}`);
+
+          resolve(`命令执行成功: ${command}${cwdInfo}`);
         } else {
-          console.log(
-            `  [工具调用] execute_command("${command}") - 执行失败，退出码: ${code}`
-          );
+          logger.error(`执行命令失败: ${command}，退出码: ${code}`);
+
           resolve(
-            `命令执行失败，退出码: ${code}${
+            `命令执行失败，退出码: ${code}${
               errorMsg ? "\n错误: " + errorMsg : ""
             }`
           );
@@ -146,15 +144,14 @@ const listDirectoryTool = tool(
   async ({ directoryPath }) => {
     try {
       const files = await fs.readdir(directoryPath);
-      console.log(
-        `  [工具调用] list_directory("${directoryPath}") - 找到 ${files.length} 个项目`
-      );
-      return `目录内容:\n${files.map((f) => `- ${f}`).join("\n")}`;
+
+      logger.toolCall(`查看目录结构: ${directoryPath}`);
+
+      return `目录内容:\n${files.map((f) => `- ${f}`).join("\n")}`;
     } catch (error) {
-      console.log(
-        `  [工具调用] list_directory("${directoryPath}") - 错误: ${error.message}`
-      );
-      return `列出目录失败: ${error.message}`;
+      logger.error(`列出目录失败: ${directoryPath}`);
+
+      return `列出目录失败: ${error.message}`;
     }
   },
   {
@@ -166,4 +163,10 @@ const listDirectoryTool = tool(
   }
 );
 
-export default [readFileTool, writeFileTool, executeCommandTool, listDirectoryTool];
+export default [
+  readFileTool,
+  writeFileTool,
+  executeCommandTool,
+  listDirectoryTool,
+];
+

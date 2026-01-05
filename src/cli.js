@@ -1,11 +1,21 @@
-import run from "./run.mjs";
+import run from "./run.js";
 import readline from "readline";
-import chalk from "chalk";
-import { cleanup } from "./process-manager.mjs";
+import { cleanup } from "./utils/process-manager.js";
+import logger from "./utils/logger.js";
+
+const welcomeMessage = `您好老板！
+
+我是您的专属 🐂 牛码 🐎 ；
+
+我擅长写代码、改BUG等；
+
+我喜欢干各种关于代码的脏活累活；
+
+有什么可以为您效劳的？😊`;
 
 // 交互式对话
 async function interactiveMode() {
-  console.log(chalk.greenBright("🤖 你好！我是mini-cursor！有什么吩咐？\n"));
+  logger.ai(welcomeMessage);
 
   const rl = readline.createInterface({
     input: process.stdin,
@@ -43,14 +53,24 @@ async function interactiveMode() {
       return;
     }
 
+    // 用户消息后空一行
+    console.log();
+
     try {
       await run(trimmedInput);
-
-      rl.prompt();
     } catch (error) {
-      console.error(`\n❌ 错误: ${error.message}\n`);
+      logger.error(`${error.message}`);
+
+      if (error.message.includes("pass an `apiKey`")) {
+        logger.error(`未配置 API_KEY`);
+      }
+
+      logger.error(`${error.message}`);
+    } finally {
+      rl.prompt();
     }
   });
 }
 
 interactiveMode();
+
