@@ -31,6 +31,8 @@ const model = new ChatOpenAI({
   modelName: process.env.NIUMA_MODEL_NAME,
   apiKey: process.env.NIUMA_API_KEY,
   temperature: 0,
+  timeout: 120000, // 120 秒超时
+  maxRetries: 2,   // 最多重试 2 次
   configuration: {
     baseURL: process.env.NIUMA_BASE_URL,
   },
@@ -43,11 +45,38 @@ async function run(query, maxIterations = 30) {
   messages.push(new HumanMessage(query));
 
   for (let i = 0; i < maxIterations; i++) {
-    const response = await logger.withLoading({
-      promise: model.invoke(messages),
-      message: "玩命思考中，稍安勿躁...🐂🐎🐂",
-      interval: 100,
-    });
+    let response;
+    try {
+      response = await logger.withLoading({
+        promise: model.invoke(messages),
+        message: "玩命思考中，稍安勿躁...🐂🐎🐂",
+        interval: 100,
+        timeout: 120000,
+        timeoutMessage: "API 请求超时（120秒），请检查网络连接或稍后重试",
+      });
+    } catch (error) {
+      // 处理 API 调用错误
+      const errorMessage = error?.message || error?.error?.message || String(error);
+      const errorDetails = error?.error || error?.response?.data || error;
+      
+      // 检查是否是配置问题
+      if (!process.env.NIUMA_API_KEY) {
+        throw new Error("未配置 NIUMA_API_KEY 环境变量");
+      }
+      if (!process.env.NIUMA_BASE_URL) {
+        throw new Error("未配置 NIUMA_BASE_URL 环境变量");
+      }
+      if (!process.env.NIUMA_MODEL_NAME) {
+        throw new Error("未配置 NIUMA_MODEL_NAME 环境变量");
+      }
+      
+      // 抛出更详细的错误信息
+      const detailedError = new Error(
+        `API 调用失败: ${errorMessage}${errorDetails ? `\n详细信息: ${JSON.stringify(errorDetails, null, 2)}` : ""}`
+      );
+      detailedError.cause = error;
+      throw detailedError;
+    }
 
     // 如果 content 为空且有工具调用，创建一个新的 AIMessage 确保 content 不为空
     let messageToAdd = response;
@@ -77,11 +106,30 @@ async function run(query, maxIterations = 30) {
       const foundTool = tools.find((t) => t.name === toolCall.name);
 
       if (foundTool) {
-        const toolResult = await foundTool.invoke(toolCall.args);
+        try {
+          const toolResult = await foundTool.invoke(toolCall.args);
 
+          messages.push(
+            new ToolMessage({
+              content: toolResult,
+              tool_call_id: toolCall.id,
+            })
+          );
+        } catch (error) {
+          // 工具执行失败，将错误信息作为 ToolMessage 返回
+          const errorMessage = error?.message || String(error);
+          messages.push(
+            new ToolMessage({
+              content: `工具执行失败: ${errorMessage}`,
+              tool_call_id: toolCall.id,
+            })
+          );
+        }
+      } else {
+        // 工具未找到
         messages.push(
           new ToolMessage({
-            content: toolResult,
+            content: `工具 "${toolCall.name}" 未找到`,
             tool_call_id: toolCall.id,
           })
         );

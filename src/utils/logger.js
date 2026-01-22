@@ -59,27 +59,42 @@ const createLoadingLog = (message = "加载中...", interval = 100) => {
 };
 
 /**
- * 包装异步函数，自动显示 loading 动画
+ * 包装异步函数，自动显示 loading 动画，支持超时
  * @param {Object} options - 配置对象
  * @param {Promise} options.promise - 要执行的异步操作
  * @param {string} [options.message="加载中..."] - loading 消息文本
  * @param {number} [options.interval=100] - 动画更新间隔（毫秒），默认 100ms
- * @param {boolean} [options.newLine=true] - 是否在新行显示，默认 true
+ * @param {number} [options.timeout] - 超时时间（毫秒），不设置则无超时限制
+ * @param {string} [options.timeoutMessage="请求超时"] - 超时错误信息
  * @returns {Promise} 返回原始 Promise
  */
 const withLoading = async ({
   promise,
   message = "加载中...",
   interval = 100,
+  timeout,
+  timeoutMessage = "请求超时",
 }) => {
   const loading = createLoadingLog(message, interval);
 
   loading.start();
 
   try {
-    const result = await promise;
+    let result;
+    
+    if (timeout) {
+      // 带超时的 Promise
+      result = await Promise.race([
+        promise,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error(timeoutMessage)), timeout)
+        ),
+      ]);
+    } else {
+      result = await promise;
+    }
+    
     loading.stop();
-
     return result;
   } catch (error) {
     loading.stop();

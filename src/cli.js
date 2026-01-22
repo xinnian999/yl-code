@@ -61,13 +61,19 @@ async function interactiveMode() {
     try {
       await run(trimmedInput);
     } catch (error) {
-      logger.error(`${error.message}`);
-
-      if (error.message.includes("pass an `apiKey`")) {
-        logger.error(`未配置 API_KEY`);
+      // 打印完整的错误信息，包括堆栈跟踪
+      if (error) {
+        logger.error(`错误: ${error.message || String(error)}`);
+        if (error.stack) {
+          logger.error(`堆栈跟踪:\n${error.stack}`);
+        }
+        
+        if (error.message && error.message.includes("pass an `apiKey`")) {
+          logger.error(`未配置 API_KEY`);
+        }
+      } else {
+        logger.error(`未知错误: ${String(error)}`);
       }
-
-      logger.error(`${error.message}`);
     } finally {
       rl.prompt();
     }

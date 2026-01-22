@@ -109,7 +109,7 @@ const executeCommandTool = tool(
 
       child.on("close", (code) => {
         if (code === 0) {
-          logger.toolCall(`执行命令成功: ${command}`);
+          // logger.toolCall(`执行命令成功: ${command}`);
 
           const cwdInfo = workingDirectory
             ? `\n\n重要提示：命令在目录 "${workingDirectory}" 中执行成功。如果需要在这个项目目录中继续执行命令，请使用 workingDirectory: "${workingDirectory}" 参数，不要使用 cd 命令。`
