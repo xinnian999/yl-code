@@ -44,17 +44,31 @@ const messages = [new SystemMessage(systemPrompt)];
 async function run(query, maxIterations = 30) {
   messages.push(new HumanMessage(query));
 
+  // 创建一个 AI 消息来承载所有输出（工具调用、最终响应等）
+  logger.createAIMessage();
+
   for (let i = 0; i < maxIterations; i++) {
+    // 设置思考状态
+    logger.setThinking(logger.ThinkingStatus.THINKING, "玩命思考中...🐂🐎");
+
     let response;
     try {
-      response = await logger.withLoading({
-        promise: model.invoke(messages),
-        message: "玩命思考中，稍安勿躁...🐂🐎🐂",
-        interval: 100,
-        timeout: 120000,
-        timeoutMessage: "API 请求超时（120秒），请检查网络连接或稍后重试",
-      });
+      // 创建带超时的 Promise
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error("API 请求超时（120秒），请检查网络连接或稍后重试")),
+          120000
+        )
+      );
+
+      response = await Promise.race([
+        model.invoke(messages),
+        timeoutPromise,
+      ]);
     } catch (error) {
+      // 清除思考状态
+      logger.setThinking(logger.ThinkingStatus.IDLE);
+
       // 处理 API 调用错误
       const errorMessage = error?.message || error?.error?.message || String(error);
       const errorDetails = error?.error || error?.response?.data || error;
@@ -93,17 +107,25 @@ async function run(query, maxIterations = 30) {
       });
     }
 
-    messages.push(messageToAdd); // 检查是否有工具调用
+    messages.push(messageToAdd);
 
     // 如果没有工具调用，直接返回内容
     if (!response.tool_calls || response.tool_calls.length === 0) {
-      logger.ai(response.content || "");
+      logger.setThinking(logger.ThinkingStatus.IDLE);
+      logger.text(response.content || "");
+      logger.endAIMessage();
       return response.content || "";
     }
 
     // 执行工具调用
     for (const toolCall of response.tool_calls) {
       const foundTool = tools.find((t) => t.name === toolCall.name);
+
+      // 更新思考状态：正在调用工具
+      logger.setThinking(
+        logger.ThinkingStatus.TOOL_CALLING,
+        `正在执行工具: ${toolCall.name}`
+      );
 
       if (foundTool) {
         try {
@@ -135,8 +157,13 @@ async function run(query, maxIterations = 30) {
         );
       }
     }
+
+    // 工具执行完成，继续等待 AI 响应
+    logger.setThinking(logger.ThinkingStatus.WAITING, "等待 AI 响应...");
   }
 
+  logger.setThinking(logger.ThinkingStatus.IDLE);
+  logger.endAIMessage();
   return messages[messages.length - 1].content;
 }
 

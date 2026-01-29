@@ -12,7 +12,7 @@ const readFileTool = tool(
     try {
       const content = await fs.readFile(filePath, "utf-8");
 
-      logger.toolCall(`阅读代码: ${filePath}`);
+      logger.tool(`阅读代码: ${filePath}`);
 
       return `文件内容:\n${content}`;
     } catch (error) {
@@ -40,7 +40,7 @@ const writeFileTool = tool(
 
       await fs.writeFile(filePath, content, "utf-8");
 
-      logger.toolCall(`写入代码: ${filePath}`);
+      logger.tool(`写入代码: ${filePath}`);
 
       return `文件写入成功: ${filePath}`;
     } catch (error) {
@@ -63,7 +63,7 @@ const writeFileTool = tool(
 const executeCommandTool = tool(
   async ({ command, workingDirectory, background = false }) => {
     const cwd = workingDirectory || process.cwd();
-    logger.toolCall(`执行命令: ${command}，工作目录: ${cwd}`);
+    logger.tool(`执行命令: ${command}，工作目录: ${cwd}`);
 
     return new Promise((resolve, reject) => {
       // 解析命令和参数
@@ -109,7 +109,7 @@ const executeCommandTool = tool(
 
       child.on("close", (code) => {
         if (code === 0) {
-          // logger.toolCall(`执行命令成功: ${command}`);
+          // logger.tool(`执行命令成功: ${command}`);
 
           const cwdInfo = workingDirectory
             ? `\n\n重要提示：命令在目录 "${workingDirectory}" 中执行成功。如果需要在这个项目目录中继续执行命令，请使用 workingDirectory: "${workingDirectory}" 参数，不要使用 cd 命令。`
@@ -145,7 +145,7 @@ const listDirectoryTool = tool(
     try {
       const files = await fs.readdir(directoryPath);
 
-      logger.toolCall(`查看目录结构: ${directoryPath}`);
+      logger.tool(`查看目录结构: ${directoryPath}`);
 
       return `目录内容:\n${files.map((f) => `- ${f}`).join("\n")}`;
     } catch (error) {
