@@ -43,7 +43,7 @@ const BlockItem = ({ block }) => {
 
   return (
     <Box>
-      <Text color={style.color}>
+      <Text color='#ffffff'>
         {style.prefix}{block.content}
       </Text>
     </Box>
@@ -91,6 +91,7 @@ const AIMessage = ({ message }) => {
       borderBottom={false}
       borderRight={false}
       padding={1}
+      backgroundColor="#333333"
     >
       {message.blocks.map((block, index) => (
         <BlockItem key={index} block={block} />

@@ -47,18 +47,12 @@ const StatusBar = ({ thinkingStatus }) => {
     return () => clearInterval(interval);
   }, [isActive]);
 
-  if (!isActive) {
-    return null;
-  }
-
   const statusText = getStatusText(status, detail);
 
   return (
-    <Box marginY={1}>
-      <Text color="yellow">
-        {LOADING_CHARS[charIndex]} {statusText}
-      </Text>
-    </Box>
+    <Text color="yellow">
+      {isActive ? `${LOADING_CHARS[charIndex]} ${statusText}` : statusText}
+    </Text>
   );
 };
 

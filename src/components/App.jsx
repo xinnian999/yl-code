@@ -30,11 +30,6 @@ const App = () => {
   });
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // 初始化：显示欢迎消息
-  useEffect(() => {
-    messageBus.ai(welcomeMessage);
-  }, []);
-
   // 订阅消息总线
   useEffect(() => {
     const handleMessage = (message) => {
@@ -61,6 +56,9 @@ const App = () => {
     messageBus.on("message:update", handleMessageUpdate);
     messageBus.on("thinking", handleThinking);
     messageBus.on("clear", handleClear);
+
+    // 订阅完成后发送欢迎消息
+    messageBus.ai(welcomeMessage);
 
     return () => {
       messageBus.off("message", handleMessage);
@@ -134,12 +132,11 @@ const App = () => {
   );
 
   return (
-    <Box flexDirection="column" height="100%">
+    <Box flexDirection="column" height="100%" padding={1} backgroundColor="#000000">
       {/* 消息列表区域 */}
       <MessageList messages={messages} />
 
-      {/* 状态栏（左下角显示思考状态） */}
-      <StatusBar thinkingStatus={thinkingStatus} />
+
 
       {/* 输入框 */}
       <InputBox
@@ -150,7 +147,8 @@ const App = () => {
       />
 
       {/* 底部提示 */}
-      <Box marginTop={1} justifyContent="flex-end" paddingX={1}>
+      <Box marginTop={1} justifyContent="space-between" paddingX={1}>
+        <StatusBar thinkingStatus={thinkingStatus} />
         <Text color="gray" dimColor>
           输入 exit 或 quit 退出 | Ctrl+C 强制退出
         </Text>
