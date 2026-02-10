@@ -42,14 +42,50 @@ const model = new ChatOpenAI({
 
 const messages = [new SystemMessage(systemPrompt)];
 
+/**
+ * 格式化耗时
+ * @param {number} ms - 毫秒数
+ * @returns {string} 格式化后的时间字符串
+ */
+const formatDuration = (ms) => {
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+};
+
+/**
+ * 获取工具调用的描述信息
+ * @param {string} toolName - 工具名称
+ * @param {object} args - 工具参数
+ * @returns {string} 工具描述
+ */
+const getToolDescription = (toolName, args) => {
+  switch (toolName) {
+    case "read_file":
+      return `阅读代码: ${args.filePath}`;
+    case "write_file":
+      return `写入代码: ${args.filePath}`;
+    case "execute_command":
+      return `执行命令: ${args.command}`;
+    case "list_directory":
+      return `查看目录: ${args.directoryPath}`;
+    default:
+      return `调用工具: ${toolName}`;
+  }
+};
+
 // Agent 执行函数
 async function run(query, maxIterations = 30) {
+  const startTime = Date.now(); // 记录总开始时间
+
   messages.push(new HumanMessage(query));
 
   // 创建一个 AI 消息来承载所有输出（工具调用、最终响应等）
   messageBus.createAIMessage();
 
   for (let i = 0; i < maxIterations; i++) {
+    // 记录本轮迭代开始时间（包含思考+工具执行）
+    const iterationStartTime = Date.now();
+
     // 设置思考状态
     messageBus.setThinkingStatus(ThinkingStatus.THINKING, "玩命思考中...🐂🐎");
 
@@ -115,6 +151,9 @@ async function run(query, maxIterations = 30) {
     if (!response.tool_calls || response.tool_calls.length === 0) {
       messageBus.setThinkingStatus(ThinkingStatus.IDLE);
       messageBus.ai(response.content || "");
+      // 输出总耗时
+      const totalDuration = Date.now() - startTime;
+      messageBus.ai(`\n🕒 总耗时: ${formatDuration(totalDuration)}`);
       messageBus.endAIMessage();
       return response.content || "";
     }
@@ -132,6 +171,11 @@ async function run(query, maxIterations = 30) {
       if (foundTool) {
         try {
           const toolResult = await foundTool.invoke(toolCall.args);
+          const toolDuration = Date.now() - iterationStartTime; // 从本轮开始计算耗时
+
+          // 输出工具调用信息和耗时
+          const toolDesc = getToolDescription(toolCall.name, toolCall.args);
+          messageBus.tool(`${toolDesc} (耗时: ${formatDuration(toolDuration)})`);
 
           messages.push(
             new ToolMessage({
@@ -140,8 +184,12 @@ async function run(query, maxIterations = 30) {
             })
           );
         } catch (error) {
+          const toolDuration = Date.now() - iterationStartTime;
+          const toolDesc = getToolDescription(toolCall.name, toolCall.args);
           // 工具执行失败，将错误信息作为 ToolMessage 返回
           const errorMessage = error?.message || String(error);
+          messageBus.tool(`${toolDesc} (耗时: ${formatDuration(toolDuration)})`);
+          messageBus.error(`   ↳ 失败: ${errorMessage}`);
           messages.push(
             new ToolMessage({
               content: `工具执行失败: ${errorMessage}`,
@@ -151,6 +199,8 @@ async function run(query, maxIterations = 30) {
         }
       } else {
         // 工具未找到
+        messageBus.tool(`调用工具: ${toolCall.name}`);
+        messageBus.error(`   ↳ 工具未找到`);
         messages.push(
           new ToolMessage({
             content: `工具 "${toolCall.name}" 未找到`,
@@ -165,6 +215,9 @@ async function run(query, maxIterations = 30) {
   }
 
   messageBus.setThinkingStatus(ThinkingStatus.IDLE);
+  // 输出总耗时（达到最大迭代次数时）
+  const totalDuration = Date.now() - startTime;
+  messageBus.ai(`\n🕒 总耗时: ${formatDuration(totalDuration)}`);
   messageBus.endAIMessage();
   return messages[messages.length - 1].content;
 }
