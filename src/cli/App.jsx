@@ -132,7 +132,7 @@ const App = () => {
   );
 
   return (
-    <Box flexDirection="column" height="100%" padding={1} backgroundColor="#000000">
+    <Box flexDirection="column" height="100%" padding={1}>
       {/* 消息列表区域 */}
       <MessageList messages={messages} />
 
@@ -150,7 +150,7 @@ const App = () => {
       <Box marginTop={1} justifyContent="space-between" paddingX={1}>
         <StatusBar thinkingStatus={thinkingStatus} />
         <Text color="gray" dimColor>
-          输入 exit 或 quit 退出 | Ctrl+C 强制退出
+          {/* 输入 exit 或 quit 退出 */}
         </Text>
       </Box>
     </Box>

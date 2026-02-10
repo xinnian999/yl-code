@@ -4,7 +4,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { z } from "zod";
 import { registerBackgroundProcess } from "@/utils/process-manager.js";
-import logger from "@/utils/logger.js";
+import messageBus from "@/utils/message-bus.js";
 
 // 1. 读取文件工具
 const readFileTool = tool(
@@ -12,11 +12,11 @@ const readFileTool = tool(
     try {
       const content = await fs.readFile(filePath, "utf-8");
 
-      logger.tool(`阅读代码: ${filePath}`);
+      messageBus.tool(`阅读代码: ${filePath}`);
 
       return `文件内容:\n${content}`;
     } catch (error) {
-      logger.error(`阅读代码失败: ${filePath}`);
+      messageBus.error(`阅读代码失败: ${filePath}`);
 
       return `读取文件失败: ${error.message}`;
     }
@@ -40,11 +40,11 @@ const writeFileTool = tool(
 
       await fs.writeFile(filePath, content, "utf-8");
 
-      logger.tool(`写入代码: ${filePath}`);
+      messageBus.tool(`写入代码: ${filePath}`);
 
       return `文件写入成功: ${filePath}`;
     } catch (error) {
-      logger.error(`写入代码失败: ${filePath}`);
+      messageBus.error(`写入代码失败: ${filePath}`);
 
       return `写入文件失败: ${error.message}`;
     }
@@ -63,7 +63,7 @@ const writeFileTool = tool(
 const executeCommandTool = tool(
   async ({ command, workingDirectory, background = false }) => {
     const cwd = workingDirectory || process.cwd();
-    logger.tool(`执行命令: ${command}，工作目录: ${cwd}`);
+    messageBus.tool(`执行命令: ${command}，工作目录: ${cwd}`);
 
     return new Promise((resolve, reject) => {
       // 解析命令和参数
@@ -117,7 +117,7 @@ const executeCommandTool = tool(
 
           resolve(`命令执行成功: ${command}${cwdInfo}`);
         } else {
-          logger.error(`执行命令失败: ${command}，退出码: ${code}`);
+          messageBus.error(`执行命令失败: ${command}，退出码: ${code}`);
 
           resolve(
             `命令执行失败，退出码: ${code}${
@@ -145,11 +145,11 @@ const listDirectoryTool = tool(
     try {
       const files = await fs.readdir(directoryPath);
 
-      logger.tool(`查看目录结构: ${directoryPath}`);
+      messageBus.tool(`查看目录结构: ${directoryPath}`);
 
       return `目录内容:\n${files.map((f) => `- ${f}`).join("\n")}`;
     } catch (error) {
-      logger.error(`列出目录失败: ${directoryPath}`);
+      messageBus.error(`列出目录失败: ${directoryPath}`);
 
       return `列出目录失败: ${error.message}`;
     }

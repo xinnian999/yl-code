@@ -10,7 +10,7 @@ import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import tools from "./tools.js";
-import logger from "@/utils/logger.js";
+import messageBus, { ThinkingStatus } from "@/utils/message-bus.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -45,11 +45,11 @@ async function run(query, maxIterations = 30) {
   messages.push(new HumanMessage(query));
 
   // 创建一个 AI 消息来承载所有输出（工具调用、最终响应等）
-  logger.createAIMessage();
+  messageBus.createAIMessage();
 
   for (let i = 0; i < maxIterations; i++) {
     // 设置思考状态
-    logger.setThinking(logger.ThinkingStatus.THINKING, "玩命思考中...🐂🐎");
+    messageBus.setThinkingStatus(ThinkingStatus.THINKING, "玩命思考中...🐂🐎");
 
     let response;
     try {
@@ -67,7 +67,7 @@ async function run(query, maxIterations = 30) {
       ]);
     } catch (error) {
       // 清除思考状态
-      logger.setThinking(logger.ThinkingStatus.IDLE);
+      messageBus.setThinkingStatus(ThinkingStatus.IDLE);
 
       // 处理 API 调用错误
       const errorMessage = error?.message || error?.error?.message || String(error);
@@ -111,9 +111,9 @@ async function run(query, maxIterations = 30) {
 
     // 如果没有工具调用，直接返回内容
     if (!response.tool_calls || response.tool_calls.length === 0) {
-      logger.setThinking(logger.ThinkingStatus.IDLE);
-      logger.text(response.content || "");
-      logger.endAIMessage();
+      messageBus.setThinkingStatus(ThinkingStatus.IDLE);
+      messageBus.ai(response.content || "");
+      messageBus.endAIMessage();
       return response.content || "";
     }
 
@@ -122,8 +122,8 @@ async function run(query, maxIterations = 30) {
       const foundTool = tools.find((t) => t.name === toolCall.name);
 
       // 更新思考状态：正在调用工具
-      logger.setThinking(
-        logger.ThinkingStatus.TOOL_CALLING,
+      messageBus.setThinkingStatus(
+        ThinkingStatus.TOOL_CALLING,
         `正在执行工具: ${toolCall.name}`
       );
 
@@ -159,11 +159,11 @@ async function run(query, maxIterations = 30) {
     }
 
     // 工具执行完成，继续等待 AI 响应
-    logger.setThinking(logger.ThinkingStatus.WAITING, "等待 AI 响应...");
+    messageBus.setThinkingStatus(ThinkingStatus.WAITING, "等待 AI 响应...");
   }
 
-  logger.setThinking(logger.ThinkingStatus.IDLE);
-  logger.endAIMessage();
+  messageBus.setThinkingStatus(ThinkingStatus.IDLE);
+  messageBus.endAIMessage();
   return messages[messages.length - 1].content;
 }
 
