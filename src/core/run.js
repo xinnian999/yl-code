@@ -110,7 +110,7 @@ async function run(query, maxIterations = 30) {
       // 处理 API 调用错误
       const errorMessage = error?.message || error?.error?.message || String(error);
       const errorDetails = error?.error || error?.response?.data || error;
-      
+
       // 检查是否是配置问题
       if (!process.env.NIUMA_API_KEY) {
         throw new Error("未配置 NIUMA_API_KEY 环境变量");
@@ -121,7 +121,7 @@ async function run(query, maxIterations = 30) {
       if (!process.env.NIUMA_MODEL_NAME) {
         throw new Error("未配置 NIUMA_MODEL_NAME 环境变量");
       }
-      
+
       // 抛出更详细的错误信息
       const detailedError = new Error(
         `API 调用失败: ${errorMessage}${errorDetails ? `\n详细信息: ${JSON.stringify(errorDetails, null, 2)}` : ""}`
@@ -158,8 +158,12 @@ async function run(query, maxIterations = 30) {
       return response.content || "";
     }
 
+
+
     // 执行工具调用
     for (const toolCall of response.tool_calls) {
+      messageBus.ai(response.content.replaceAll('\n', '') || "");
+
       const foundTool = tools.find((t) => t.name === toolCall.name);
 
       // 更新思考状态：正在调用工具

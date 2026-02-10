@@ -119,14 +119,14 @@ class MessageBus extends EventEmitter {
    * 快捷方法：添加 AI 文本输出
    */
   ai(content) {
-    this.appendBlock(BlockType.TEXT, content);
+    this.appendBlock(BlockType.TEXT, content + '\n');
   }
 
   /**
    * 快捷方法：添加工具调用信息
    */
   tool(content) {
-    this.appendBlock(BlockType.TOOL, content);
+    this.appendBlock(BlockType.TOOL, content + '\n');
   }
 
   /**
