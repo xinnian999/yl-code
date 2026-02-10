@@ -6,6 +6,7 @@ import {
   ToolMessage,
   AIMessage,
 } from "@langchain/core/messages";
+import { concat } from "@langchain/core/utils/stream";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
@@ -43,6 +44,41 @@ const model = new ChatOpenAI({
 const messages = [new SystemMessage(systemPrompt)];
 
 /**
+ * 从流式工具调用块中提取工具名称
+ */
+const getToolNameFromChunk = (toolCallChunks) => {
+  if (!toolCallChunks || toolCallChunks.length === 0) return null;
+  const chunk = toolCallChunks[0];
+  return chunk.name || null;
+};
+
+/**
+ * 从流式工具调用块中提取文件路径参数（用于显示）
+ */
+const getToolArgsPreview = (toolCallChunks) => {
+  if (!toolCallChunks || toolCallChunks.length === 0) return null;
+  const chunk = toolCallChunks[0];
+  if (!chunk.args) return null;
+  
+  try {
+    // 尝试解析部分 JSON 来获取文件路径
+    const argsStr = chunk.args;
+    // 匹配 filePath 或 directoryPath 或 command
+    const filePathMatch = argsStr.match(/"filePath"\s*:\s*"([^"]+)"/);
+    if (filePathMatch) return filePathMatch[1];
+    
+    const dirPathMatch = argsStr.match(/"directoryPath"\s*:\s*"([^"]+)"/);
+    if (dirPathMatch) return dirPathMatch[1];
+    
+    const commandMatch = argsStr.match(/"command"\s*:\s*"([^"]+)"/);
+    if (commandMatch) return commandMatch[1];
+  } catch (e) {
+    // 忽略解析错误
+  }
+  return null;
+};
+
+/**
  * 格式化耗时
  * @param {number} ms - 毫秒数
  * @returns {string} 格式化后的时间字符串
@@ -73,7 +109,7 @@ const getToolDescription = (toolName, args) => {
   }
 };
 
-// Agent 执行函数
+// Agent 执行函数（流式版本）
 async function run(query, maxIterations = 30) {
   const startTime = Date.now(); // 记录总开始时间
 
@@ -91,18 +127,48 @@ async function run(query, maxIterations = 30) {
 
     let response;
     try {
-      // 创建带超时的 Promise
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(
-          () => reject(new Error(`API 请求超时（${timeout / 1000}秒），请检查网络连接或稍后重试`)),
-          timeout
-        )
-      );
-
-      response = await Promise.race([
-        model.invoke(messages),
-        timeoutPromise,
-      ]);
+      // 使用流式输出
+      const stream = await model.stream(messages);
+      
+      let currentToolName = null;
+      let currentToolArgs = null;
+      let hasShownToolStatus = false;
+      
+      // 处理流式输出
+      for await (const chunk of stream) {
+        // 累积响应
+        response = response ? concat(response, chunk) : chunk;
+        
+        // 检测工具调用并实时更新状态
+        if (chunk.tool_call_chunks && chunk.tool_call_chunks.length > 0) {
+          const toolName = getToolNameFromChunk(chunk.tool_call_chunks);
+          const toolArgs = getToolArgsPreview(chunk.tool_call_chunks);
+          
+          // 工具名称首次出现时切换状态
+          if (toolName && toolName !== currentToolName) {
+            currentToolName = toolName;
+            hasShownToolStatus = true;
+            messageBus.setThinkingStatus(
+              ThinkingStatus.TOOL_CALLING,
+              `准备调用: ${toolName}`
+            );
+          }
+          
+          // 参数出现时更新状态显示
+          if (toolArgs && toolArgs !== currentToolArgs) {
+            currentToolArgs = toolArgs;
+            const toolDesc = getToolDescription(currentToolName, { 
+              filePath: toolArgs, 
+              directoryPath: toolArgs, 
+              command: toolArgs 
+            });
+            messageBus.setThinkingStatus(
+              ThinkingStatus.TOOL_CALLING,
+              toolDesc
+            );
+          }
+        }
+      }
     } catch (error) {
       // 清除思考状态
       messageBus.setThinkingStatus(ThinkingStatus.IDLE);
@@ -158,18 +224,20 @@ async function run(query, maxIterations = 30) {
       return response.content || "";
     }
 
-
-
     // 执行工具调用
     for (const toolCall of response.tool_calls) {
-      messageBus.ai(response.content.replaceAll('\n', '') || "");
+      const contentText = response.content?.replaceAll('\n', '') || "";
+      if (contentText) {
+        messageBus.ai(contentText);
+      }
 
       const foundTool = tools.find((t) => t.name === toolCall.name);
+      const toolDesc = getToolDescription(toolCall.name, toolCall.args);
 
-      // 更新思考状态：正在调用工具
+      // 更新思考状态：正在执行工具
       messageBus.setThinkingStatus(
         ThinkingStatus.TOOL_CALLING,
-        `正在执行工具: ${toolCall.name}`
+        `执行中: ${toolDesc}`
       );
 
       if (foundTool) {
@@ -178,7 +246,6 @@ async function run(query, maxIterations = 30) {
           const toolDuration = Date.now() - iterationStartTime; // 从本轮开始计算耗时
 
           // 输出工具调用信息和耗时
-          const toolDesc = getToolDescription(toolCall.name, toolCall.args);
           messageBus.tool(`${toolDesc} (耗时: ${formatDuration(toolDuration)})`);
 
           messages.push(
@@ -189,7 +256,6 @@ async function run(query, maxIterations = 30) {
           );
         } catch (error) {
           const toolDuration = Date.now() - iterationStartTime;
-          const toolDesc = getToolDescription(toolCall.name, toolCall.args);
           // 工具执行失败，将错误信息作为 ToolMessage 返回
           const errorMessage = error?.message || String(error);
           messageBus.tool(`${toolDesc} (耗时: ${formatDuration(toolDuration)})`);
