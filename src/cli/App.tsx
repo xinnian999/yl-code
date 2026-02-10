@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Box, Text, useApp, useInput } from "ink";
-import MessageList from "./MessageList.jsx";
-import InputBox from "./InputBox.jsx";
-import StatusBar from "./StatusBar.jsx";
-import messageBus, { ThinkingStatus } from "@/utils/message-bus.js";
-import run from "@/core/run.js";
-import { cleanup } from "@/utils/process-manager.js";
-import { loadHistory, addToHistory } from "@/utils/history.js";
+import MessageList from "./MessageList.tsx";
+import InputBox from "./InputBox.tsx";
+import StatusBar from "./StatusBar.tsx";
+import messageBus, { ThinkingStatus, type Message, type ThinkingState } from "@/utils/message-bus.ts";
+import run from "@/core/run.ts";
+import { cleanup } from "@/utils/process-manager.ts";
+import { loadHistory, addToHistory } from "@/utils/history.ts";
 
 const welcomeMessage = `您好老板！
 
@@ -21,28 +21,28 @@ const welcomeMessage = `您好老板！
 /**
  * 主应用组件
  */
-const App = () => {
+const App: React.FC = () => {
   const { exit } = useApp();
-  const [messages, setMessages] = useState([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
-  const [thinkingStatus, setThinkingStatus] = useState({
+  const [thinkingStatus, setThinkingStatus] = useState<ThinkingState>({
     status: ThinkingStatus.IDLE,
     detail: "",
   });
   const [isProcessing, setIsProcessing] = useState(false);
 
   // 历史命令相关状态
-  const [history, setHistory] = useState(() => loadHistory()); // 从文件加载历史
+  const [history, setHistory] = useState<string[]>(() => loadHistory()); // 从文件加载历史
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [tempInput, setTempInput] = useState(""); // 保存当前输入（用于从历史返回时恢复）
 
   // 订阅消息总线
   useEffect(() => {
-    const handleMessage = (message) => {
+    const handleMessage = (message: Message) => {
       setMessages((prev) => [...prev, message]);
     };
 
-    const handleMessageUpdate = (updatedMessage) => {
+    const handleMessageUpdate = (updatedMessage: Message) => {
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === updatedMessage.id ? { ...updatedMessage } : msg
@@ -50,7 +50,7 @@ const App = () => {
       );
     };
 
-    const handleThinking = (status) => {
+    const handleThinking = (status: ThinkingState) => {
       setThinkingStatus(status);
     };
 
@@ -114,7 +114,7 @@ const App = () => {
 
   // 处理用户输入提交
   const handleSubmit = useCallback(
-    async (value) => {
+    async (value: string) => {
       const trimmedValue = value.trim();
 
       if (!trimmedValue || isProcessing) {
@@ -153,13 +153,14 @@ const App = () => {
       } catch (error) {
         // 确保有一个 AI 消息来承载错误
         messageBus.createAIMessage();
-        if (error) {
-          messageBus.error(`错误: ${error.message || String(error)}`);
-          if (error.stack) {
-            messageBus.error(`堆栈跟踪:\n${error.stack}`);
+        const err = error as Error;
+        if (err) {
+          messageBus.error(`错误: ${err.message || String(error)}`);
+          if (err.stack) {
+            messageBus.error(`堆栈跟踪:\n${err.stack}`);
           }
 
-          if (error.message && error.message.includes("pass an `apiKey`")) {
+          if (err.message && err.message.includes("pass an `apiKey`")) {
             messageBus.error(`未配置 API_KEY`);
           }
         } else {

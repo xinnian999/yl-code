@@ -2,12 +2,13 @@
   "name": "niuma-code",
   "version": "1.0.0",
   "type": "module",
-  "main": "index.js",
+  "main": "src/cli/index.ts",
   "bin": {
-    "niuma": "./src/cli/index.js"
+    "niuma": "./src/cli/index.ts"
   },
   "scripts": {
-    "dev": "bun --watch src/cli/index.js"
+    "dev": "bun --watch src/cli/index.ts",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [],
   "author": "",
@@ -23,5 +24,12 @@
     "ink-text-input": "^6.0.0",
     "react": "^19.2.4",
     "zod": "^4.3.4"
+  },
+  "devDependencies": {
+    "@types/ink-spinner": "^3.0.5",
+    "@types/node": "^25.2.3",
+    "@types/react": "^19.2.13",
+    "bun-types": "^1.3.9",
+    "typescript": "^5.9.3"
   }
 }

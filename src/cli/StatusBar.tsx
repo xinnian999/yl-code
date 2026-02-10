@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Text } from "ink";
 import Spinner from "ink-spinner";
-import { ThinkingStatus } from "../utils/message-bus.js";
+import { ThinkingStatus, type ThinkingState } from "../utils/message-bus.ts";
 
 /**
  * 格式化耗时
  */
-const formatDuration = (ms) => {
+const formatDuration = (ms: number): string => {
   if (ms < 1000) return `${ms}ms`;
   return `${(ms / 1000).toFixed(1)}s`;
 };
@@ -14,7 +14,7 @@ const formatDuration = (ms) => {
 /**
  * 根据状态获取默认显示文本
  */
-const getStatusText = (status, detail) => {
+const getStatusText = (status: string, detail: string): string => {
   if (detail) {
     return detail;
   }
@@ -31,18 +31,22 @@ const getStatusText = (status, detail) => {
   }
 };
 
+interface StatusBarProps {
+  thinkingStatus: ThinkingState;
+}
+
 /**
  * 状态栏组件
  * 显示思考状态（位于左下角）+ 实时计时
  */
-const StatusBar = ({ thinkingStatus }) => {
+const StatusBar: React.FC<StatusBarProps> = ({ thinkingStatus }) => {
   const { status, detail } = thinkingStatus || { status: ThinkingStatus.IDLE, detail: "" };
   const isActive = status !== ThinkingStatus.IDLE;
   const statusText = getStatusText(status, detail);
 
   // 实时计时
   const [elapsed, setElapsed] = useState(0);
-  const startTimeRef = useRef(null);
+  const startTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (isActive) {
@@ -51,7 +55,9 @@ const StatusBar = ({ thinkingStatus }) => {
       setElapsed(0);
 
       const interval = setInterval(() => {
-        setElapsed(Date.now() - startTimeRef.current);
+        if (startTimeRef.current) {
+          setElapsed(Date.now() - startTimeRef.current);
+        }
       }, 100); // 每 100ms 更新一次
 
       return () => clearInterval(interval);

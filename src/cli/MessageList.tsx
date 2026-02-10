@@ -1,11 +1,24 @@
 import React from "react";
 import { Box, Text } from "ink";
-import { MessageType, BlockType } from "../utils/message-bus.js";
+import { 
+  MessageType, 
+  BlockType, 
+  type Message, 
+  type Block, 
+  type UserMessage as UserMessageType, 
+  type AIMessage as AIMessageType,
+  type BlockTypeValue 
+} from "../utils/message-bus.ts";
+
+interface BlockStyle {
+  color: string;
+  prefix: string;
+}
 
 /**
  * 根据块类型获取样式配置
  */
-const getBlockStyle = (blockType) => {
+const getBlockStyle = (blockType: BlockTypeValue): BlockStyle => {
   switch (blockType) {
     case BlockType.TEXT:
       return {
@@ -35,10 +48,14 @@ const getBlockStyle = (blockType) => {
   }
 };
 
+interface BlockItemProps {
+  block: Block;
+}
+
 /**
  * 内容块组件
  */
-const BlockItem = ({ block }) => {
+const BlockItem: React.FC<BlockItemProps> = ({ block }) => {
   const style = getBlockStyle(block.type);
 
   return (
@@ -50,10 +67,14 @@ const BlockItem = ({ block }) => {
   );
 };
 
+interface UserMessageProps {
+  message: UserMessageType;
+}
+
 /**
  * 用户消息组件
  */
-const UserMessage = ({ message }) => {
+const UserMessage: React.FC<UserMessageProps> = ({ message }) => {
   return (
     <Box
       flexDirection="column"
@@ -71,10 +92,14 @@ const UserMessage = ({ message }) => {
   );
 };
 
+interface AIMessageProps {
+  message: AIMessageType;
+}
+
 /**
  * AI 消息组件（支持多内容块）
  */
-const AIMessage = ({ message }) => {
+const AIMessageComponent: React.FC<AIMessageProps> = ({ message }) => {
   // 如果没有块或块为空，不渲染
   if (!message.blocks || message.blocks.length === 0) {
     return null;
@@ -100,26 +125,34 @@ const AIMessage = ({ message }) => {
   );
 };
 
+interface MessageItemProps {
+  message: Message;
+}
+
 /**
  * 单条消息组件
  */
-const MessageItem = ({ message }) => {
+const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
   if (message.type === MessageType.USER) {
-    return <UserMessage message={message} />;
+    return <UserMessage message={message as UserMessageType} />;
   }
 
   if (message.type === MessageType.AI) {
-    return <AIMessage message={message} />;
+    return <AIMessageComponent message={message as AIMessageType} />;
   }
 
   return null;
 };
 
+interface MessageListProps {
+  messages: Message[];
+}
+
 /**
  * 消息列表组件
  * 渲染所有历史消息
  */
-const MessageList = ({ messages }) => {
+const MessageList: React.FC<MessageListProps> = ({ messages }) => {
   return (
     <Box flexDirection="column" flexGrow={1}>
       {messages.map((msg) => (

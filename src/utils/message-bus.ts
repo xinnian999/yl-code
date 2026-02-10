@@ -1,12 +1,14 @@
 import { EventEmitter } from "events";
 
 /**
- * 消息类型枚举（简化为两种）
+ * 消息类型枚举
  */
 export const MessageType = {
   AI: "ai",
   USER: "user",
-};
+} as const;
+
+export type MessageTypeValue = (typeof MessageType)[keyof typeof MessageType];
 
 /**
  * AI 消息内容块类型枚举
@@ -16,7 +18,9 @@ export const BlockType = {
   TOOL: "tool",       // 工具调用，蓝色
   ERROR: "error",     // 错误提示，红色
   WARNING: "warning", // 警告提示，黄色
-};
+} as const;
+
+export type BlockTypeValue = (typeof BlockType)[keyof typeof BlockType];
 
 /**
  * 思考状态枚举
@@ -26,37 +30,91 @@ export const ThinkingStatus = {
   THINKING: "thinking",       // 思考中
   TOOL_CALLING: "tool_calling", // 正在调用工具
   WAITING: "waiting",         // 等待响应
-};
+} as const;
+
+export type ThinkingStatusValue = (typeof ThinkingStatus)[keyof typeof ThinkingStatus];
+
+/**
+ * 内容块类型
+ */
+export interface Block {
+  type: BlockTypeValue;
+  content: string;
+}
+
+/**
+ * 用户消息类型
+ */
+export interface UserMessage {
+  id: string;
+  type: typeof MessageType.USER;
+  content: string;
+  timestamp: Date;
+}
+
+/**
+ * AI 消息类型
+ */
+export interface AIMessage {
+  id: string;
+  type: typeof MessageType.AI;
+  blocks: Block[];
+  timestamp: Date;
+}
+
+/**
+ * 消息联合类型
+ */
+export type Message = UserMessage | AIMessage;
+
+/**
+ * 思考状态类型
+ */
+export interface ThinkingState {
+  status: ThinkingStatusValue;
+  detail: string;
+}
+
+/**
+ * 消息总线事件类型
+ */
+interface MessageBusEvents {
+  message: (message: Message) => void;
+  "message:update": (message: Message) => void;
+  thinking: (status: ThinkingState) => void;
+  clear: () => void;
+}
 
 /**
  * 消息总线类
  * 用于统一管理和分发所有消息
  */
 class MessageBus extends EventEmitter {
+  private messages: Message[] = [];
+  private currentAIMessage: AIMessage | null = null;
+  private thinkingStatus: ThinkingState = {
+    status: ThinkingStatus.IDLE,
+    detail: "",
+  };
+  private messageIdCounter: number = 0;
+
   constructor() {
     super();
-    this.messages = [];
-    this.currentAIMessage = null; // 当前正在构建的 AI 消息
-    this.thinkingStatus = {
-      status: ThinkingStatus.IDLE,
-      detail: "",
-    };
   }
 
   /**
    * 生成消息 ID
    */
-  _generateId() {
-    this.messageIdCounter = (this.messageIdCounter || 0) + 1;
+  private _generateId(): string {
+    this.messageIdCounter++;
     return `msg-${this.messageIdCounter}-${Date.now()}`;
   }
 
   /**
    * 发送用户消息
-   * @param {string} content - 消息内容
    */
-  user(content) {
-    const message = {
+  user(content: string): UserMessage {
+    const message: UserMessage = {
       id: this._generateId(),
       type: MessageType.USER,
       content,
@@ -70,10 +128,9 @@ class MessageBus extends EventEmitter {
 
   /**
    * 创建新的 AI 消息
-   * @returns {Object} 新创建的 AI 消息
    */
-  createAIMessage() {
-    const message = {
+  createAIMessage(): AIMessage {
+    const message: AIMessage = {
       id: this._generateId(),
       type: MessageType.AI,
       blocks: [],
@@ -89,21 +146,19 @@ class MessageBus extends EventEmitter {
   /**
    * 向当前 AI 消息追加内容块
    * 如果没有当前 AI 消息，会自动创建一个
-   * @param {string} blockType - 块类型（BlockType 枚举值）
-   * @param {string} content - 块内容
    */
-  appendBlock(blockType, content) {
+  appendBlock(blockType: BlockTypeValue, content: string): Block {
     if (!this.currentAIMessage) {
       this.createAIMessage();
     }
 
-    const block = {
+    const block: Block = {
       type: blockType,
       content,
     };
 
-    this.currentAIMessage.blocks.push(block);
-    this.emit("message:update", this.currentAIMessage);
+    this.currentAIMessage!.blocks.push(block);
+    this.emit("message:update", this.currentAIMessage!);
     return block;
   }
 
@@ -111,44 +166,42 @@ class MessageBus extends EventEmitter {
    * 结束当前 AI 消息
    * 清除 currentAIMessage 引用
    */
-  endAIMessage() {
+  endAIMessage(): void {
     this.currentAIMessage = null;
   }
 
   /**
    * 快捷方法：添加 AI 文本输出
    */
-  ai(content) {
+  ai(content: string): void {
     this.appendBlock(BlockType.TEXT, content + '\n');
   }
 
   /**
    * 快捷方法：添加工具调用信息
    */
-  tool(content) {
+  tool(content: string): void {
     this.appendBlock(BlockType.TOOL, content + '\n');
   }
 
   /**
    * 快捷方法：添加错误信息
    */
-  error(content) {
+  error(content: string): void {
     this.appendBlock(BlockType.ERROR, content);
   }
 
   /**
    * 快捷方法：添加警告信息
    */
-  warning(content) {
+  warning(content: string): void {
     this.appendBlock(BlockType.WARNING, content);
   }
 
   /**
    * 设置思考状态
-   * @param {string} status - 状态（ThinkingStatus 枚举值）
-   * @param {string} detail - 详细描述
    */
-  setThinkingStatus(status, detail = "") {
+  setThinkingStatus(status: ThinkingStatusValue, detail: string = ""): void {
     this.thinkingStatus = { status, detail };
     this.emit("thinking", this.thinkingStatus);
   }
@@ -156,24 +209,37 @@ class MessageBus extends EventEmitter {
   /**
    * 获取当前思考状态
    */
-  getThinkingStatus() {
+  getThinkingStatus(): ThinkingState {
     return { ...this.thinkingStatus };
   }
 
   /**
    * 获取所有历史消息
    */
-  getMessages() {
+  getMessages(): Message[] {
     return [...this.messages];
   }
 
   /**
    * 清空所有消息
    */
-  clearMessages() {
+  clearMessages(): void {
     this.messages = [];
     this.currentAIMessage = null;
     this.emit("clear");
+  }
+
+  // 类型安全的事件监听方法
+  on<K extends keyof MessageBusEvents>(event: K, listener: MessageBusEvents[K]): this {
+    return super.on(event, listener);
+  }
+
+  off<K extends keyof MessageBusEvents>(event: K, listener: MessageBusEvents[K]): this {
+    return super.off(event, listener);
+  }
+
+  emit<K extends keyof MessageBusEvents>(event: K, ...args: Parameters<MessageBusEvents[K]>): boolean {
+    return super.emit(event, ...args);
   }
 }
 

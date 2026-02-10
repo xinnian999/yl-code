@@ -2,8 +2,8 @@
 
 import React from "react";
 import { render } from "ink";
-import App from "./App.jsx";
-import { cleanup } from "@/utils/process-manager.js";
+import App from "./App.tsx";
+import { cleanup } from "@/utils/process-manager.ts";
 
 // 检查是否在 TTY 环境下运行
 if (!process.stdin.isTTY) {

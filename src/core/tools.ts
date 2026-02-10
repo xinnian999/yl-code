@@ -3,16 +3,17 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { z } from "zod";
-import { registerBackgroundProcess } from "@/utils/process-manager.js";
+import { registerBackgroundProcess } from "@/utils/process-manager.ts";
 
 // 1. 读取文件工具
 const readFileTool = tool(
-  async ({ filePath }) => {
+  async ({ filePath }: { filePath: string }): Promise<string> => {
     try {
       const content = await fs.readFile(filePath, "utf-8");
       return `文件内容:\n${content}`;
     } catch (error) {
-      return `读取文件失败: ${error.message}`;
+      const err = error as Error;
+      return `读取文件失败: ${err.message}`;
     }
   },
   {
@@ -26,14 +27,15 @@ const readFileTool = tool(
 
 // 2. 写入文件工具
 const writeFileTool = tool(
-  async ({ filePath, content }) => {
+  async ({ filePath, content }: { filePath: string; content: string }): Promise<string> => {
     try {
       const dir = path.dirname(filePath);
       await fs.mkdir(dir, { recursive: true });
       await fs.writeFile(filePath, content, "utf-8");
       return `文件写入成功: ${filePath}`;
     } catch (error) {
-      return `写入文件失败: ${error.message}`;
+      const err = error as Error;
+      return `写入文件失败: ${err.message}`;
     }
   },
   {
@@ -48,10 +50,18 @@ const writeFileTool = tool(
 
 // 3. 执行命令工具（带实时输出）
 const executeCommandTool = tool(
-  async ({ command, workingDirectory, background = false }) => {
+  async ({ 
+    command, 
+    workingDirectory, 
+    background = false 
+  }: { 
+    command: string; 
+    workingDirectory?: string; 
+    background?: boolean;
+  }): Promise<string> => {
     const cwd = workingDirectory || process.cwd();
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       // 解析命令和参数
       const [cmd, ...args] = command.split(" ");
 
@@ -65,7 +75,7 @@ const executeCommandTool = tool(
 
         // 跟踪后台进程
         const processInfo = {
-          pid: child.pid,
+          pid: child.pid!,
           command,
           workingDirectory: cwd,
           process: child,
@@ -123,12 +133,13 @@ const executeCommandTool = tool(
 
 // 4. 列出目录内容工具
 const listDirectoryTool = tool(
-  async ({ directoryPath }) => {
+  async ({ directoryPath }: { directoryPath: string }): Promise<string> => {
     try {
       const files = await fs.readdir(directoryPath);
       return `目录内容:\n${files.map((f) => `- ${f}`).join("\n")}`;
     } catch (error) {
-      return `列出目录失败: ${error.message}`;
+      const err = error as Error;
+      return `列出目录失败: ${err.message}`;
     }
   },
   {
@@ -140,10 +151,11 @@ const listDirectoryTool = tool(
   }
 );
 
-export default [
+const tools = [
   readFileTool,
   writeFileTool,
   executeCommandTool,
   listDirectoryTool,
 ];
 
+export default tools;

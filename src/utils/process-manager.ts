@@ -1,15 +1,22 @@
+import type { ChildProcess } from "child_process";
+
+/**
+ * 后台进程信息类型
+ */
+export interface ProcessInfo {
+  pid: number;
+  command: string;
+  workingDirectory: string;
+  process: ChildProcess;
+}
+
 // 后台进程跟踪列表
-const backgroundProcesses = [];
+const backgroundProcesses: ProcessInfo[] = [];
 
 /**
  * 注册一个后台进程
- * @param {Object} processInfo - 进程信息
- * @param {number} processInfo.pid - 进程 ID
- * @param {string} processInfo.command - 执行的命令
- * @param {string} processInfo.workingDirectory - 工作目录
- * @param {ChildProcess} processInfo.process - 子进程对象
  */
-export function registerBackgroundProcess(processInfo) {
+export function registerBackgroundProcess(processInfo: ProcessInfo): void {
   backgroundProcesses.push(processInfo);
 
   // 监听进程退出，从列表中移除
@@ -24,7 +31,7 @@ export function registerBackgroundProcess(processInfo) {
 /**
  * 清理所有后台进程
  */
-export async function cleanupBackgroundProcesses() {
+export async function cleanupBackgroundProcesses(): Promise<void> {
   if (backgroundProcesses.length === 0) {
     return;
   }
@@ -32,7 +39,7 @@ export async function cleanupBackgroundProcesses() {
   console.log(`\n🧹 正在清理 ${backgroundProcesses.length} 个后台进程...`);
 
   const cleanupPromises = backgroundProcesses.map(({ pid, command, process: child }) => {
-    return new Promise((resolve) => {
+    return new Promise<void>((resolve) => {
       // 检查进程是否还在运行
       try {
         // 尝试优雅终止
@@ -45,7 +52,8 @@ export async function cleanupBackgroundProcesses() {
             child.kill("SIGKILL");
             console.log(`  ✓ 已强制终止进程 ${pid} (${command})`);
           } catch (killError) {
-            console.log(`  ✗ 无法终止进程 ${pid} (${command}): ${killError.message}`);
+            const err = killError as Error;
+            console.log(`  ✗ 无法终止进程 ${pid} (${command}): ${err.message}`);
           }
           resolve();
         }, 2000);
@@ -76,11 +84,10 @@ let isCleaning = false;
 /**
  * 清理所有后台进程并退出程序
  */
-export async function cleanup() {
+export async function cleanup(): Promise<void> {
   if (isCleaning) return;
   isCleaning = true;
   
   await cleanupBackgroundProcesses();
   process.exit(0);
 }
-

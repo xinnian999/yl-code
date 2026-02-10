@@ -10,8 +10,9 @@ import { concat } from "@langchain/core/utils/stream";
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import tools from "./tools.js";
-import messageBus, { ThinkingStatus } from "@/utils/message-bus.js";
+import tools from "./tools.ts";
+import messageBus, { ThinkingStatus } from "@/utils/message-bus.ts";
+import type { BaseMessage } from "@langchain/core/messages";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -41,12 +42,29 @@ const model = new ChatOpenAI({
   },
 }).bindTools(tools);
 
-const messages = [new SystemMessage(systemPrompt)];
+const messages: BaseMessage[] = [new SystemMessage(systemPrompt)];
+
+interface ToolCallChunk {
+  name?: string;
+  args?: string;
+}
+
+interface ToolCall {
+  id: string;
+  name: string;
+  args: Record<string, unknown>;
+}
+
+interface ToolArgs {
+  filePath?: string;
+  directoryPath?: string;
+  command?: string;
+}
 
 /**
  * 从流式工具调用块中提取工具名称
  */
-const getToolNameFromChunk = (toolCallChunks) => {
+const getToolNameFromChunk = (toolCallChunks: ToolCallChunk[]): string | null => {
   if (!toolCallChunks || toolCallChunks.length === 0) return null;
   const chunk = toolCallChunks[0];
   return chunk.name || null;
@@ -55,7 +73,7 @@ const getToolNameFromChunk = (toolCallChunks) => {
 /**
  * 从流式工具调用块中提取文件路径参数（用于显示）
  */
-const getToolArgsPreview = (toolCallChunks) => {
+const getToolArgsPreview = (toolCallChunks: ToolCallChunk[]): string | null => {
   if (!toolCallChunks || toolCallChunks.length === 0) return null;
   const chunk = toolCallChunks[0];
   if (!chunk.args) return null;
@@ -80,21 +98,16 @@ const getToolArgsPreview = (toolCallChunks) => {
 
 /**
  * 格式化耗时
- * @param {number} ms - 毫秒数
- * @returns {string} 格式化后的时间字符串
  */
-const formatDuration = (ms) => {
+const formatDuration = (ms: number): string => {
   if (ms < 1000) return `${ms}ms`;
   return `${(ms / 1000).toFixed(1)}s`;
 };
 
 /**
  * 获取工具调用的描述信息
- * @param {string} toolName - 工具名称
- * @param {object} args - 工具参数
- * @returns {string} 工具描述
  */
-const getToolDescription = (toolName, args) => {
+const getToolDescription = (toolName: string, args: ToolArgs): string => {
   switch (toolName) {
     case "read_file":
       return `阅读代码: ${args.filePath}`;
@@ -110,7 +123,7 @@ const getToolDescription = (toolName, args) => {
 };
 
 // Agent 执行函数（流式版本）
-async function run(query, maxIterations = 30) {
+async function run(query: string, maxIterations: number = 30): Promise<string> {
   const startTime = Date.now(); // 记录总开始时间
 
   messages.push(new HumanMessage(query));
@@ -125,14 +138,13 @@ async function run(query, maxIterations = 30) {
     // 设置思考状态
     messageBus.setThinkingStatus(ThinkingStatus.THINKING, "玩命思考中...🐂🐎");
 
-    let response;
+    let response: any;
     try {
       // 使用流式输出
       const stream = await model.stream(messages);
       
-      let currentToolName = null;
-      let currentToolArgs = null;
-      let hasShownToolStatus = false;
+      let currentToolName: string | null = null;
+      let currentToolArgs: string | null = null;
       
       // 处理流式输出
       for await (const chunk of stream) {
@@ -140,14 +152,14 @@ async function run(query, maxIterations = 30) {
         response = response ? concat(response, chunk) : chunk;
         
         // 检测工具调用并实时更新状态
-        if (chunk.tool_call_chunks && chunk.tool_call_chunks.length > 0) {
-          const toolName = getToolNameFromChunk(chunk.tool_call_chunks);
-          const toolArgs = getToolArgsPreview(chunk.tool_call_chunks);
+        const chunkAny = chunk as any;
+        if (chunkAny.tool_call_chunks && chunkAny.tool_call_chunks.length > 0) {
+          const toolName = getToolNameFromChunk(chunkAny.tool_call_chunks);
+          const toolArgs = getToolArgsPreview(chunkAny.tool_call_chunks);
           
           // 工具名称首次出现时切换状态
           if (toolName && toolName !== currentToolName) {
             currentToolName = toolName;
-            hasShownToolStatus = true;
             messageBus.setThinkingStatus(
               ThinkingStatus.TOOL_CALLING,
               `准备调用: ${toolName}`
@@ -157,7 +169,7 @@ async function run(query, maxIterations = 30) {
           // 参数出现时更新状态显示
           if (toolArgs && toolArgs !== currentToolArgs) {
             currentToolArgs = toolArgs;
-            const toolDesc = getToolDescription(currentToolName, { 
+            const toolDesc = getToolDescription(currentToolName!, { 
               filePath: toolArgs, 
               directoryPath: toolArgs, 
               command: toolArgs 
@@ -173,9 +185,10 @@ async function run(query, maxIterations = 30) {
       // 清除思考状态
       messageBus.setThinkingStatus(ThinkingStatus.IDLE);
 
+      const err = error as any;
       // 处理 API 调用错误
-      const errorMessage = error?.message || error?.error?.message || String(error);
-      const errorDetails = error?.error || error?.response?.data || error;
+      const errorMessage = err?.message || err?.error?.message || String(error);
+      const errorDetails = err?.error || err?.response?.data || err;
 
       // 检查是否是配置问题
       if (!process.env.NIUMA_API_KEY) {
@@ -192,14 +205,14 @@ async function run(query, maxIterations = 30) {
       const detailedError = new Error(
         `API 调用失败: ${errorMessage}${errorDetails ? `\n详细信息: ${JSON.stringify(errorDetails, null, 2)}` : ""}`
       );
-      detailedError.cause = error;
+      (detailedError as any).cause = error;
       throw detailedError;
     }
 
     // 如果 content 为空且有工具调用，创建一个新的 AIMessage 确保 content 不为空
     let messageToAdd = response;
     if (
-      (!response.content || response.content.trim() === "") &&
+      (!response.content || (typeof response.content === 'string' && response.content.trim() === "")) &&
       response.tool_calls &&
       response.tool_calls.length > 0
     ) {
@@ -225,14 +238,14 @@ async function run(query, maxIterations = 30) {
     }
 
     // 执行工具调用
-    for (const toolCall of response.tool_calls) {
-      const contentText = response.content?.replaceAll('\n', '') || "";
+    for (const toolCall of response.tool_calls as ToolCall[]) {
+      const contentText = response.content?.toString().replaceAll('\n', '') || "";
       if (contentText) {
         messageBus.ai(contentText);
       }
 
       const foundTool = tools.find((t) => t.name === toolCall.name);
-      const toolDesc = getToolDescription(toolCall.name, toolCall.args);
+      const toolDesc = getToolDescription(toolCall.name, toolCall.args as ToolArgs);
 
       // 更新思考状态：正在执行工具
       messageBus.setThinkingStatus(
@@ -242,7 +255,7 @@ async function run(query, maxIterations = 30) {
 
       if (foundTool) {
         try {
-          const toolResult = await foundTool.invoke(toolCall.args);
+          const toolResult = await (foundTool as any).invoke(toolCall.args);
           const toolDuration = Date.now() - iterationStartTime; // 从本轮开始计算耗时
 
           // 输出工具调用信息和耗时
@@ -250,14 +263,15 @@ async function run(query, maxIterations = 30) {
 
           messages.push(
             new ToolMessage({
-              content: toolResult,
+              content: toolResult as string,
               tool_call_id: toolCall.id,
             })
           );
         } catch (error) {
           const toolDuration = Date.now() - iterationStartTime;
           // 工具执行失败，将错误信息作为 ToolMessage 返回
-          const errorMessage = error?.message || String(error);
+          const err = error as Error;
+          const errorMessage = err?.message || String(error);
           messageBus.tool(`${toolDesc} (耗时: ${formatDuration(toolDuration)})`);
           messageBus.error(`   ↳ 失败: ${errorMessage}`);
           messages.push(
@@ -289,7 +303,9 @@ async function run(query, maxIterations = 30) {
   const totalDuration = Date.now() - startTime;
   messageBus.ai(`\n🕒 总耗时: ${formatDuration(totalDuration)}`);
   messageBus.endAIMessage();
-  return messages[messages.length - 1].content;
+  
+  const lastMessage = messages[messages.length - 1];
+  return typeof lastMessage.content === 'string' ? lastMessage.content : '';
 }
 
 export default run;
