@@ -6,6 +6,7 @@ import StatusBar from "./StatusBar.jsx";
 import messageBus, { ThinkingStatus } from "@/utils/message-bus.js";
 import run from "@/core/run.js";
 import { cleanup } from "@/utils/process-manager.js";
+import { loadHistory, addToHistory } from "@/utils/history.js";
 
 const welcomeMessage = `您好老板！
 
@@ -29,6 +30,11 @@ const App = () => {
     detail: "",
   });
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // 历史命令相关状态
+  const [history, setHistory] = useState(() => loadHistory()); // 从文件加载历史
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const [tempInput, setTempInput] = useState(""); // 保存当前输入（用于从历史返回时恢复）
 
   // 订阅消息总线
   useEffect(() => {
@@ -68,11 +74,41 @@ const App = () => {
     };
   }, []);
 
-  // 处理键盘输入（退出）
+  // 处理键盘输入（退出 + 历史命令切换）
   useInput((input, key) => {
     if (key.ctrl && input === "c") {
       cleanup();
       exit();
+    }
+
+    // 上下键切换历史命令
+    if (!isProcessing && history.length > 0) {
+      if (key.upArrow) {
+        if (historyIndex === -1) {
+          // 首次按上键，保存当前输入
+          setTempInput(inputValue);
+          setHistoryIndex(history.length - 1);
+          setInputValue(history[history.length - 1]);
+        } else if (historyIndex > 0) {
+          // 继续往上翻
+          setHistoryIndex(historyIndex - 1);
+          setInputValue(history[historyIndex - 1]);
+        }
+      }
+
+      if (key.downArrow) {
+        if (historyIndex !== -1) {
+          if (historyIndex < history.length - 1) {
+            // 往下翻
+            setHistoryIndex(historyIndex + 1);
+            setInputValue(history[historyIndex + 1]);
+          } else {
+            // 到底了，恢复临时输入
+            setHistoryIndex(-1);
+            setInputValue(tempInput);
+          }
+        }
+      }
     }
   });
 
@@ -102,6 +138,13 @@ const App = () => {
       setInputValue("");
       setIsProcessing(true);
 
+      // 添加到历史记录并持久化
+      const newHistory = addToHistory(history, trimmedValue);
+      setHistory(newHistory);
+      // 重置历史索引
+      setHistoryIndex(-1);
+      setTempInput("");
+
       // 显示用户消息
       messageBus.user(trimmedValue);
 
@@ -128,7 +171,7 @@ const App = () => {
         messageBus.setThinkingStatus(ThinkingStatus.IDLE);
       }
     },
-    [isProcessing, exit]
+    [isProcessing, exit, history]
   );
 
   return (

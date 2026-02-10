@@ -27,11 +27,13 @@ const systemPrompt = systemPromptTemplate.replace(
   process.cwd()
 );
 
+const timeout = 300000;
+
 const model = new ChatOpenAI({
   modelName: process.env.NIUMA_MODEL_NAME,
   apiKey: process.env.NIUMA_API_KEY,
   temperature: 0,
-  timeout: 120000, // 120 秒超时
+  timeout,
   maxRetries: 2,   // 最多重试 2 次
   configuration: {
     baseURL: process.env.NIUMA_BASE_URL,
@@ -56,8 +58,8 @@ async function run(query, maxIterations = 30) {
       // 创建带超时的 Promise
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(
-          () => reject(new Error("API 请求超时（120秒），请检查网络连接或稍后重试")),
-          120000
+          () => reject(new Error(`API 请求超时（${timeout / 1000}秒），请检查网络连接或稍后重试`)),
+          timeout
         )
       );
 

@@ -1,0 +1,5 @@
+---
+alwaysApply: true
+---
+
+1. 这个项目all in bun ， npm相关操作都必须使用bun
