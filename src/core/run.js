@@ -10,7 +10,7 @@ import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import tools from "./tools.js";
-import logger from "./utils/logger.js";
+import logger from "@/utils/logger.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);

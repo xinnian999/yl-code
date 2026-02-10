@@ -4,11 +4,10 @@
   "type": "module",
   "main": "index.js",
   "bin": {
-    "niuma": "./src/cli.js"
+    "niuma": "./src/cli/index.js"
   },
   "scripts": {
-    "dev": "bun --watch src/cli.js",
-    "start": "bun src/cli.js"
+    "dev": "bun --watch src/cli/index.js"
   },
   "keywords": [],
   "author": "",

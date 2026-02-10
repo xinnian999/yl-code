@@ -3,8 +3,8 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { z } from "zod";
-import { registerBackgroundProcess } from "./utils/process-manager.js";
-import logger from "./utils/logger.js";
+import { registerBackgroundProcess } from "@/utils/process-manager.js";
+import logger from "@/utils/logger.js";
 
 // 1. 读取文件工具
 const readFileTool = tool(

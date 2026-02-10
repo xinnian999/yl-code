@@ -3,9 +3,9 @@ import { Box, Text, useApp, useInput } from "ink";
 import MessageList from "./MessageList.jsx";
 import InputBox from "./InputBox.jsx";
 import StatusBar from "./StatusBar.jsx";
-import messageBus, { ThinkingStatus } from "../utils/message-bus.js";
-import run from "../run.js";
-import { cleanup } from "../utils/process-manager.js";
+import messageBus, { ThinkingStatus } from "@/utils/message-bus.js";
+import run from "@/core/run.js";
+import { cleanup } from "@/utils/process-manager.js";
 
 const welcomeMessage = `您好老板！
 
