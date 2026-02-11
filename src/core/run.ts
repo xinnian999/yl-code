@@ -61,7 +61,16 @@ configBus.on("model:change", () => {
   currentModel = null;
 });
 
+// 对话历史
 const messages: BaseMessage[] = [new SystemMessage(systemPrompt)];
+
+/**
+ * 清空对话记忆
+ */
+export function clearMemory(): void {
+  messages.length = 0;
+  messages.push(new SystemMessage(systemPrompt));
+}
 
 interface ToolCallChunk {
   name?: string;
