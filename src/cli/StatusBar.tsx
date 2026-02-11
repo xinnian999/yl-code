@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { Box, Text } from "ink";
 import Spinner from "ink-spinner";
 import { ThinkingStatus, type ThinkingState } from "../utils/message-bus.ts";
-import configBus, { type ModelConfig } from "../utils/config-bus.ts";
 
 /**
  * 格式化耗时
@@ -38,7 +37,7 @@ interface StatusBarProps {
 
 /**
  * 状态栏组件
- * 显示思考状态（位于左下角）+ 实时计时 + 当前模型
+ * 显示思考状态（位于左下角）+ 实时计时
  */
 const StatusBar: React.FC<StatusBarProps> = ({ thinkingStatus }) => {
   const { status, detail } = thinkingStatus || { status: ThinkingStatus.IDLE, detail: "" };
@@ -48,23 +47,6 @@ const StatusBar: React.FC<StatusBarProps> = ({ thinkingStatus }) => {
   // 实时计时
   const [elapsed, setElapsed] = useState(0);
   const startTimeRef = useRef<number | null>(null);
-
-  // 当前模型状态
-  const [currentModel, setCurrentModel] = useState<ModelConfig>(
-    configBus.getCurrentModel()
-  );
-
-  // 订阅模型变更
-  useEffect(() => {
-    const handleModelChange = (model: ModelConfig) => {
-      setCurrentModel(model);
-    };
-
-    configBus.on("model:change", handleModelChange);
-    return () => {
-      configBus.off("model:change", handleModelChange);
-    };
-  }, []);
 
   useEffect(() => {
     if (isActive) {
@@ -94,12 +76,6 @@ const StatusBar: React.FC<StatusBarProps> = ({ thinkingStatus }) => {
         {statusText}
         {isActive && elapsed > 0 && <Text color="gray"> ({formatDuration(elapsed)})</Text>}
       </Text>
-      {/* 当前模型 */}
-      {!isActive && (
-        <Text color="gray" dimColor>
-          📦 {currentModel.name} | /model 切换
-        </Text>
-      )}
     </Box>
   );
 };

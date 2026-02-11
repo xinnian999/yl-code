@@ -1,19 +1,27 @@
 import React from "react";
-import { Box, Text } from "ink";
+import { Box, Text, useInput } from "ink";
 import SelectInput from "ink-select-input";
 import configBus, { type ModelConfig } from "@/utils/config-bus.ts";
 
 interface Props {
   onSelect: (model: ModelConfig) => void;
+  onCancel?: () => void;
 }
 
 /**
  * 模型选择组件
  * 使用 ink-select-input 实现交互式模型选择
  */
-const ModelSelector: React.FC<Props> = ({ onSelect }) => {
+const ModelSelector: React.FC<Props> = ({ onSelect, onCancel }) => {
   const models = configBus.getModels();
   const currentId = configBus.getCurrentModelId();
+
+  // 监听 Esc 键退出
+  useInput((input, key) => {
+    if (key.escape && onCancel) {
+      onCancel();
+    }
+  });
 
   // 构建选项列表，当前模型显示 ✓ 标记
   const items = models.map((model) => ({
@@ -37,7 +45,7 @@ const ModelSelector: React.FC<Props> = ({ onSelect }) => {
   return (
     <Box flexDirection="column" paddingY={1}>
       <Text color="cyan" bold>
-        🔧 选择模型 (↑↓/jk 移动, Enter 确认):
+        🔧 选择模型 (↑↓/jk 移动, Enter 确认, Esc 取消):
       </Text>
       <Box marginTop={1}>
         <SelectInput
