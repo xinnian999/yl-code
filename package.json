@@ -1,19 +1,23 @@
 {
-  "name": "niuma-code",
+  "name": "niu-code",
   "version": "1.0.0",
   "type": "module",
-  "main": "src/cli/index.ts",
+  "main": "dist/index.js",
   "bin": {
-    "niuma": "./src/cli/index.ts"
+    "niu": "./dist/index.js"
   },
+  "files": ["dist"],
+  "engines": { "bun": ">=1.0.0" },
   "scripts": {
     "dev": "bun --watch src/cli/index.ts",
+    "build": "bun build src/cli/index.ts --outdir=dist --target=node --external=react-devtools-core",
+    "prepublishOnly": "bun run build",
     "typecheck": "tsc --noEmit"
   },
-  "keywords": [],
+  "keywords": ["cli", "ai", "terminal", "ink"],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "终端内 AI 助手 CLI，输入 niu 即可召唤使用",
   "dependencies": {
     "@langchain/core": "^1.1.8",
     "@langchain/openai": "^1.2.0",
