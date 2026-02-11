@@ -56,7 +56,7 @@ const AIMessageComponent: React.FC<AIMessageProps> = ({ message }) => {
       borderBottom={false}
       borderRight={false}
       padding={1}
-      backgroundColor="#333333"
+      // backgroundColor="#333333"
     >
       {message.blocks.map((block, index) => (
         <Box key={index} marginBottom={1}>
