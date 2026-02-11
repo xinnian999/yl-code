@@ -166,7 +166,6 @@ const App: React.FC = () => {
         } else {
           messageBus.error(`未知错误: ${String(error)}`);
         }
-        messageBus.endAIMessage();
       } finally {
         setIsProcessing(false);
         messageBus.setThinkingStatus(ThinkingStatus.IDLE);

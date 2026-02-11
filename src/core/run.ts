@@ -233,7 +233,6 @@ async function run(query: string, maxIterations: number = 30): Promise<string> {
       // 输出总耗时
       const totalDuration = Date.now() - startTime;
       messageBus.ai(`\n🕒 总耗时: ${formatDuration(totalDuration)}`);
-      messageBus.endAIMessage();
       return response.content || "";
     }
 
@@ -302,7 +301,6 @@ async function run(query: string, maxIterations: number = 30): Promise<string> {
   // 输出总耗时（达到最大迭代次数时）
   const totalDuration = Date.now() - startTime;
   messageBus.ai(`\n🕒 总耗时: ${formatDuration(totalDuration)}`);
-  messageBus.endAIMessage();
   
   const lastMessage = messages[messages.length - 1];
   return typeof lastMessage.content === 'string' ? lastMessage.content : '';

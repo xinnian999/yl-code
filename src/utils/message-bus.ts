@@ -11,18 +11,6 @@ export const MessageType = {
 export type MessageTypeValue = (typeof MessageType)[keyof typeof MessageType];
 
 /**
- * AI 消息内容块类型枚举
- */
-export const BlockType = {
-  TEXT: "text",       // 普通文本输出，绿色
-  TOOL: "tool",       // 工具调用，蓝色
-  ERROR: "error",     // 错误提示，红色
-  WARNING: "warning", // 警告提示，黄色
-} as const;
-
-export type BlockTypeValue = (typeof BlockType)[keyof typeof BlockType];
-
-/**
  * 思考状态枚举
  */
 export const ThinkingStatus = {
@@ -33,14 +21,6 @@ export const ThinkingStatus = {
 } as const;
 
 export type ThinkingStatusValue = (typeof ThinkingStatus)[keyof typeof ThinkingStatus];
-
-/**
- * 内容块类型
- */
-export interface Block {
-  type: BlockTypeValue;
-  content: string;
-}
 
 /**
  * 用户消息类型
@@ -58,7 +38,7 @@ export interface UserMessage {
 export interface AIMessage {
   id: string;
   type: typeof MessageType.AI;
-  blocks: Block[];
+  blocks: string[];
   timestamp: Date;
 }
 
@@ -91,7 +71,6 @@ interface MessageBusEvents {
  */
 class MessageBus extends EventEmitter {
   private messages: Message[] = [];
-  private currentAIMessage: AIMessage | null = null;
   private thinkingStatus: ThinkingState = {
     status: ThinkingStatus.IDLE,
     detail: "",
@@ -108,6 +87,18 @@ class MessageBus extends EventEmitter {
   private _generateId(): string {
     this.messageIdCounter++;
     return `msg-${this.messageIdCounter}-${Date.now()}`;
+  }
+
+  /**
+   * 获取最后一条 AI 消息
+   */
+  private getLastAIMessage(): AIMessage | null {
+    for (let i = this.messages.length - 1; i >= 0; i--) {
+      if (this.messages[i].type === MessageType.AI) {
+        return this.messages[i] as AIMessage;
+      }
+    }
+    return null;
   }
 
   /**
@@ -138,64 +129,56 @@ class MessageBus extends EventEmitter {
     };
 
     this.messages.push(message);
-    this.currentAIMessage = message;
     this.emit("message", message);
     return message;
-  }
-
-  /**
-   * 向当前 AI 消息追加内容块
-   * 如果没有当前 AI 消息，会自动创建一个
-   */
-  appendBlock(blockType: BlockTypeValue, content: string): Block {
-    if (!this.currentAIMessage) {
-      this.createAIMessage();
-    }
-
-    const block: Block = {
-      type: blockType,
-      content,
-    };
-
-    this.currentAIMessage!.blocks.push(block);
-    this.emit("message:update", this.currentAIMessage!);
-    return block;
-  }
-
-  /**
-   * 结束当前 AI 消息
-   * 清除 currentAIMessage 引用
-   */
-  endAIMessage(): void {
-    this.currentAIMessage = null;
   }
 
   /**
    * 快捷方法：添加 AI 文本输出
    */
   ai(content: string): void {
-    this.appendBlock(BlockType.TEXT, content + '\n');
+    let msg = this.getLastAIMessage();
+    if (!msg) {
+      msg = this.createAIMessage();
+    }
+    msg.blocks.push(content);
+    this.emit("message:update", msg);
   }
 
   /**
    * 快捷方法：添加工具调用信息
    */
   tool(content: string): void {
-    this.appendBlock(BlockType.TOOL, content + '\n');
+    let msg = this.getLastAIMessage();
+    if (!msg) {
+      msg = this.createAIMessage();
+    }
+    msg.blocks.push('🔨 ' + content);
+    this.emit("message:update", msg);
   }
 
   /**
    * 快捷方法：添加错误信息
    */
   error(content: string): void {
-    this.appendBlock(BlockType.ERROR, content);
+    let msg = this.getLastAIMessage();
+    if (!msg) {
+      msg = this.createAIMessage();
+    }
+    msg.blocks.push('❌ ' + content);
+    this.emit("message:update", msg);
   }
 
   /**
    * 快捷方法：添加警告信息
    */
   warning(content: string): void {
-    this.appendBlock(BlockType.WARNING, content);
+    let msg = this.getLastAIMessage();
+    if (!msg) {
+      msg = this.createAIMessage();
+    }
+    msg.blocks.push('⚠️  ' + content);
+    this.emit("message:update", msg);
   }
 
   /**
@@ -225,7 +208,6 @@ class MessageBus extends EventEmitter {
    */
   clearMessages(): void {
     this.messages = [];
-    this.currentAIMessage = null;
     this.emit("clear");
   }
 

@@ -2,70 +2,10 @@ import React from "react";
 import { Box, Text } from "ink";
 import { 
   MessageType, 
-  BlockType, 
   type Message, 
-  type Block, 
   type UserMessage as UserMessageType, 
   type AIMessage as AIMessageType,
-  type BlockTypeValue 
 } from "../utils/message-bus.ts";
-
-interface BlockStyle {
-  color: string;
-  prefix: string;
-}
-
-/**
- * 根据块类型获取样式配置
- */
-const getBlockStyle = (blockType: BlockTypeValue): BlockStyle => {
-  switch (blockType) {
-    case BlockType.TEXT:
-      return {
-        color: "green",
-        prefix: "",
-      };
-    case BlockType.TOOL:
-      return {
-        color: "blueBright",
-        prefix: "🔨 ",
-      };
-    case BlockType.ERROR:
-      return {
-        color: "red",
-        prefix: "❌ ",
-      };
-    case BlockType.WARNING:
-      return {
-        color: "yellow",
-        prefix: "⚠️  ",
-      };
-    default:
-      return {
-        color: "white",
-        prefix: "",
-      };
-  }
-};
-
-interface BlockItemProps {
-  block: Block;
-}
-
-/**
- * 内容块组件
- */
-const BlockItem: React.FC<BlockItemProps> = ({ block }) => {
-  const style = getBlockStyle(block.type);
-
-  return (
-    <Box>
-      <Text color='#ffffff'>
-        {style.prefix}{block.content}
-      </Text>
-    </Box>
-  );
-};
 
 interface UserMessageProps {
   message: UserMessageType;
@@ -119,7 +59,9 @@ const AIMessageComponent: React.FC<AIMessageProps> = ({ message }) => {
       backgroundColor="#333333"
     >
       {message.blocks.map((block, index) => (
-        <BlockItem key={index} block={block} />
+        <Box key={index} marginBottom={1}>
+          <Text color='#ffffff'>{block}</Text>
+        </Box>
       ))}
     </Box>
   );
