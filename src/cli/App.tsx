@@ -4,8 +4,6 @@ import MessageList from "./MessageList.tsx";
 import InputBox from "./InputBox.tsx";
 import StatusBar from "./StatusBar.tsx";
 import ModelSelector from "./ModelSelector.tsx";
-import ModelForm, { type ModelFormData } from "./ModelForm.tsx";
-import ConfirmDialog from "./ConfirmDialog.tsx";
 import CommandSuggestions from "./CommandSuggestions.tsx";
 import { commands } from "./commands.ts";
 import messageBus, { ThinkingStatus, type Message, type ThinkingState } from "@/utils/message-bus.ts";
@@ -44,13 +42,6 @@ const App: React.FC = () => {
 
   // 模型选择状态
   const [isSelectingModel, setIsSelectingModel] = useState(false);
-
-  // 模型管理状态
-  const [isAddingModel, setIsAddingModel] = useState(false);
-  const [isEditingModel, setIsEditingModel] = useState(false);
-  const [isDeletingModel, setIsDeletingModel] = useState(false);
-  const [editingModel, setEditingModel] = useState<ModelConfig | null>(null);
-  const [deletingModel, setDeletingModel] = useState<ModelConfig | null>(null);
 
   // 命令选择状态
   const [showCommandSuggestions, setShowCommandSuggestions] = useState(false);
@@ -182,8 +173,8 @@ const App: React.FC = () => {
       }
     }
 
-    // 上下键切换历史命令（非命令补全模式）
-    if (!isProcessing && !showCommandSuggestions && history.length > 0) {
+    // 上下键切换历史命令（非命令补全模式，非模型选择模式）
+    if (!isProcessing && !showCommandSuggestions && !isSelectingModel && history.length > 0) {
       if (key.upArrow) {
         if (historyIndex === -1) {
           setTempInput(inputValue);
@@ -279,7 +270,6 @@ const App: React.FC = () => {
   // 模型选择回调
   const handleModelSelect = useCallback((model: ModelConfig) => {
     configBus.setCurrentModel(model.id);
-    // clearMemory();
     messageBus.createAIMessage();
     messageBus.ai(`✅ 已切换到: ${model.name}`);
     setIsSelectingModel(false);
@@ -288,90 +278,6 @@ const App: React.FC = () => {
   // 模型选择取消回调
   const handleModelCancel = useCallback(() => {
     setIsSelectingModel(false);
-  }, []);
-
-  // 添加模型回调
-  const handleAddModel = useCallback(() => {
-    setIsSelectingModel(false);
-    setIsAddingModel(true);
-  }, []);
-
-  // 编辑模型回调
-  const handleEditModel = useCallback((model: ModelConfig) => {
-    setIsSelectingModel(false);
-    setEditingModel(model);
-    setIsEditingModel(true);
-  }, []);
-
-  // 删除模型回调
-  const handleDeleteModel = useCallback((model: ModelConfig) => {
-    // 不能删除当前正在使用的模型
-    if (model.id === configBus.getCurrentModelId()) {
-      messageBus.createAIMessage();
-      messageBus.ai("⚠️ 不能删除当前正在使用的模型，请先切换到其他模型");
-      setIsSelectingModel(false);
-      return;
-    }
-    setIsSelectingModel(false);
-    setDeletingModel(model);
-    setIsDeletingModel(true);
-  }, []);
-
-  // 模型表单提交回调
-  const handleModelFormSubmit = useCallback((data: ModelFormData) => {
-    if (isAddingModel) {
-      // 添加新模型
-      const newModel: ModelConfig = {
-        id: `model_${Date.now()}`,
-        name: data.name,
-        baseUrl: data.baseUrl,
-        apiKey: data.apiKey,
-        modelName: data.modelName,
-      };
-      configBus.addModel(newModel);
-      configBus.setCurrentModel(newModel.id);
-      messageBus.createAIMessage();
-      messageBus.ai(`✅ 模型 "${data.name}" 添加成功，已自动切换`);
-      setIsAddingModel(false);
-    } else if (isEditingModel && editingModel) {
-      // 更新现有模型
-      configBus.updateModel(editingModel.id, {
-        name: data.name,
-        baseUrl: data.baseUrl,
-        apiKey: data.apiKey,
-        modelName: data.modelName,
-      });
-      messageBus.createAIMessage();
-      messageBus.ai(`✅ 模型 "${data.name}" 更新成功`);
-      setIsEditingModel(false);
-      setEditingModel(null);
-    }
-  }, [isAddingModel, isEditingModel, editingModel]);
-
-  // 模型表单取消回调
-  const handleModelFormCancel = useCallback(() => {
-    setIsAddingModel(false);
-    setIsEditingModel(false);
-    setEditingModel(null);
-    setIsSelectingModel(true);
-  }, []);
-
-  // 删除确认回调
-  const handleDeleteConfirm = useCallback(() => {
-    if (deletingModel) {
-      configBus.removeModel(deletingModel.id);
-      messageBus.createAIMessage();
-      messageBus.ai(`✅ 模型 "${deletingModel.name}" 已删除`);
-      setIsDeletingModel(false);
-      setDeletingModel(null);
-    }
-  }, [deletingModel]);
-
-  // 删除取消回调
-  const handleDeleteCancel = useCallback(() => {
-    setIsDeletingModel(false);
-    setDeletingModel(null);
-    setIsSelectingModel(true);
   }, []);
 
   // 处理输入变化，检测 "/" 显示命令补全
@@ -393,41 +299,11 @@ const App: React.FC = () => {
 
   return (
     <Box flexDirection="column" height="100%" padding={1}>
-      {isAddingModel ? (
-        // 添加模型表单
-        <ModelForm
-          mode="add"
-          onSubmit={handleModelFormSubmit}
-          onCancel={handleModelFormCancel}
-        />
-      ) : isEditingModel && editingModel ? (
-        // 编辑模型表单
-        <ModelForm
-          mode="edit"
-          initialValues={{
-            name: editingModel.name,
-            baseUrl: editingModel.baseUrl,
-            apiKey: editingModel.apiKey,
-            modelName: editingModel.modelName,
-          }}
-          onSubmit={handleModelFormSubmit}
-          onCancel={handleModelFormCancel}
-        />
-      ) : isDeletingModel && deletingModel ? (
-        // 删除确认对话框
-        <ConfirmDialog
-          message={`确认删除模型 "${deletingModel.name}"？`}
-          onConfirm={handleDeleteConfirm}
-          onCancel={handleDeleteCancel}
-        />
-      ) : isSelectingModel ? (
-        // 模型选择模式
+      {isSelectingModel ? (
+        // 模型选择模式（内部管理添加/编辑/删除）
         <ModelSelector
           onSelect={handleModelSelect}
           onCancel={handleModelCancel}
-          onAddModel={handleAddModel}
-          onEditModel={handleEditModel}
-          onDeleteModel={handleDeleteModel}
         />
       ) : (
         <>
