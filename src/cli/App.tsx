@@ -3,7 +3,9 @@ import { Box, Text, useApp, useInput } from "ink";
 import MessageList from "./MessageList.tsx";
 import InputBox from "./InputBox.tsx";
 import StatusBar from "./StatusBar.tsx";
+import ModelSelector from "./ModelSelector.tsx";
 import messageBus, { ThinkingStatus, type Message, type ThinkingState } from "@/utils/message-bus.ts";
+import configBus, { type ModelConfig } from "@/utils/config-bus.ts";
 import run from "@/core/run.ts";
 import { cleanup } from "@/utils/process-manager.ts";
 import { loadHistory, addToHistory } from "@/utils/history.ts";
@@ -35,6 +37,9 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<string[]>(() => loadHistory()); // 从文件加载历史
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [tempInput, setTempInput] = useState(""); // 保存当前输入（用于从历史返回时恢复）
+
+  // 模型选择状态
+  const [isSelectingModel, setIsSelectingModel] = useState(false);
 
   // 订阅消息总线
   useEffect(() => {
@@ -134,6 +139,13 @@ const App: React.FC = () => {
         return;
       }
 
+      // 检查 /model 命令 - 进入模型选择模式
+      if (trimmedValue === "/model") {
+        setInputValue("");
+        setIsSelectingModel(true);
+        return;
+      }
+
       // 清空输入
       setInputValue("");
       setIsProcessing(true);
@@ -174,28 +186,41 @@ const App: React.FC = () => {
     [isProcessing, exit, history]
   );
 
+  // 模型选择回调
+  const handleModelSelect = useCallback((model: ModelConfig) => {
+    configBus.setCurrentModel(model.id);
+    messageBus.createAIMessage();
+    messageBus.ai(`✅ 已切换到: ${model.name}`);
+    setIsSelectingModel(false);
+  }, []);
+
   return (
     <Box flexDirection="column" height="100%" padding={1}>
-      {/* 消息列表区域 */}
-      <MessageList messages={messages} />
+      {isSelectingModel ? (
+        // 模型选择模式
+        <ModelSelector onSelect={handleModelSelect} />
+      ) : (
+        <>
+          {/* 消息列表区域 */}
+          <MessageList messages={messages} />
 
+          {/* 输入框 */}
+          <InputBox
+            value={inputValue}
+            onChange={setInputValue}
+            onSubmit={handleSubmit}
+            isDisabled={isProcessing}
+          />
 
-
-      {/* 输入框 */}
-      <InputBox
-        value={inputValue}
-        onChange={setInputValue}
-        onSubmit={handleSubmit}
-        isDisabled={isProcessing}
-      />
-
-      {/* 底部提示 */}
-      <Box marginTop={1} justifyContent="space-between" paddingX={1}>
-        <StatusBar thinkingStatus={thinkingStatus} />
-        <Text color="gray" dimColor>
-          {/* 输入 exit 或 quit 退出 */}
-        </Text>
-      </Box>
+          {/* 底部提示 */}
+          <Box marginTop={1} justifyContent="space-between" paddingX={1}>
+            <StatusBar thinkingStatus={thinkingStatus} />
+            <Text color="gray" dimColor>
+              {/* 输入 exit 或 quit 退出 */}
+            </Text>
+          </Box>
+        </>
+      )}
     </Box>
   );
 };

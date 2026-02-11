@@ -12,6 +12,7 @@ import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import tools from "./tools.ts";
 import messageBus, { ThinkingStatus } from "@/utils/message-bus.ts";
+import configBus from "@/utils/config-bus.ts";
 import type { BaseMessage } from "@langchain/core/messages";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -31,16 +32,34 @@ const systemPrompt = systemPromptTemplate.replace(
 
 const timeout = 300000;
 
-const model = new ChatOpenAI({
-  modelName: process.env.NIUMA_MODEL_NAME,
-  apiKey: process.env.NIUMA_API_KEY,
-  temperature: 0,
-  timeout,
-  maxRetries: 2,   // 最多重试 2 次
-  configuration: {
-    baseURL: process.env.NIUMA_BASE_URL,
-  },
-}).bindTools(tools);
+// 动态模型实例（支持运行时切换）
+// 使用 any 类型因为 bindTools 返回的是 Runnable 类型
+let currentModel: ReturnType<ChatOpenAI["bindTools"]> | null = null;
+
+/**
+ * 获取模型实例（懒加载 + 缓存）
+ */
+function getModel() {
+  if (!currentModel) {
+    const config = configBus.getCurrentModel();
+    currentModel = new ChatOpenAI({
+      modelName: config.modelName,
+      apiKey: config.apiKey,
+      temperature: 0,
+      timeout,
+      maxRetries: 2,
+      configuration: {
+        baseURL: config.baseUrl,
+      },
+    }).bindTools(tools);
+  }
+  return currentModel;
+}
+
+// 订阅模型变更事件，自动重置模型实例
+configBus.on("model:change", () => {
+  currentModel = null;
+});
 
 const messages: BaseMessage[] = [new SystemMessage(systemPrompt)];
 
@@ -140,7 +159,8 @@ async function run(query: string, maxIterations: number = 30): Promise<string> {
 
     let response: any;
     try {
-      // 使用流式输出
+      // 使用流式输出（动态获取模型实例）
+      const model = getModel();
       const stream = await model.stream(messages);
       
       let currentToolName: string | null = null;
@@ -191,14 +211,15 @@ async function run(query: string, maxIterations: number = 30): Promise<string> {
       const errorDetails = err?.error || err?.response?.data || err;
 
       // 检查是否是配置问题
-      if (!process.env.NIUMA_API_KEY) {
-        throw new Error("未配置 NIUMA_API_KEY 环境变量");
+      const modelConfig = configBus.getCurrentModel();
+      if (!modelConfig.apiKey) {
+        throw new Error("未配置模型 API Key，请检查 ~/.niu-code/config.json");
       }
-      if (!process.env.NIUMA_BASE_URL) {
-        throw new Error("未配置 NIUMA_BASE_URL 环境变量");
+      if (!modelConfig.baseUrl) {
+        throw new Error("未配置模型 Base URL，请检查 ~/.niu-code/config.json");
       }
-      if (!process.env.NIUMA_MODEL_NAME) {
-        throw new Error("未配置 NIUMA_MODEL_NAME 环境变量");
+      if (!modelConfig.modelName) {
+        throw new Error("未配置模型名称，请检查 ~/.niu-code/config.json");
       }
 
       // 抛出更详细的错误信息
