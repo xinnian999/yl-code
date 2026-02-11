@@ -25,7 +25,7 @@ const ModelSelector: React.FC<Props> = ({ onSelect, onCancel }) => {
   const [editingModel, setEditingModel] = useState<ModelConfig | null>(null);
   const [deletingModel, setDeletingModel] = useState<ModelConfig | null>(null);
   const [copyingModel, setCopyingModel] = useState<ModelConfig | null>(null);
-  
+
   // 使用函数获取最新的 models，确保更新后能获取到最新数据
   const getModels = () => configBus.getModels();
   const currentId = configBus.getCurrentModelId();
@@ -113,34 +113,37 @@ const ModelSelector: React.FC<Props> = ({ onSelect, onCancel }) => {
   };
 
   // 模型表单提交回调
-  const handleFormSubmit = useCallback((data: ModelFormData) => {
-    if (viewState === "add" || viewState === "copy") {
-      const newModel: ModelConfig = {
-        id: `model_${Date.now()}`,
-        name: data.name,
-        baseUrl: data.baseUrl,
-        apiKey: data.apiKey,
-        modelName: data.modelName,
-      };
-      configBus.addModel(newModel);
-      configBus.setCurrentModel(newModel.id);
-      messageBus.createAIMessage();
-      messageBus.ai(`✅ 模型 "${data.name}" 添加成功，已自动切换`);
-      setCopyingModel(null);
-      onCancel?.();
-    } else if (viewState === "edit" && editingModel) {
-      configBus.updateModel(editingModel.id, {
-        name: data.name,
-        baseUrl: data.baseUrl,
-        apiKey: data.apiKey,
-        modelName: data.modelName,
-      });
-      messageBus.createAIMessage();
-      messageBus.ai(`✅ 模型 "${data.name}" 更新成功`);
-      setEditingModel(null);
-      setViewState("list");
-    }
-  }, [viewState, editingModel, onCancel]);
+  const handleFormSubmit = useCallback(
+    (data: ModelFormData) => {
+      if (viewState === "add" || viewState === "copy") {
+        const newModel: ModelConfig = {
+          id: `model_${Date.now()}`,
+          name: data.name,
+          baseUrl: data.baseUrl,
+          apiKey: data.apiKey,
+          modelName: data.modelName,
+        };
+        configBus.addModel(newModel);
+        configBus.setCurrentModel(newModel.id);
+        messageBus.createAIMessage();
+        messageBus.ai(`✅ 模型 "${data.name}" 添加成功，已自动切换`);
+        setCopyingModel(null);
+        onCancel?.();
+      } else if (viewState === "edit" && editingModel) {
+        configBus.updateModel(editingModel.id, {
+          name: data.name,
+          baseUrl: data.baseUrl,
+          apiKey: data.apiKey,
+          modelName: data.modelName,
+        });
+        messageBus.createAIMessage();
+        messageBus.ai(`✅ 模型 "${data.name}" 更新成功`);
+        setEditingModel(null);
+        setViewState("list");
+      }
+    },
+    [viewState, editingModel, onCancel]
+  );
 
   // 模型表单取消回调
   const handleFormCancel = useCallback(() => {
@@ -225,7 +228,16 @@ const ModelSelector: React.FC<Props> = ({ onSelect, onCancel }) => {
       <Text color="cyan" bold>
         🔧 选择模型 (↑↓ 移动, Enter 确认, Esc 取消)
       </Text>
-      <Box marginTop={1}>
+      <Box
+        borderStyle="single"
+        borderTop
+        borderBottom
+        borderLeft={false}
+        borderRight={false}
+        padding={1}
+        marginTop={1}
+        marginBottom={1}
+      >
         <SelectInput
           items={items}
           initialIndex={initialIndex}
@@ -234,9 +246,10 @@ const ModelSelector: React.FC<Props> = ({ onSelect, onCancel }) => {
         />
       </Box>
       {/* 快捷键提示 */}
-      <Box marginTop={1}>
+      <Box>
         <Text color="gray">
-          <Text color="cyan">a</Text> 添加 | <Text color="cyan">c</Text> 复制 | <Text color="cyan">e</Text> 编辑 | <Text color="cyan">d</Text> 删除
+          <Text color="cyan">a</Text> 添加 | <Text color="cyan">c</Text> 复制 |{" "}
+          <Text color="cyan">e</Text> 编辑 | <Text color="cyan">d</Text> 删除
         </Text>
       </Box>
     </Box>

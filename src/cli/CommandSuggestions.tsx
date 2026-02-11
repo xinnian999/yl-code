@@ -32,7 +32,7 @@ const CommandSuggestions: React.FC<Props> = ({ selectedIndex, filter }) => {
               bold={isSelected}
             >
               {isSelected ? "❯ " : "  "}
-              <Text color={isSelected ? "cyan" : "white"}>/{cmd.value}</Text>
+              <Text color={isSelected ? "cyan" : "#000"}>/{cmd.value}</Text>
               <Text color="gray">{"    "}{cmd.label.split("    ")[1]}</Text>
             </Text>
           </Box>

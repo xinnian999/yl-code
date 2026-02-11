@@ -60,7 +60,7 @@ const AIMessageComponent: React.FC<AIMessageProps> = ({ message }) => {
     >
       {message.blocks.map((block, index) => (
         <Box key={index} marginBottom={1}>
-          <Text color='#ffffff'>{block}</Text>
+          <Text>{block}</Text>
         </Box>
       ))}
     </Box>
