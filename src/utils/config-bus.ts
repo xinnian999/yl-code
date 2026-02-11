@@ -2,7 +2,6 @@ import { EventEmitter } from "events";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
-import "dotenv/config";
 
 // ============ 类型定义 ============
 
@@ -54,7 +53,7 @@ class ConfigBus extends EventEmitter {
   }
 
   /**
-   * 加载配置文件，如果不存在则从环境变量迁移创建默认配置
+   * 加载配置文件，如果不存在则创建空配置
    */
   private loadConfig(): AppConfig {
     if (existsSync(this.configPath)) {
@@ -66,18 +65,10 @@ class ConfigBus extends EventEmitter {
       }
     }
 
-    // 首次运行：从环境变量迁移
+    // 首次运行：创建空配置
     const defaultConfig: AppConfig = {
-      currentModel: "default",
-      models: [
-        {
-          id: "default",
-          name: process.env.NIUMA_MODEL_NAME || "Default Model",
-          apiKey: process.env.NIUMA_API_KEY || "",
-          baseUrl: process.env.NIUMA_BASE_URL || "",
-          modelName: process.env.NIUMA_MODEL_NAME || "",
-        },
-      ],
+      currentModel: "",
+      models: [],
     };
 
     this.saveConfig(defaultConfig);
@@ -92,6 +83,13 @@ class ConfigBus extends EventEmitter {
   }
 
   // ============ 模型相关方法 ============
+
+  /**
+   * 检查是否有可用的模型配置
+   */
+  hasModels(): boolean {
+    return this.config.models.length > 0;
+  }
 
   /**
    * 获取所有模型配置
@@ -109,8 +107,14 @@ class ConfigBus extends EventEmitter {
 
   /**
    * 获取当前模型配置
+   * 如果没有配置模型，抛出友好提示
    */
   getCurrentModel(): ModelConfig {
+    // 检查是否有模型配置
+    if (this.config.models.length === 0) {
+      throw new Error("请先配置模型：输入 /model 然后按 a 添加");
+    }
+
     const model = this.config.models.find(
       (m) => m.id === this.config.currentModel
     );

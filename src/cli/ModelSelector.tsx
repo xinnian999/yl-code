@@ -7,7 +7,7 @@ import ConfirmDialog from "./ConfirmDialog.tsx";
 import messageBus from "@/utils/message-bus.ts";
 
 // 内部视图状态
-type ViewState = "list" | "add" | "edit" | "delete";
+type ViewState = "list" | "add" | "edit" | "delete" | "copy";
 
 interface Props {
   onSelect: (model: ModelConfig) => void;
@@ -18,12 +18,13 @@ interface Props {
  * 模型选择组件
  * 使用 ink-select-input 实现交互式模型选择
  * 内部管理添加、编辑、删除模型的表单状态
- * 支持快捷键：a 添加、e 编辑、d 删除
+ * 支持快捷键：a 添加、c 复制、e 编辑、d 删除
  */
 const ModelSelector: React.FC<Props> = ({ onSelect, onCancel }) => {
   const [viewState, setViewState] = useState<ViewState>("list");
   const [editingModel, setEditingModel] = useState<ModelConfig | null>(null);
   const [deletingModel, setDeletingModel] = useState<ModelConfig | null>(null);
+  const [copyingModel, setCopyingModel] = useState<ModelConfig | null>(null);
   
   // 使用函数获取最新的 models，确保更新后能获取到最新数据
   const getModels = () => configBus.getModels();
@@ -50,6 +51,16 @@ const ModelSelector: React.FC<Props> = ({ onSelect, onCancel }) => {
     // a 添加模型
     if (input.toLowerCase() === "a") {
       setViewState("add");
+      return;
+    }
+
+    // c 复制当前高亮的模型
+    if (input.toLowerCase() === "c") {
+      const model = models[highlightedIndex];
+      if (model) {
+        setCopyingModel(model);
+        setViewState("copy");
+      }
       return;
     }
 
@@ -103,7 +114,7 @@ const ModelSelector: React.FC<Props> = ({ onSelect, onCancel }) => {
 
   // 模型表单提交回调
   const handleFormSubmit = useCallback((data: ModelFormData) => {
-    if (viewState === "add") {
+    if (viewState === "add" || viewState === "copy") {
       const newModel: ModelConfig = {
         id: `model_${Date.now()}`,
         name: data.name,
@@ -115,6 +126,7 @@ const ModelSelector: React.FC<Props> = ({ onSelect, onCancel }) => {
       configBus.setCurrentModel(newModel.id);
       messageBus.createAIMessage();
       messageBus.ai(`✅ 模型 "${data.name}" 添加成功，已自动切换`);
+      setCopyingModel(null);
       onCancel?.();
     } else if (viewState === "edit" && editingModel) {
       configBus.updateModel(editingModel.id, {
@@ -133,6 +145,7 @@ const ModelSelector: React.FC<Props> = ({ onSelect, onCancel }) => {
   // 模型表单取消回调
   const handleFormCancel = useCallback(() => {
     setEditingModel(null);
+    setCopyingModel(null);
     setViewState("list");
   }, []);
 
@@ -158,6 +171,22 @@ const ModelSelector: React.FC<Props> = ({ onSelect, onCancel }) => {
     return (
       <ModelForm
         mode="add"
+        onSubmit={handleFormSubmit}
+        onCancel={handleFormCancel}
+      />
+    );
+  }
+
+  if (viewState === "copy" && copyingModel) {
+    return (
+      <ModelForm
+        mode="add"
+        initialValues={{
+          name: `${copyingModel.name} (复制)`,
+          baseUrl: copyingModel.baseUrl,
+          apiKey: copyingModel.apiKey,
+          modelName: "",
+        }}
         onSubmit={handleFormSubmit}
         onCancel={handleFormCancel}
       />
@@ -207,7 +236,7 @@ const ModelSelector: React.FC<Props> = ({ onSelect, onCancel }) => {
       {/* 快捷键提示 */}
       <Box marginTop={1}>
         <Text color="gray">
-          <Text color="cyan">a</Text> 添加 | <Text color="cyan">e</Text> 编辑 | <Text color="cyan">d</Text> 删除
+          <Text color="cyan">a</Text> 添加 | <Text color="cyan">c</Text> 复制 | <Text color="cyan">e</Text> 编辑 | <Text color="cyan">d</Text> 删除
         </Text>
       </Box>
     </Box>

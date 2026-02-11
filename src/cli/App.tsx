@@ -14,11 +14,9 @@ import { loadHistory, addToHistory } from "@/utils/history.ts";
 
 const welcomeMessage = `您好老板！
 
-我是您的专属 🐂 牛码 🐎 ；
+我是《牛码》；
 
 我擅长写代码、改BUG等；
-
-我喜欢干各种关于代码的脏活累活；
 
 有什么可以为您效劳的？😊`;
 
@@ -248,14 +246,7 @@ const App: React.FC = () => {
         messageBus.createAIMessage();
         const err = error as Error;
         if (err) {
-          messageBus.error(`错误: ${err.message || String(error)}`);
-          if (err.stack) {
-            messageBus.error(`堆栈跟踪:\n${err.stack}`);
-          }
-
-          if (err.message && err.message.includes("pass an `apiKey`")) {
-            messageBus.error(`未配置 API_KEY`);
-          }
+          messageBus.error(`${err.message || String(error)}`);
         } else {
           messageBus.error(`未知错误: ${String(error)}`);
         }
