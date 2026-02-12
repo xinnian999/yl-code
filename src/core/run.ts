@@ -151,10 +151,16 @@ const getToolDescription = (toolName: string, args: ToolArgs): string => {
 };
 
 // Agent 执行函数（流式版本）
-async function run(query: string, maxIterations: number = 30): Promise<string> {
+async function run(query: string, fileContext: string = "", maxIterations: number = 30): Promise<string> {
   const startTime = Date.now(); // 记录总开始时间
 
-  messages.push(new HumanMessage(query));
+  // 构建消息内容，如果有文件上下文则附加
+  let messageContent = query;
+  if (fileContext) {
+    messageContent = `${query}\n\n【用户引用的文件内容如下，请根据这些内容完成任务】${fileContext}`;
+  }
+
+  messages.push(new HumanMessage(messageContent));
 
   // 创建一个 AI 消息来承载所有输出（工具调用、最终响应等）
   messageBus.createAIMessage();

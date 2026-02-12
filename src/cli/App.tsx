@@ -5,12 +5,15 @@ import InputBox from "./InputBox.tsx";
 import StatusBar from "./StatusBar.tsx";
 import ModelSelector from "./ModelSelector.tsx";
 import CommandSuggestions from "./CommandSuggestions.tsx";
+import FileSuggestions, { getFilteredFiles } from "./FileSuggestions.tsx";
 import { commands } from "./commands.ts";
 import messageBus, { ThinkingStatus, type Message, type ThinkingState } from "@/utils/message-bus.ts";
 import configBus, { type ModelConfig } from "@/utils/config-bus.ts";
 import run, { clearMemory } from "@/core/run.ts";
 import { cleanup } from "@/utils/process-manager.ts";
 import { loadHistory, addToHistory } from "@/utils/history.ts";
+import { extractAtFilter, parseAtReferences, getFileContent } from "@/utils/file-scanner.ts";
+import { join } from "path";
 
 const welcomeMessage = `您好老板！
 
@@ -44,6 +47,15 @@ const App: React.FC = () => {
   // 命令选择状态
   const [showCommandSuggestions, setShowCommandSuggestions] = useState(false);
   const [commandSelectedIndex, setCommandSelectedIndex] = useState(0);
+
+  // 文件选择状态
+  const [showFileSuggestions, setShowFileSuggestions] = useState(false);
+  const [fileSelectedIndex, setFileSelectedIndex] = useState(0);
+  const [fileFilter, setFileFilter] = useState("");
+  const [atStartIndex, setAtStartIndex] = useState(-1);
+
+  // 输入框 key，用于强制重新挂载以重置光标位置
+  const [inputKey, setInputKey] = useState(0);
 
   // 订阅消息总线
   useEffect(() => {
@@ -118,7 +130,8 @@ const App: React.FC = () => {
 其他：
 - 输入 exit 或 quit 也可退出
 - 按 ↑↓ 键可切换历史命令
-- 按 Ctrl+C 强制退出`);
+- 按 Ctrl+C 强制退出
+- 输入 @ 可引用文件/目录`);
         break;
       case "exit":
         messageBus.ai("👋 再见！");
@@ -130,11 +143,65 @@ const App: React.FC = () => {
     }
   }, [exit]);
 
-  // 处理键盘输入（退出 + 历史命令切换 + 命令补全选择）
+  // 处理键盘输入（退出 + 历史命令切换 + 命令补全选择 + 文件补全选择）
   useInput((input, key) => {
     if (key.ctrl && input === "c") {
       cleanup();
       exit();
+    }
+
+    // 文件补全模式下的键盘处理
+    if (showFileSuggestions && !isSelectingModel) {
+      const filteredFiles = getFilteredFiles(fileFilter);
+
+      if (key.upArrow) {
+        setFileSelectedIndex((prev) =>
+          prev > 0 ? prev - 1 : filteredFiles.length - 1
+        );
+        return;
+      }
+
+      if (key.downArrow) {
+        setFileSelectedIndex((prev) =>
+          prev < filteredFiles.length - 1 ? prev + 1 : 0
+        );
+        return;
+      }
+
+      if (key.return && filteredFiles.length > 0) {
+        const selectedFile = filteredFiles[fileSelectedIndex];
+        if (selectedFile) {
+          // 如果是目录，展开目录内容
+          if (selectedFile.isDirectory) {
+            const newFilter = selectedFile.relativePath + "/";
+            setFileFilter(newFilter);
+            setFileSelectedIndex(0);
+            // 更新输入框
+            const beforeAt = inputValue.slice(0, atStartIndex);
+            setInputValue(beforeAt + "@" + newFilter);
+            setInputKey((k) => k + 1); // 重置光标到末尾
+          } else {
+            // 如果是文件，插入完整路径并关闭补全
+            const beforeAt = inputValue.slice(0, atStartIndex);
+            const newValue = beforeAt + "@" + selectedFile.relativePath + " ";
+            setInputValue(newValue);
+            setInputKey((k) => k + 1); // 重置光标到末尾
+            setShowFileSuggestions(false);
+            setFileSelectedIndex(0);
+            setFileFilter("");
+            setAtStartIndex(-1);
+          }
+        }
+        return;
+      }
+
+      if (key.escape) {
+        setShowFileSuggestions(false);
+        setFileSelectedIndex(0);
+        setFileFilter("");
+        setAtStartIndex(-1);
+        return;
+      }
     }
 
     // 命令补全模式下的键盘处理
@@ -201,8 +268,8 @@ const App: React.FC = () => {
   // 处理用户输入提交
   const handleSubmit = useCallback(
     async (value: string) => {
-      // 如果处于命令补全模式，不处理提交（由 useInput 处理）
-      if (showCommandSuggestions) {
+      // 如果处于命令补全模式或文件补全模式，不处理提交（由 useInput 处理）
+      if (showCommandSuggestions || showFileSuggestions) {
         return;
       }
 
@@ -236,11 +303,24 @@ const App: React.FC = () => {
       setHistoryIndex(-1);
       setTempInput("");
 
+      // 解析 @ 引用并读取文件内容
+      const atRefs = parseAtReferences(trimmedValue);
+      let fileContext = "";
+      if (atRefs.length > 0) {
+        const fileContents: string[] = [];
+        for (const ref of atRefs) {
+          const fullPath = join(process.cwd(), ref);
+          const content = getFileContent(fullPath);
+          fileContents.push(`--- 文件: ${ref} ---\n${content}\n--- 文件结束 ---`);
+        }
+        fileContext = "\n\n" + fileContents.join("\n\n");
+      }
+
       // 显示用户消息
       messageBus.user(trimmedValue);
 
       try {
-        await run(trimmedValue);
+        await run(trimmedValue, fileContext);
       } catch (error) {
         // 确保有一个 AI 消息来承载错误
         messageBus.createAIMessage();
@@ -255,7 +335,7 @@ const App: React.FC = () => {
         messageBus.setThinkingStatus(ThinkingStatus.IDLE);
       }
     },
-    [isProcessing, exit, history, showCommandSuggestions]
+    [isProcessing, exit, history, showCommandSuggestions, showFileSuggestions]
   );
 
   // 模型选择回调
@@ -271,17 +351,30 @@ const App: React.FC = () => {
     setIsSelectingModel(false);
   }, []);
 
-  // 处理输入变化，检测 "/" 显示命令补全
+  // 处理输入变化，检测 "/" 显示命令补全，检测 "@" 显示文件补全
   const handleInputChange = useCallback((value: string) => {
     setInputValue(value);
     
     // 检测是否以 "/" 开头，显示命令补全
     if (value.startsWith("/")) {
       setShowCommandSuggestions(true);
-      // 重置选中索引
+      setShowFileSuggestions(false);
       setCommandSelectedIndex(0);
     } else {
       setShowCommandSuggestions(false);
+      
+      // 检测 @ 符号，显示文件补全
+      const atInfo = extractAtFilter(value);
+      if (atInfo) {
+        setShowFileSuggestions(true);
+        setFileFilter(atInfo.filter);
+        setAtStartIndex(atInfo.atIndex);
+        setFileSelectedIndex(0);
+      } else {
+        setShowFileSuggestions(false);
+        setFileFilter("");
+        setAtStartIndex(-1);
+      }
     }
     
     // 重置历史索引
@@ -309,12 +402,21 @@ const App: React.FC = () => {
             />
           )}
 
+          {/* 文件补全列表 */}
+          {showFileSuggestions && (
+            <FileSuggestions
+              selectedIndex={fileSelectedIndex}
+              filter={fileFilter}
+            />
+          )}
+
           {/* 输入框 */}
           <InputBox
             value={inputValue}
             onChange={handleInputChange}
             onSubmit={handleSubmit}
             isDisabled={isProcessing}
+            inputKey={inputKey}
           />
 
           {/* 底部提示 */}
