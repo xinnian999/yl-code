@@ -4,6 +4,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { z } from "zod";
 import { registerBackgroundProcess } from "@/utils/process-manager.ts";
+import diffBus from "@/utils/diff-bus.ts";
 
 // 1. 读取文件工具
 const readFileTool = tool(
@@ -25,14 +26,40 @@ const readFileTool = tool(
   }
 );
 
-// 2. 写入文件工具
+// 2. 写入文件工具（带 diff 确认）
 const writeFileTool = tool(
   async ({ filePath, content }: { filePath: string; content: string }): Promise<string> => {
     try {
+      // 读取原文件内容（如果存在）
+      let originalContent = "";
+      try {
+        originalContent = await fs.readFile(filePath, "utf-8");
+      } catch {
+        // 文件不存在，视为新文件
+      }
+
+      // 如果内容相同，无需写入
+      if (originalContent === content) {
+        return `文件内容未变化，无需写入: ${filePath}`;
+      }
+
+      // 请求用户确认
+      const result = await diffBus.requestConfirm(filePath, originalContent, content);
+
+      // 根据用户选择处理
+      if (result === "reject") {
+        return `用户拒绝了对 ${filePath} 的修改，请根据情况调整方案或询问用户意见`;
+      }
+
+      // 用户同意，执行写入
       const dir = path.dirname(filePath);
       await fs.mkdir(dir, { recursive: true });
       await fs.writeFile(filePath, content, "utf-8");
-      return `文件写入成功: ${filePath}`;
+      
+      const isNewFile = originalContent === "";
+      return isNewFile 
+        ? `文件创建成功: ${filePath}` 
+        : `文件写入成功: ${filePath}`;
     } catch (error) {
       const err = error as Error;
       return `写入文件失败: ${err.message}`;
@@ -40,7 +67,7 @@ const writeFileTool = tool(
   },
   {
     name: "write_file",
-    description: "向指定路径写入文件内容，自动创建目录",
+    description: "向指定路径写入文件内容，自动创建目录。写入前会请求用户确认。",
     schema: z.object({
       filePath: z.string().describe("文件路径"),
       content: z.string().describe("要写入的文件内容"),
@@ -48,7 +75,7 @@ const writeFileTool = tool(
   }
 );
 
-// 3. 执行命令工具（带实时输出）
+// 3. 执行命令工具（带确认和实时输出）
 const executeCommandTool = tool(
   async ({ 
     command, 
@@ -61,6 +88,13 @@ const executeCommandTool = tool(
   }): Promise<string> => {
     const cwd = workingDirectory || process.cwd();
 
+    // 请求用户确认
+    const result = await diffBus.requestCommandConfirm(command, workingDirectory, background);
+
+    if (result === "reject") {
+      return `用户拒绝执行命令: ${command}，请根据情况调整方案或询问用户意见`;
+    }
+
     return new Promise((resolve) => {
       // 解析命令和参数
       const [cmd, ...args] = command.split(" ");
@@ -68,12 +102,10 @@ const executeCommandTool = tool(
       if (background) {
         const child = spawn(cmd, args, {
           cwd,
-          stdio: "ignore", // 完全忽略输入输出
+          stdio: "ignore",
           shell: true,
-          // 不使用 detached: true，保持对进程的引用以便清理
         });
 
-        // 跟踪后台进程
         const processInfo = {
           pid: child.pid!,
           command,
@@ -93,7 +125,7 @@ const executeCommandTool = tool(
 
       const child = spawn(cmd, args, {
         cwd,
-        stdio: "inherit", // 实时输出到控制台
+        stdio: "inherit",
         shell: true,
       });
 
@@ -122,7 +154,7 @@ const executeCommandTool = tool(
   },
   {
     name: "execute_command",
-    description: "执行系统命令，支持指定工作目录，实时显示输出",
+    description: "执行系统命令，支持指定工作目录，实时显示输出。执行前会请求用户确认。",
     schema: z.object({
       command: z.string().describe("要执行的命令"),
       workingDirectory: z.string().optional().describe("工作目录（推荐指定）"),

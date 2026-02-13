@@ -13,6 +13,7 @@ import { dirname, join } from "path";
 import tools from "./tools.ts";
 import messageBus, { ThinkingStatus } from "@/utils/message-bus.ts";
 import configBus from "@/utils/config-bus.ts";
+import diffBus from "@/utils/diff-bus.ts";
 import type { BaseMessage } from "@langchain/core/messages";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -154,6 +155,9 @@ const getToolDescription = (toolName: string, args: ToolArgs): string => {
 async function run(query: string, fileContext: string = "", maxIterations: number = 30): Promise<string> {
   const startTime = Date.now(); // 记录总开始时间
 
+  // 重置本轮对话的跳过确认状态（用户每次发送新消息时重置）
+  diffBus.resetSkipConfirm();
+
   // 构建消息内容，如果有文件上下文则附加
   let messageContent = query;
   if (fileContext) {
@@ -266,8 +270,8 @@ async function run(query: string, fileContext: string = "", maxIterations: numbe
     if (!response.tool_calls || response.tool_calls.length === 0) {
       messageBus.setThinkingStatus(ThinkingStatus.IDLE);
       messageBus.ai(response.content || "");
-      // 输出总耗时
-      const totalDuration = Date.now() - startTime;
+      // 输出总耗时（扣除用户确认等待时间）
+      const totalDuration = Date.now() - startTime - diffBus.totalWaitTime;
       messageBus.ai(`\n🕒 总耗时: ${formatDuration(totalDuration)}`);
       return response.content || "";
     }
@@ -290,8 +294,15 @@ async function run(query: string, fileContext: string = "", maxIterations: numbe
 
       if (foundTool) {
         try {
+          // 记录工具调用前的等待时间
+          const waitTimeBefore = diffBus.totalWaitTime;
+          const toolStartTime = Date.now();
+          
           const toolResult = await (foundTool as any).invoke(toolCall.args);
-          const toolDuration = Date.now() - iterationStartTime; // 从本轮开始计算耗时
+          
+          // 计算工具耗时（扣除用户确认等待时间）
+          const waitTimeAdded = diffBus.totalWaitTime - waitTimeBefore;
+          const toolDuration = Date.now() - toolStartTime - waitTimeAdded;
 
           // 输出工具调用信息和耗时
           messageBus.tool(`${toolDesc} (耗时: ${formatDuration(toolDuration)})`);
@@ -334,8 +345,8 @@ async function run(query: string, fileContext: string = "", maxIterations: numbe
   }
 
   messageBus.setThinkingStatus(ThinkingStatus.IDLE);
-  // 输出总耗时（达到最大迭代次数时）
-  const totalDuration = Date.now() - startTime;
+  // 输出总耗时（扣除用户确认等待时间，达到最大迭代次数时）
+  const totalDuration = Date.now() - startTime - diffBus.totalWaitTime;
   messageBus.ai(`\n🕒 总耗时: ${formatDuration(totalDuration)}`);
   
   const lastMessage = messages[messages.length - 1];

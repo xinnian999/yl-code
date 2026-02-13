@@ -6,9 +6,12 @@ import StatusBar from "./StatusBar.tsx";
 import ModelSelector from "./ModelSelector.tsx";
 import CommandSuggestions from "./CommandSuggestions.tsx";
 import FileSuggestions, { getFilteredFiles } from "./FileSuggestions.tsx";
+import DiffConfirm from "./DiffConfirm.tsx";
 import { commands } from "./commands.ts";
 import messageBus, { ThinkingStatus, type Message, type ThinkingState } from "@/utils/message-bus.ts";
 import configBus, { type ModelConfig } from "@/utils/config-bus.ts";
+import diffBus, { type PendingChange, type ConfirmResult } from "@/utils/diff-bus.ts";
+import { tryOpenDiff, cleanupTempFile, type EditorType } from "@/utils/editor-detector.ts";
 import run, { clearMemory } from "@/core/run.ts";
 import { cleanup } from "@/utils/process-manager.ts";
 import { loadHistory, addToHistory } from "@/utils/history.ts";
@@ -57,6 +60,12 @@ const App: React.FC = () => {
   // 输入框 key，用于强制重新挂载以重置光标位置
   const [inputKey, setInputKey] = useState(0);
 
+  // Diff 确认相关状态
+  const [showDiffConfirm, setShowDiffConfirm] = useState(false);
+  const [pendingChange, setPendingChange] = useState<PendingChange | null>(null);
+  const [diffEditorOpened, setDiffEditorOpened] = useState<EditorType | null>(null);
+  const [diffTempFile, setDiffTempFile] = useState<string | null>(null);
+
   // 订阅消息总线
   useEffect(() => {
     const handleMessage = (message: Message) => {
@@ -95,6 +104,37 @@ const App: React.FC = () => {
     };
   }, []);
 
+  // 订阅 diffBus 事件
+  useEffect(() => {
+    const handlePendingChange = (change: PendingChange) => {
+      // 只有文件变更才尝试打开编辑器 diff
+      if (change.type === "file" && change.filePath && change.newContent) {
+        const result = tryOpenDiff(change.filePath, change.newContent);
+        
+        if (result) {
+          setDiffEditorOpened(result.editor);
+          setDiffTempFile(result.tempPath);
+        } else {
+          setDiffEditorOpened(null);
+          setDiffTempFile(null);
+        }
+      } else {
+        // 命令确认不需要打开编辑器
+        setDiffEditorOpened(null);
+        setDiffTempFile(null);
+      }
+      
+      setPendingChange(change);
+      setShowDiffConfirm(true);
+    };
+
+    diffBus.on("pending-change", handlePendingChange);
+
+    return () => {
+      diffBus.off("pending-change", handlePendingChange);
+    };
+  }, []);
+
   // 获取过滤后的命令列表
   const getFilteredCommands = useCallback(() => {
     return commands.filter((cmd) =>
@@ -115,6 +155,7 @@ const App: React.FC = () => {
       case "clear":
         messageBus.emit("clear");
         clearMemory();
+        diffBus.resetSession(); // 重置 diff 确认状态
         messageBus.createAIMessage();
         messageBus.ai("🧹 对话和记忆已清空");
         break;
@@ -351,6 +392,23 @@ const App: React.FC = () => {
     setIsSelectingModel(false);
   }, []);
 
+  // Diff 确认回调
+  const handleDiffConfirm = useCallback((result: ConfirmResult) => {
+    if (pendingChange) {
+      diffBus.resolveChange(pendingChange.id, result);
+    }
+    
+    // 清理临时文件
+    if (diffTempFile) {
+      cleanupTempFile(diffTempFile);
+      setDiffTempFile(null);
+    }
+    
+    setShowDiffConfirm(false);
+    setPendingChange(null);
+    setDiffEditorOpened(null);
+  }, [pendingChange, diffTempFile]);
+
   // 处理输入变化，检测 "/" 显示命令补全，检测 "@" 显示文件补全
   const handleInputChange = useCallback((value: string) => {
     setInputValue(value);
@@ -383,7 +441,14 @@ const App: React.FC = () => {
 
   return (
     <Box flexDirection="column" height="100%" padding={1}>
-      {isSelectingModel ? (
+      {showDiffConfirm && pendingChange ? (
+        // Diff 确认模式
+        <DiffConfirm
+          change={pendingChange}
+          onConfirm={handleDiffConfirm}
+          editorOpened={diffEditorOpened}
+        />
+      ) : isSelectingModel ? (
         // 模型选择模式（内部管理添加/编辑/删除）
         <ModelSelector
           onSelect={handleModelSelect}
