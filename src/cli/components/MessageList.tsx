@@ -1,11 +1,11 @@
 import React from "react";
 import { Box, Text } from "ink";
-import { 
-  MessageType, 
-  type Message, 
-  type UserMessage as UserMessageType, 
-  type AIMessage as AIMessageType,
-} from "../utils/message-bus.ts";
+import { MessageType } from "@/core/types.ts";
+import type {
+  Message,
+  UserMessage as UserMessageType,
+  AIMessage as AIMessageType,
+} from "@/core/message-bus.ts";
 
 interface UserMessageProps {
   message: UserMessageType;

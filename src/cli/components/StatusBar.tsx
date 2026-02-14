@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Box, Text } from "ink";
 import Spinner from "ink-spinner";
-import { ThinkingStatus, type ThinkingState } from "../utils/message-bus.ts";
+import { ThinkingStatus, type ThinkingState } from "@/core/types.ts";
 
 /**
  * 格式化耗时

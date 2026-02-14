@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from "react";
 import { Box, Text, useInput } from "ink";
-import type { PendingChange, ConfirmResult } from "@/utils/diff-bus.ts";
-import { generateCompactDiff, type DiffLine } from "@/utils/diff-generator.ts";
-import { getEditorName, type EditorType } from "@/utils/editor-detector.ts";
+import type { PendingChange } from "@/core/confirm-bus.ts";
+import type { ConfirmResult } from "@/core/types.ts";
+import { generateCompactDiff, type DiffLine } from "./diff-generator.ts";
+import { getEditorName, type EditorType } from "./editor-detector.ts";
 
 interface DiffConfirmProps {
   change: PendingChange;

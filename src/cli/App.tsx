@@ -1,21 +1,19 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useCallback } from "react";
 import { Box, Text, useApp, useInput } from "ink";
-import MessageList from "./MessageList.tsx";
-import InputBox from "./InputBox.tsx";
-import StatusBar from "./StatusBar.tsx";
-import ModelSelector from "./ModelSelector.tsx";
-import CommandSuggestions from "./CommandSuggestions.tsx";
-import FileSuggestions, { getFilteredFiles } from "./FileSuggestions.tsx";
-import DiffConfirm from "./DiffConfirm.tsx";
+import MessageList from "./components/MessageList.tsx";
+import InputBox from "./components/InputBox.tsx";
+import StatusBar from "./components/StatusBar.tsx";
+import CommandSuggestions from "./components/CommandSuggestions.tsx";
+import ModelSelector from "./features/model/ModelSelector.tsx";
+import FileSuggestions, { getFilteredFiles } from "./features/file-picker/FileSuggestions.tsx";
+import DiffConfirm from "./features/diff/DiffConfirm.tsx";
 import { commands } from "./commands.ts";
-import messageBus, { ThinkingStatus, type Message, type ThinkingState } from "@/utils/message-bus.ts";
-import configBus, { type ModelConfig } from "@/utils/config-bus.ts";
-import diffBus, { type PendingChange, type ConfirmResult } from "@/utils/diff-bus.ts";
-import { tryOpenDiff, cleanupTempFile, type EditorType } from "@/utils/editor-detector.ts";
-import run, { clearMemory } from "@/core/run.ts";
-import { cleanup } from "@/utils/process-manager.ts";
-import { loadHistory, addToHistory } from "@/utils/history.ts";
-import { extractAtFilter, parseAtReferences, getFileContent } from "@/utils/file-scanner.ts";
+import { useMessages } from "./hooks/useMessages.ts";
+import { useDiffConfirm } from "./hooks/useDiffConfirm.ts";
+import { useHistory } from "./hooks/useHistory.ts";
+import { ThinkingStatus, type ModelConfig } from "@/core/types.ts";
+import type { Agent } from "@/core/agent.ts";
+import { extractAtFilter, parseAtReferences, getFileContent } from "./features/file-picker/file-scanner.ts";
 import { join } from "path";
 
 const welcomeMessage = `您好老板！
@@ -26,123 +24,38 @@ const welcomeMessage = `您好老板！
 
 有什么可以为您效劳的？😊`;
 
-/**
- * 主应用组件
- */
-const App: React.FC = () => {
+export interface AppProps {
+  agent: Agent;
+}
+
+const App: React.FC<AppProps> = ({ agent }) => {
+  const { messageBus, confirmBus, config } = agent;
+
   const { exit } = useApp();
-  const [messages, setMessages] = useState<Message[]>([]);
+  const { messages, thinkingStatus } = useMessages(messageBus, welcomeMessage);
+  const { showDiffConfirm, pendingChange, diffEditorOpened, handleDiffConfirm } = useDiffConfirm(confirmBus);
+  const { pushHistory, navigateUp, navigateDown, resetNavigation } = useHistory();
+
   const [inputValue, setInputValue] = useState("");
-  const [thinkingStatus, setThinkingStatus] = useState<ThinkingState>({
-    status: ThinkingStatus.IDLE,
-    detail: "",
-  });
   const [isProcessing, setIsProcessing] = useState(false);
-
-  // 历史命令相关状态
-  const [history, setHistory] = useState<string[]>(() => loadHistory()); // 从文件加载历史
-  const [historyIndex, setHistoryIndex] = useState(-1);
-  const [tempInput, setTempInput] = useState(""); // 保存当前输入（用于从历史返回时恢复）
-
-  // 模型选择状态
   const [isSelectingModel, setIsSelectingModel] = useState(false);
-
-  // 命令选择状态
   const [showCommandSuggestions, setShowCommandSuggestions] = useState(false);
   const [commandSelectedIndex, setCommandSelectedIndex] = useState(0);
-
-  // 文件选择状态
   const [showFileSuggestions, setShowFileSuggestions] = useState(false);
   const [fileSelectedIndex, setFileSelectedIndex] = useState(0);
   const [fileFilter, setFileFilter] = useState("");
   const [atStartIndex, setAtStartIndex] = useState(-1);
-
-  // 输入框 key，用于强制重新挂载以重置光标位置
   const [inputKey, setInputKey] = useState(0);
 
-  // Diff 确认相关状态
-  const [showDiffConfirm, setShowDiffConfirm] = useState(false);
-  const [pendingChange, setPendingChange] = useState<PendingChange | null>(null);
-  const [diffEditorOpened, setDiffEditorOpened] = useState<EditorType | null>(null);
-  const [diffTempFile, setDiffTempFile] = useState<string | null>(null);
+  const handleExit = useCallback(() => {
+    agent.dispose();
+    exit();
+  }, [agent, exit]);
 
-  // 订阅消息总线
-  useEffect(() => {
-    const handleMessage = (message: Message) => {
-      setMessages((prev) => [...prev, message]);
-    };
-
-    const handleMessageUpdate = (updatedMessage: Message) => {
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === updatedMessage.id ? { ...updatedMessage } : msg
-        )
-      );
-    };
-
-    const handleThinking = (status: ThinkingState) => {
-      setThinkingStatus(status);
-    };
-
-    const handleClear = () => {
-      setMessages([]);
-    };
-
-    messageBus.on("message", handleMessage);
-    messageBus.on("message:update", handleMessageUpdate);
-    messageBus.on("thinking", handleThinking);
-    messageBus.on("clear", handleClear);
-
-    // 订阅完成后发送欢迎消息
-    messageBus.ai(welcomeMessage);
-
-    return () => {
-      messageBus.off("message", handleMessage);
-      messageBus.off("message:update", handleMessageUpdate);
-      messageBus.off("thinking", handleThinking);
-      messageBus.off("clear", handleClear);
-    };
-  }, []);
-
-  // 订阅 diffBus 事件
-  useEffect(() => {
-    const handlePendingChange = (change: PendingChange) => {
-      // 只有文件变更才尝试打开编辑器 diff
-      if (change.type === "file" && change.filePath && change.newContent) {
-        const result = tryOpenDiff(change.filePath, change.newContent);
-        
-        if (result) {
-          setDiffEditorOpened(result.editor);
-          setDiffTempFile(result.tempPath);
-        } else {
-          setDiffEditorOpened(null);
-          setDiffTempFile(null);
-        }
-      } else {
-        // 命令确认不需要打开编辑器
-        setDiffEditorOpened(null);
-        setDiffTempFile(null);
-      }
-      
-      setPendingChange(change);
-      setShowDiffConfirm(true);
-    };
-
-    diffBus.on("pending-change", handlePendingChange);
-
-    return () => {
-      diffBus.off("pending-change", handlePendingChange);
-    };
-  }, []);
-
-  // 获取过滤后的命令列表
   const getFilteredCommands = useCallback(() => {
-    return commands.filter((cmd) =>
-      `/${cmd.value}`.startsWith(inputValue)
-    );
+    return commands.filter((cmd) => `/${cmd.value}`.startsWith(inputValue));
   }, [inputValue]);
 
-  // 执行命令
   const executeCommand = useCallback((commandValue: string) => {
     setShowCommandSuggestions(false);
     setInputValue("");
@@ -153,9 +66,9 @@ const App: React.FC = () => {
         setIsSelectingModel(true);
         break;
       case "clear":
-        messageBus.emit("clear");
-        clearMemory();
-        diffBus.resetSession(); // 重置 diff 确认状态
+        messageBus.clearMessages();
+        agent.clearMemory();
+        confirmBus.resetSession();
         messageBus.createAIMessage();
         messageBus.ai("🧹 对话和记忆已清空");
         break;
@@ -176,252 +89,112 @@ const App: React.FC = () => {
         break;
       case "exit":
         messageBus.ai("👋 再见！");
-        setTimeout(() => {
-          cleanup();
-          exit();
-        }, 500);
+        setTimeout(() => handleExit(), 500);
         break;
     }
-  }, [exit]);
+  }, [handleExit, agent, messageBus, confirmBus]);
 
-  // 处理键盘输入（退出 + 历史命令切换 + 命令补全选择 + 文件补全选择）
   useInput((input, key) => {
-    if (key.ctrl && input === "c") {
-      cleanup();
-      exit();
-    }
+    if (key.ctrl && input === "c") { handleExit(); }
 
-    // 文件补全模式下的键盘处理
+    // 文件补全键盘处理
     if (showFileSuggestions && !isSelectingModel) {
       const filteredFiles = getFilteredFiles(fileFilter);
-
-      if (key.upArrow) {
-        setFileSelectedIndex((prev) =>
-          prev > 0 ? prev - 1 : filteredFiles.length - 1
-        );
-        return;
-      }
-
-      if (key.downArrow) {
-        setFileSelectedIndex((prev) =>
-          prev < filteredFiles.length - 1 ? prev + 1 : 0
-        );
-        return;
-      }
-
+      if (key.upArrow) { setFileSelectedIndex((p) => p > 0 ? p - 1 : filteredFiles.length - 1); return; }
+      if (key.downArrow) { setFileSelectedIndex((p) => p < filteredFiles.length - 1 ? p + 1 : 0); return; }
       if (key.return && filteredFiles.length > 0) {
-        const selectedFile = filteredFiles[fileSelectedIndex];
-        if (selectedFile) {
-          // 如果是目录，展开目录内容
-          if (selectedFile.isDirectory) {
-            const newFilter = selectedFile.relativePath + "/";
+        const selected = filteredFiles[fileSelectedIndex];
+        if (selected) {
+          const beforeAt = inputValue.slice(0, atStartIndex);
+          if (selected.isDirectory) {
+            const newFilter = selected.relativePath + "/";
             setFileFilter(newFilter);
             setFileSelectedIndex(0);
-            // 更新输入框
-            const beforeAt = inputValue.slice(0, atStartIndex);
             setInputValue(beforeAt + "@" + newFilter);
-            setInputKey((k) => k + 1); // 重置光标到末尾
           } else {
-            // 如果是文件，插入完整路径并关闭补全
-            const beforeAt = inputValue.slice(0, atStartIndex);
-            const newValue = beforeAt + "@" + selectedFile.relativePath + " ";
-            setInputValue(newValue);
-            setInputKey((k) => k + 1); // 重置光标到末尾
+            setInputValue(beforeAt + "@" + selected.relativePath + " ");
             setShowFileSuggestions(false);
             setFileSelectedIndex(0);
             setFileFilter("");
             setAtStartIndex(-1);
           }
+          setInputKey((k) => k + 1);
         }
         return;
       }
-
-      if (key.escape) {
-        setShowFileSuggestions(false);
-        setFileSelectedIndex(0);
-        setFileFilter("");
-        setAtStartIndex(-1);
-        return;
-      }
+      if (key.escape) { setShowFileSuggestions(false); setFileSelectedIndex(0); setFileFilter(""); setAtStartIndex(-1); return; }
     }
 
-    // 命令补全模式下的键盘处理
+    // 命令补全键盘处理
     if (showCommandSuggestions && !isSelectingModel) {
-      const filteredCommands = getFilteredCommands();
-      
-      if (key.upArrow) {
-        setCommandSelectedIndex((prev) =>
-          prev > 0 ? prev - 1 : filteredCommands.length - 1
-        );
-        return;
-      }
-
-      if (key.downArrow) {
-        setCommandSelectedIndex((prev) =>
-          prev < filteredCommands.length - 1 ? prev + 1 : 0
-        );
-        return;
-      }
-
-      if (key.return && filteredCommands.length > 0) {
-        const selectedCommand = filteredCommands[commandSelectedIndex];
-        if (selectedCommand) {
-          executeCommand(selectedCommand.value);
-        }
-        return;
-      }
-
-      if (key.escape) {
-        setShowCommandSuggestions(false);
-        setInputValue("");
-        setCommandSelectedIndex(0);
-        return;
-      }
+      const filtered = getFilteredCommands();
+      if (key.upArrow) { setCommandSelectedIndex((p) => p > 0 ? p - 1 : filtered.length - 1); return; }
+      if (key.downArrow) { setCommandSelectedIndex((p) => p < filtered.length - 1 ? p + 1 : 0); return; }
+      if (key.return && filtered.length > 0) { const cmd = filtered[commandSelectedIndex]; if (cmd) executeCommand(cmd.value); return; }
+      if (key.escape) { setShowCommandSuggestions(false); setInputValue(""); setCommandSelectedIndex(0); return; }
     }
 
-    // 上下键切换历史命令（非命令补全模式，非模型选择模式）
-    if (!isProcessing && !showCommandSuggestions && !isSelectingModel && history.length > 0) {
-      if (key.upArrow) {
-        if (historyIndex === -1) {
-          setTempInput(inputValue);
-          setHistoryIndex(history.length - 1);
-          setInputValue(history[history.length - 1]);
-        } else if (historyIndex > 0) {
-          setHistoryIndex(historyIndex - 1);
-          setInputValue(history[historyIndex - 1]);
-        }
-      }
-
-      if (key.downArrow) {
-        if (historyIndex !== -1) {
-          if (historyIndex < history.length - 1) {
-            setHistoryIndex(historyIndex + 1);
-            setInputValue(history[historyIndex + 1]);
-          } else {
-            setHistoryIndex(-1);
-            setInputValue(tempInput);
-          }
-        }
-      }
+    // 历史命令导航
+    if (!isProcessing && !showCommandSuggestions && !isSelectingModel) {
+      if (key.upArrow) { const val = navigateUp(inputValue); if (val !== null) setInputValue(val); }
+      if (key.downArrow) { const val = navigateDown(); if (val !== null) setInputValue(val); }
     }
   });
 
-  // 处理用户输入提交
-  const handleSubmit = useCallback(
-    async (value: string) => {
-      // 如果处于命令补全模式或文件补全模式，不处理提交（由 useInput 处理）
-      if (showCommandSuggestions || showFileSuggestions) {
-        return;
-      }
+  const handleSubmit = useCallback(async (value: string) => {
+    if (showCommandSuggestions || showFileSuggestions) return;
+    const trimmedValue = value.trim();
+    if (!trimmedValue || isProcessing) return;
 
-      const trimmedValue = value.trim();
+    if (trimmedValue.toLowerCase() === "exit" || trimmedValue.toLowerCase() === "quit") {
+      messageBus.ai("👋 再见！");
+      setTimeout(() => handleExit(), 500);
+      return;
+    }
 
-      if (!trimmedValue || isProcessing) {
-        return;
-      }
+    setInputValue("");
+    setIsProcessing(true);
+    pushHistory(trimmedValue);
 
-      // 检查退出命令
-      if (
-        trimmedValue.toLowerCase() === "exit" ||
-        trimmedValue.toLowerCase() === "quit"
-      ) {
-        messageBus.ai("👋 再见！");
-        setTimeout(() => {
-          cleanup();
-          exit();
-        }, 500);
-        return;
-      }
+    const atRefs = parseAtReferences(trimmedValue);
+    let fileContext = "";
+    if (atRefs.length > 0) {
+      const contents = atRefs.map((ref) => {
+        const fullPath = join(process.cwd(), ref);
+        return `--- 文件: ${ref} ---\n${getFileContent(fullPath)}\n--- 文件结束 ---`;
+      });
+      fileContext = "\n\n" + contents.join("\n\n");
+    }
 
-      // 清空输入
-      setInputValue("");
-      setIsProcessing(true);
+    messageBus.user(trimmedValue);
 
-      // 添加到历史记录并持久化
-      const newHistory = addToHistory(history, trimmedValue);
-      setHistory(newHistory);
-      // 重置历史索引
-      setHistoryIndex(-1);
-      setTempInput("");
+    try {
+      await agent.run(trimmedValue, fileContext);
+    } catch (error) {
+      messageBus.createAIMessage();
+      const err = error as Error;
+      messageBus.error(err?.message || String(error));
+    } finally {
+      setIsProcessing(false);
+      messageBus.setThinkingStatus(ThinkingStatus.IDLE);
+    }
+  }, [isProcessing, handleExit, showCommandSuggestions, showFileSuggestions, agent, pushHistory, messageBus]);
 
-      // 解析 @ 引用并读取文件内容
-      const atRefs = parseAtReferences(trimmedValue);
-      let fileContext = "";
-      if (atRefs.length > 0) {
-        const fileContents: string[] = [];
-        for (const ref of atRefs) {
-          const fullPath = join(process.cwd(), ref);
-          const content = getFileContent(fullPath);
-          fileContents.push(`--- 文件: ${ref} ---\n${content}\n--- 文件结束 ---`);
-        }
-        fileContext = "\n\n" + fileContents.join("\n\n");
-      }
-
-      // 显示用户消息
-      messageBus.user(trimmedValue);
-
-      try {
-        await run(trimmedValue, fileContext);
-      } catch (error) {
-        // 确保有一个 AI 消息来承载错误
-        messageBus.createAIMessage();
-        const err = error as Error;
-        if (err) {
-          messageBus.error(`${err.message || String(error)}`);
-        } else {
-          messageBus.error(`未知错误: ${String(error)}`);
-        }
-      } finally {
-        setIsProcessing(false);
-        messageBus.setThinkingStatus(ThinkingStatus.IDLE);
-      }
-    },
-    [isProcessing, exit, history, showCommandSuggestions, showFileSuggestions]
-  );
-
-  // 模型选择回调
   const handleModelSelect = useCallback((model: ModelConfig) => {
-    configBus.setCurrentModel(model.id);
+    config.setCurrentModel(model.id);
     messageBus.createAIMessage();
     messageBus.ai(`✅ 已切换到: ${model.name}`);
     setIsSelectingModel(false);
-  }, []);
+  }, [config, messageBus]);
 
-  // 模型选择取消回调
-  const handleModelCancel = useCallback(() => {
-    setIsSelectingModel(false);
-  }, []);
-
-  // Diff 确认回调
-  const handleDiffConfirm = useCallback((result: ConfirmResult) => {
-    if (pendingChange) {
-      diffBus.resolveChange(pendingChange.id, result);
-    }
-    
-    // 清理临时文件
-    if (diffTempFile) {
-      cleanupTempFile(diffTempFile);
-      setDiffTempFile(null);
-    }
-    
-    setShowDiffConfirm(false);
-    setPendingChange(null);
-    setDiffEditorOpened(null);
-  }, [pendingChange, diffTempFile]);
-
-  // 处理输入变化，检测 "/" 显示命令补全，检测 "@" 显示文件补全
   const handleInputChange = useCallback((value: string) => {
     setInputValue(value);
-    
-    // 检测是否以 "/" 开头，显示命令补全
     if (value.startsWith("/")) {
       setShowCommandSuggestions(true);
       setShowFileSuggestions(false);
       setCommandSelectedIndex(0);
     } else {
       setShowCommandSuggestions(false);
-      
-      // 检测 @ 符号，显示文件补全
       const atInfo = extractAtFilter(value);
       if (atInfo) {
         setShowFileSuggestions(true);
@@ -434,62 +207,29 @@ const App: React.FC = () => {
         setAtStartIndex(-1);
       }
     }
-    
-    // 重置历史索引
-    setHistoryIndex(-1);
-  }, []);
+    resetNavigation();
+  }, [resetNavigation]);
 
   return (
     <Box flexDirection="column" height="100%" padding={1}>
       {showDiffConfirm && pendingChange ? (
-        // Diff 确认模式
-        <DiffConfirm
-          change={pendingChange}
-          onConfirm={handleDiffConfirm}
-          editorOpened={diffEditorOpened}
-        />
+        <DiffConfirm change={pendingChange} onConfirm={handleDiffConfirm} editorOpened={diffEditorOpened} />
       ) : isSelectingModel ? (
-        // 模型选择模式（内部管理添加/编辑/删除）
         <ModelSelector
+          configManager={config}
+          messageBus={messageBus}
           onSelect={handleModelSelect}
-          onCancel={handleModelCancel}
+          onCancel={() => setIsSelectingModel(false)}
         />
       ) : (
         <>
-          {/* 消息列表区域 */}
           <MessageList messages={messages} />
-
-          {/* 命令补全列表 */}
-          {showCommandSuggestions && (
-            <CommandSuggestions
-              selectedIndex={commandSelectedIndex}
-              filter={inputValue}
-            />
-          )}
-
-          {/* 文件补全列表 */}
-          {showFileSuggestions && (
-            <FileSuggestions
-              selectedIndex={fileSelectedIndex}
-              filter={fileFilter}
-            />
-          )}
-
-          {/* 输入框 */}
-          <InputBox
-            value={inputValue}
-            onChange={handleInputChange}
-            onSubmit={handleSubmit}
-            isDisabled={isProcessing}
-            inputKey={inputKey}
-          />
-
-          {/* 底部提示 */}
+          {showCommandSuggestions && <CommandSuggestions selectedIndex={commandSelectedIndex} filter={inputValue} />}
+          {showFileSuggestions && <FileSuggestions selectedIndex={fileSelectedIndex} filter={fileFilter} />}
+          <InputBox value={inputValue} onChange={handleInputChange} onSubmit={handleSubmit} isDisabled={isProcessing} inputKey={inputKey} />
           <Box marginTop={1} justifyContent="space-between" paddingX={1}>
             <StatusBar thinkingStatus={thinkingStatus} />
-            <Text color="gray" dimColor>
-              {/* 输入 exit 或 quit 退出 */}
-            </Text>
+            <Text color="gray" dimColor>{""}</Text>
           </Box>
         </>
       )}

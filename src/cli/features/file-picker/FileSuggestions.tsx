@@ -1,6 +1,6 @@
 import React, { useMemo } from "react";
 import { Box, Text } from "ink";
-import { scanDirectory, type FileItem } from "@/utils/file-scanner.ts";
+import { scanDirectory, type FileItem } from "./file-scanner.ts";
 
 interface Props {
   selectedIndex: number;
@@ -17,7 +17,6 @@ const FileSuggestions: React.FC<Props> = ({
   filter,
   maxItems = 8,
 }) => {
-  // 扫描并缓存文件列表
   const files = useMemo(() => {
     return scanDirectory(process.cwd(), filter);
   }, [filter]);
@@ -30,7 +29,6 @@ const FileSuggestions: React.FC<Props> = ({
     );
   }
 
-  // 限制显示数量，支持滚动
   const startIndex = Math.max(
     0,
     Math.min(selectedIndex - Math.floor(maxItems / 2), files.length - maxItems)

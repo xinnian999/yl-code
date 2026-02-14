@@ -2,8 +2,8 @@
 
 import React from "react";
 import { render } from "ink";
+import { Agent } from "@/core/agent.ts";
 import App from "./App.tsx";
-import { cleanup } from "@/utils/process-manager.ts";
 
 // 检查是否在 TTY 环境下运行
 if (!process.stdin.isTTY) {
@@ -12,14 +12,9 @@ if (!process.stdin.isTTY) {
   process.exit(1);
 }
 
-// 监听退出信号
-process.on("SIGINT", () => {
-  cleanup();
-});
+const agent = new Agent();
 
-process.on("SIGTERM", () => {
-  cleanup();
-});
+process.on("SIGINT", () => agent.cleanup());
+process.on("SIGTERM", () => agent.cleanup());
 
-// 渲染 TUI
-render(React.createElement(App));
+render(React.createElement(App, { agent }));

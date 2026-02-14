@@ -1,15 +1,17 @@
 import React, { useState, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
 import SelectInput from "ink-select-input";
-import configBus, { type ModelConfig } from "@/utils/config-bus.ts";
+import type { ConfigManager, ModelConfig } from "@/core/config.ts";
+import type { MessageBus } from "@/core/message-bus.ts";
 import ModelForm, { type ModelFormData } from "./ModelForm.tsx";
-import ConfirmDialog from "./ConfirmDialog.tsx";
-import messageBus from "@/utils/message-bus.ts";
+import ConfirmDialog from "@/cli/components/ConfirmDialog.tsx";
 
 // 内部视图状态
 type ViewState = "list" | "add" | "edit" | "delete" | "copy";
 
 interface Props {
+  configManager: ConfigManager;
+  messageBus: MessageBus;
   onSelect: (model: ModelConfig) => void;
   onCancel?: () => void;
 }
@@ -20,41 +22,35 @@ interface Props {
  * 内部管理添加、编辑、删除模型的表单状态
  * 支持快捷键：a 添加、c 复制、e 编辑、d 删除
  */
-const ModelSelector: React.FC<Props> = ({ onSelect, onCancel }) => {
+const ModelSelector: React.FC<Props> = ({ configManager, messageBus, onSelect, onCancel }) => {
   const [viewState, setViewState] = useState<ViewState>("list");
   const [editingModel, setEditingModel] = useState<ModelConfig | null>(null);
   const [deletingModel, setDeletingModel] = useState<ModelConfig | null>(null);
   const [copyingModel, setCopyingModel] = useState<ModelConfig | null>(null);
 
-  // 使用函数获取最新的 models，确保更新后能获取到最新数据
-  const getModels = () => configBus.getModels();
-  const currentId = configBus.getCurrentModelId();
+  const getModels = () => configManager.getModels();
+  const currentId = configManager.getCurrentModelId();
   const models = getModels();
 
-  // 追踪当前高亮的模型索引
   const initialIndex = Math.max(
     0,
     models.findIndex((m) => m.id === currentId)
   );
   const [highlightedIndex, setHighlightedIndex] = useState(initialIndex);
 
-  // 监听键盘输入（仅在列表视图时生效）
   useInput((input, key) => {
     if (viewState !== "list") return;
 
-    // Esc 退出
     if (key.escape && onCancel) {
       onCancel();
       return;
     }
 
-    // a 添加模型
     if (input.toLowerCase() === "a") {
       setViewState("add");
       return;
     }
 
-    // c 复制当前高亮的模型
     if (input.toLowerCase() === "c") {
       const model = models[highlightedIndex];
       if (model) {
@@ -64,7 +60,6 @@ const ModelSelector: React.FC<Props> = ({ onSelect, onCancel }) => {
       return;
     }
 
-    // e 编辑当前高亮的模型
     if (input.toLowerCase() === "e") {
       const model = models[highlightedIndex];
       if (model) {
@@ -74,11 +69,9 @@ const ModelSelector: React.FC<Props> = ({ onSelect, onCancel }) => {
       return;
     }
 
-    // d 删除当前高亮的模型
     if (input.toLowerCase() === "d") {
       const model = models[highlightedIndex];
       if (model) {
-        // 不能删除当前正在使用的模型
         if (model.id === currentId) {
           messageBus.createAIMessage();
           messageBus.ai("⚠️ 不能删除当前正在使用的模型，请先切换到其他模型");
@@ -92,7 +85,6 @@ const ModelSelector: React.FC<Props> = ({ onSelect, onCancel }) => {
     }
   });
 
-  // 构建选项列表，当前模型显示 ✓ 标记
   const items = models.map((model) => ({
     label: model.id === currentId ? `${model.name} ✓` : model.name,
     value: model.id,
@@ -112,7 +104,6 @@ const ModelSelector: React.FC<Props> = ({ onSelect, onCancel }) => {
     }
   };
 
-  // 模型表单提交回调
   const handleFormSubmit = useCallback(
     (data: ModelFormData) => {
       if (viewState === "add" || viewState === "copy") {
@@ -123,14 +114,14 @@ const ModelSelector: React.FC<Props> = ({ onSelect, onCancel }) => {
           apiKey: data.apiKey,
           modelName: data.modelName,
         };
-        configBus.addModel(newModel);
-        configBus.setCurrentModel(newModel.id);
+        configManager.addModel(newModel);
+        configManager.setCurrentModel(newModel.id);
         messageBus.createAIMessage();
         messageBus.ai(`✅ 模型 "${data.name}" 添加成功，已自动切换`);
         setCopyingModel(null);
         onCancel?.();
       } else if (viewState === "edit" && editingModel) {
-        configBus.updateModel(editingModel.id, {
+        configManager.updateModel(editingModel.id, {
           name: data.name,
           baseUrl: data.baseUrl,
           apiKey: data.apiKey,
@@ -142,34 +133,30 @@ const ModelSelector: React.FC<Props> = ({ onSelect, onCancel }) => {
         setViewState("list");
       }
     },
-    [viewState, editingModel, onCancel]
+    [viewState, editingModel, onCancel, configManager, messageBus]
   );
 
-  // 模型表单取消回调
   const handleFormCancel = useCallback(() => {
     setEditingModel(null);
     setCopyingModel(null);
     setViewState("list");
   }, []);
 
-  // 删除确认回调
   const handleDeleteConfirm = useCallback(() => {
     if (deletingModel) {
-      configBus.removeModel(deletingModel.id);
+      configManager.removeModel(deletingModel.id);
       messageBus.createAIMessage();
       messageBus.ai(`✅ 模型 "${deletingModel.name}" 已删除`);
       setDeletingModel(null);
       onCancel?.();
     }
-  }, [deletingModel, onCancel]);
+  }, [deletingModel, onCancel, configManager, messageBus]);
 
-  // 删除取消回调
   const handleDeleteCancel = useCallback(() => {
     setDeletingModel(null);
     setViewState("list");
   }, []);
 
-  // 根据当前视图状态渲染不同内容
   if (viewState === "add") {
     return (
       <ModelForm
@@ -222,7 +209,6 @@ const ModelSelector: React.FC<Props> = ({ onSelect, onCancel }) => {
     );
   }
 
-  // 默认显示模型列表
   return (
     <Box flexDirection="column" paddingY={1}>
       <Text color="cyan" bold>
@@ -245,7 +231,6 @@ const ModelSelector: React.FC<Props> = ({ onSelect, onCancel }) => {
           onHighlight={handleHighlight}
         />
       </Box>
-      {/* 快捷键提示 */}
       <Box>
         <Text color="gray">
           <Text color="cyan">a</Text> 添加 | <Text color="cyan">c</Text> 复制 |{" "}

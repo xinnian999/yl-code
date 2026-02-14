@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
-import { commands } from "./commands.ts";
+import { commands } from "@/cli/commands.ts";
 
 interface Props {
   selectedIndex: number;
