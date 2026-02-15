@@ -26,6 +26,30 @@ export interface ThinkingState {
 
 export type ConfirmResult = "accept" | "accept_all" | "reject";
 
+// ============ Agent 模式 ============
+
+/** Agent 工作模式 */
+export const AgentMode = {
+  ASK: "ask",
+  BUILD: "build",
+} as const;
+
+/** Agent 模式值类型 */
+export type AgentModeValue = (typeof AgentMode)[keyof typeof AgentMode];
+
+/** 模式配置信息（用于 UI 展示和扩展） */
+export interface AgentModeConfig {
+  value: AgentModeValue;
+  label: string;
+  description: string;
+}
+
+/** 所有可用模式列表 */
+export const AGENT_MODES: AgentModeConfig[] = [
+  { value: "ask",   label: "Ask",   description: "问答模式" },
+  { value: "build", label: "Build", description: "构建模式" },
+];
+
 // ============ 模型配置 ============
 
 export interface ModelConfig {

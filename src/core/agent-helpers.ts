@@ -1,7 +1,8 @@
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import { ThinkingStatus } from "./types.ts";
+import { AgentMode, ThinkingStatus } from "./types.ts";
+import type { AgentModeValue } from "./types.ts";
 
 // ============ 辅助类型 ============
 
@@ -74,12 +75,34 @@ export function getToolDescription(toolName: string, args: ToolArgs): string {
   }
 }
 
-/** 加载 system.md 模板并注入当前工作目录 */
-export function loadSystemPrompt(): string {
+/** 加载 system.md 原始模板 */
+export function loadSystemTemplate(): string {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = dirname(__filename);
-  const template = readFileSync(join(__dirname, "system.md"), "utf-8");
-  return template.replace("${process.cwd()}", process.cwd());
+  return readFileSync(join(__dirname, "system.md"), "utf-8");
+}
+
+/** 根据模式生成模式说明文本 */
+export function getModeInstructions(mode: AgentModeValue): string {
+  switch (mode) {
+    case AgentMode.ASK:
+      return [
+        "当前是 **问答模式（Ask）**。",
+        "你只能使用 `read_file` 和 `list_directory` 工具来阅读代码、回答问题。",
+        "**严禁调用 `write_file` 或 `execute_command`**，即使用户要求也不行，请告知用户切换到 Build 模式。",
+      ].join("\n");
+    case AgentMode.BUILD:
+      return "当前是 **构建模式（Build）**，你可以使用所有工具来完成编码任务。";
+    default:
+      return "";
+  }
+}
+
+/** 根据模板和模式构建完整系统提示词 */
+export function buildSystemPrompt(template: string, mode: AgentModeValue): string {
+  return template
+    .replace("${process.cwd()}", process.cwd())
+    .replace("${mode_instructions}", getModeInstructions(mode));
 }
 
 /** 根据思考状态获取默认显示文本 */

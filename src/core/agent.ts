@@ -7,20 +7,22 @@ import {
   AIMessage,
 } from "@langchain/core/messages";
 import { concat } from "@langchain/core/utils/stream";
-import { createTools } from "./tools.ts";
+import { createTools, getToolsForMode } from "./tools.ts";
+import type { ModeTool } from "./tools.ts";
 import { MessageBus } from "./message-bus.ts";
 import { ConfirmBus } from "./confirm-bus.ts";
 import { ConfigManager } from "./config.ts";
 import { ProcessManager } from "./process-manager.ts";
-import { ThinkingStatus } from "./types.ts";
-import type { ModelConfig } from "./types.ts";
+import { AgentMode, ThinkingStatus } from "./types.ts";
+import type { ModelConfig, AgentModeValue } from "./types.ts";
 import type { BaseMessage } from "@langchain/core/messages";
 import { HELP_TEXT, type CommandAction } from "./commands.ts";
 import { SessionManager } from "./session-manager.ts";
 import { parseAtReferences, getFileContent } from "./file-scanner.ts";
 import { join } from "path";
 import {
-  loadSystemPrompt,
+  loadSystemTemplate,
+  buildSystemPrompt,
   formatDuration,
   getToolNameFromChunk,
   getToolArgsPreview,
@@ -32,9 +34,7 @@ import {
 /** 欢迎消息文本 */
 const WELCOME_MESSAGE = `您好老板！
 
-我是《牛码》；
-
-我擅长写代码、改BUG等；
+我是一个会写代码的《牛码》；
 
 有什么可以为您效劳的？😊`;
 
@@ -57,16 +57,19 @@ export class Agent {
   private chatMessages: BaseMessage[];
   /** 当前绑定工具的模型实例 */
   private currentModel: ReturnType<ChatOpenAI["bindTools"]> | null = null;
-  /** 系统提示词 */
-  private systemPrompt: string;
-  /** 工具列表 */
-  private tools: ReturnType<typeof createTools>;
+  /** 系统提示词原始模板 */
+  private systemTemplate: string;
+  /** 带模式标签的工具列表 */
+  private tools: ModeTool[];
+  /** 当前工作模式 */
+  private mode: AgentModeValue = AgentMode.BUILD;
   /** 模型变更事件的取消订阅函数 */
   private unsubModelChange: (() => void);
 
   constructor() {
-    this.systemPrompt = loadSystemPrompt();
-    this.chatMessages = [new SystemMessage(this.systemPrompt)];
+    this.systemTemplate = loadSystemTemplate();
+    const systemPrompt = buildSystemPrompt(this.systemTemplate, this.mode);
+    this.chatMessages = [new SystemMessage(systemPrompt)];
     this.tools = createTools(this.confirmBus, this.processManager);
 
     this.unsubModelChange = this.config.onModelChange(() => {
@@ -76,18 +79,20 @@ export class Agent {
     this.messageBus.ai(WELCOME_MESSAGE);
   }
 
-  /** 获取或创建绑定工具的模型实例 */
+  /** 获取或创建绑定工具的模型实例（根据当前模式筛选工具） */
   private getModel() {
     if (!this.currentModel) {
       const modelConfig = this.config.getCurrentModel();
-      this.currentModel = new ChatOpenAI({
+      const llm = new ChatOpenAI({
         modelName: modelConfig.modelName,
         apiKey: modelConfig.apiKey,
         temperature: 0,
         timeout: 300000,
         maxRetries: 2,
         configuration: { baseURL: modelConfig.baseUrl },
-      }).bindTools(this.tools);
+      });
+      const tools = getToolsForMode(this.tools, this.mode);
+      this.currentModel = llm.bindTools(tools);
     }
     return this.currentModel;
   }
@@ -95,7 +100,8 @@ export class Agent {
   /** 清空对话历史，仅保留系统提示词 */
   clearMemory(): void {
     this.chatMessages.length = 0;
-    this.chatMessages.push(new SystemMessage(this.systemPrompt));
+    const systemPrompt = buildSystemPrompt(this.systemTemplate, this.mode);
+    this.chatMessages.push(new SystemMessage(systemPrompt));
   }
 
   /** 执行一次对话，支持多轮工具调用 */
@@ -226,44 +232,52 @@ export class Agent {
 
   /** 执行响应中的工具调用列表 */
   private async executeToolCalls(response: any, iterationStartTime: number): Promise<void> {
+    const allowedTools = getToolsForMode(this.tools, this.mode);
+
     for (const toolCall of response.tool_calls as ToolCall[]) {
       const contentText = response.content?.toString().replaceAll("\n", "") || "";
       if (contentText) {
         this.messageBus.ai(contentText);
       }
 
-      const foundTool = this.tools.find((t) => t.name === toolCall.name);
+      const foundTool = allowedTools.find((t) => t.name === toolCall.name);
       const toolDesc = getToolDescription(toolCall.name, toolCall.args as ToolArgs);
 
       this.messageBus.setThinkingStatus(ThinkingStatus.TOOL_CALLING, `执行中: ${toolDesc}`);
 
-      if (foundTool) {
-        try {
-          const waitTimeBefore = this.confirmBus.totalWaitTime;
-          const toolStartTime = Date.now();
-          const toolResult = await (foundTool as any).invoke(toolCall.args);
-          const waitTimeAdded = this.confirmBus.totalWaitTime - waitTimeBefore;
-          const toolDuration = Date.now() - toolStartTime - waitTimeAdded;
+      if (!foundTool) {
+        const isKnownTool = this.tools.some((t) => t.tool.name === toolCall.name);
+        const errorMsg = isKnownTool
+          ? `工具 "${toolCall.name}" 在当前模式下不可用，请切换到 Build 模式`
+          : `工具 "${toolCall.name}" 未找到`;
 
-          this.messageBus.tool(`${toolDesc} (耗时: ${formatDuration(toolDuration)})`);
-          this.chatMessages.push(
-            new ToolMessage({ content: toolResult as string, tool_call_id: toolCall.id })
-          );
-        } catch (error) {
-          const toolDuration = Date.now() - iterationStartTime;
-          const err = error as Error;
-          const errMsg = err?.message || String(error);
-          this.messageBus.tool(`${toolDesc} (耗时: ${formatDuration(toolDuration)})`);
-          this.messageBus.error(`   ↳ 失败: ${errMsg}`);
-          this.chatMessages.push(
-            new ToolMessage({ content: `工具执行失败: ${errMsg}`, tool_call_id: toolCall.id })
-          );
-        }
-      } else {
         this.messageBus.tool(`调用工具: ${toolCall.name}`);
-        this.messageBus.error(`   ↳ 工具未找到`);
+        this.messageBus.error(`   ↳ ${errorMsg}`);
         this.chatMessages.push(
-          new ToolMessage({ content: `工具 "${toolCall.name}" 未找到`, tool_call_id: toolCall.id })
+          new ToolMessage({ content: errorMsg, tool_call_id: toolCall.id })
+        );
+        continue;
+      }
+
+      try {
+        const waitTimeBefore = this.confirmBus.totalWaitTime;
+        const toolStartTime = Date.now();
+        const toolResult = await (foundTool as any).invoke(toolCall.args);
+        const waitTimeAdded = this.confirmBus.totalWaitTime - waitTimeBefore;
+        const toolDuration = Date.now() - toolStartTime - waitTimeAdded;
+
+        this.messageBus.tool(`${toolDesc} (耗时: ${formatDuration(toolDuration)})`);
+        this.chatMessages.push(
+          new ToolMessage({ content: toolResult as string, tool_call_id: toolCall.id })
+        );
+      } catch (error) {
+        const toolDuration = Date.now() - iterationStartTime;
+        const err = error as Error;
+        const errMsg = err?.message || String(error);
+        this.messageBus.tool(`${toolDesc} (耗时: ${formatDuration(toolDuration)})`);
+        this.messageBus.error(`   ↳ 失败: ${errMsg}`);
+        this.chatMessages.push(
+          new ToolMessage({ content: `工具执行失败: ${errMsg}`, tool_call_id: toolCall.id })
         );
       }
     }
@@ -378,6 +392,29 @@ export class Agent {
     this.messageBus.ai(message);
   }
 
+  // ============ 模式管理 ============
+
+  /** 获取当前工作模式 */
+  getMode(): AgentModeValue {
+    return this.mode;
+  }
+
+  /** 设置工作模式，更新系统提示词并清除模型缓存以重新绑定工具 */
+  setMode(mode: AgentModeValue): void {
+    if (this.mode === mode) return;
+    this.mode = mode;
+    this.currentModel = null;
+    this.updateSystemMessage();
+  }
+
+  /** 更新对话历史中的系统提示词（替换 chatMessages[0]） */
+  private updateSystemMessage(): void {
+    const systemPrompt = buildSystemPrompt(this.systemTemplate, this.mode);
+    if (this.chatMessages.length > 0) {
+      this.chatMessages[0] = new SystemMessage(systemPrompt);
+    }
+  }
+
   // ============ 会话管理 ============
 
   /** 获取第一条用户消息内容（用于会话标题） */
@@ -406,6 +443,7 @@ export class Agent {
     if (!data) return false;
 
     this.chatMessages = data.chatMessages;
+    this.updateSystemMessage();
     this.messageBus.restoreMessages(data.uiMessages);
     this.confirmBus.resetSession();
     return true;

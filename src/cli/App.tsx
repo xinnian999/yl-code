@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import { Box, Text, useApp, useInput } from "ink";
+import { Box, useApp, useInput } from "ink";
 import MessageList from "./components/MessageList.tsx";
 import InputBox from "./components/InputBox.tsx";
 import StatusBar from "./components/StatusBar.tsx";
@@ -8,12 +8,14 @@ import ModelSelector from "./components/ModelSelector.tsx";
 import HistorySelector, { NEW_SESSION_ID } from "./components/HistorySelector.tsx";
 import FileSuggestions, { getFilteredFiles } from "./components/FileSuggestions.tsx";
 import DiffConfirm from "./components/DiffConfirm.tsx";
+import ModeIndicator from "./components/ModeIndicator.tsx";
 import { commands } from "@/core/commands.ts";
 import { useMessages } from "./hooks/useMessages.ts";
 import { useDiffConfirm } from "./hooks/useDiffConfirm.ts";
 import { useHistory } from "./hooks/useHistory.ts";
 import { extractAtFilter } from "@/core/file-scanner.ts";
-import type { ModelConfig } from "@/core/types.ts";
+import { AgentMode, AGENT_MODES } from "@/core/types.ts";
+import type { ModelConfig, AgentModeValue } from "@/core/types.ts";
 import type { Agent } from "@/core/agent.ts";
 
 /** 主应用组件属性 */
@@ -38,6 +40,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
   const [fileFilter, setFileFilter] = useState("");
   const [atStartIndex, setAtStartIndex] = useState(-1);
   const [inputKey, setInputKey] = useState(0);
+  const [currentMode, setCurrentMode] = useState<AgentModeValue>(AgentMode.BUILD);
 
   const handleExit = useCallback(() => {
     agent.dispose();
@@ -103,6 +106,15 @@ const App: React.FC<AppProps> = ({ agent }) => {
     if (!isProcessing && !showCommandSuggestions && !isSelectingModel) {
       if (key.upArrow) { const val = navigateUp(inputValue); if (val !== null) setInputValue(val); }
       if (key.downArrow) { const val = navigateDown(); if (val !== null) setInputValue(val); }
+    }
+
+    // Tab 切换工作模式
+    if (key.tab && !showCommandSuggestions && !showFileSuggestions
+        && !isSelectingModel && !isSelectingHistory && !showDiffConfirm) {
+      const currentIndex = AGENT_MODES.findIndex((m) => m.value === currentMode);
+      const nextMode = AGENT_MODES[(currentIndex + 1) % AGENT_MODES.length].value;
+      setCurrentMode(nextMode);
+      agent.setMode(nextMode);
     }
   });
 
@@ -186,7 +198,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
           <InputBox value={inputValue} onChange={handleInputChange} onSubmit={handleSubmit} isDisabled={isProcessing} inputKey={inputKey} />
           <Box marginTop={1} justifyContent="space-between" paddingX={1}>
             <StatusBar thinkingStatus={thinkingStatus} />
-            <Text color="gray" dimColor>{""}</Text>
+            <ModeIndicator mode={currentMode} />
           </Box>
         </>
       )}

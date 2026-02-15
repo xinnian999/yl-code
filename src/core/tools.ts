@@ -1,14 +1,32 @@
 import { tool } from "@langchain/core/tools";
+import type { StructuredToolInterface } from "@langchain/core/tools";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { z } from "zod";
-import type { ConfirmPort, ProcessPort } from "./types.ts";
+import { AgentMode } from "./types.ts";
+import type { ConfirmPort, ProcessPort, AgentModeValue } from "./types.ts";
+
+// ============ 类型定义 ============
+
+/** 带模式标签的工具 */
+export interface ModeTool {
+  tool: StructuredToolInterface;
+  modes: AgentModeValue[];
+}
+
+// ============ 工具筛选 ============
+
+/** 按模式筛选可用工具 */
+export function getToolsForMode(tools: ModeTool[], mode: AgentModeValue): StructuredToolInterface[] {
+  return tools.filter((t) => t.modes.includes(mode)).map((t) => t.tool);
+}
 
 /**
  * 创建工具集，通过端口注入确认和进程管理能力
+ * 每个工具绑定支持的模式标签，用于按模式筛选
  */
-export function createTools(confirm: ConfirmPort, processPort: ProcessPort) {
+export function createTools(confirm: ConfirmPort, processPort: ProcessPort): ModeTool[] {
   const readFileTool = tool(
     async ({ filePath }: { filePath: string }): Promise<string> => {
       try {
@@ -173,5 +191,10 @@ export function createTools(confirm: ConfirmPort, processPort: ProcessPort) {
     }
   );
 
-  return [readFileTool, writeFileTool, executeCommandTool, listDirectoryTool];
+  return [
+    { tool: readFileTool,       modes: [AgentMode.ASK, AgentMode.BUILD] },
+    { tool: listDirectoryTool,  modes: [AgentMode.ASK, AgentMode.BUILD] },
+    { tool: writeFileTool,      modes: [AgentMode.BUILD] },
+    { tool: executeCommandTool, modes: [AgentMode.BUILD] },
+  ];
 }
