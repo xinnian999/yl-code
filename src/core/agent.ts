@@ -16,6 +16,7 @@ import { ThinkingStatus } from "./types.ts";
 import type { ModelConfig } from "./types.ts";
 import type { BaseMessage } from "@langchain/core/messages";
 import { HELP_TEXT, type CommandAction } from "./commands.ts";
+import { SessionManager } from "./session-manager.ts";
 import { parseAtReferences, getFileContent } from "./file-scanner.ts";
 import { join } from "path";
 import {
@@ -47,6 +48,8 @@ export class Agent {
   readonly confirmBus = new ConfirmBus();
   /** 配置管理器 */
   readonly config = new ConfigManager();
+  /** 会话管理器 */
+  readonly sessionManager = new SessionManager();
   /** 后台进程管理器 */
   private processManager = new ProcessManager();
 
@@ -269,14 +272,15 @@ export class Agent {
   /** 执行斜杠命令，返回 UI 需要响应的动作 */
   executeCommand(command: string): CommandAction {
     switch (command) {
+      case "new":
+        this.newSession();
+        return { action: "none" };
+      case "history":
+        return { action: "show_history" };
       case "model":
         return { action: "select_model" };
       case "clear":
-        this.messageBus.clearMessages();
-        this.clearMemory();
-        this.confirmBus.resetSession();
-        this.messageBus.createAIMessage();
-        this.messageBus.ai("🧹 对话和记忆已清空");
+        this.newSession();
         return { action: "none" };
       case "help":
         this.messageBus.createAIMessage();
@@ -310,6 +314,7 @@ export class Agent {
       this.messageBus.error(err?.message || String(error));
     } finally {
       this.messageBus.setThinkingStatus(ThinkingStatus.IDLE);
+      this.saveSession();
     }
   }
 
@@ -373,6 +378,50 @@ export class Agent {
     this.messageBus.ai(message);
   }
 
+  // ============ 会话管理 ============
+
+  /** 获取第一条用户消息内容（用于会话标题） */
+  private getFirstUserMessage(): string {
+    for (const msg of this.chatMessages) {
+      if (msg instanceof HumanMessage) {
+        return typeof msg.content === "string" ? msg.content : "";
+      }
+    }
+    return "";
+  }
+
+  /** 保存当前会话到磁盘 */
+  saveSession(): void {
+    this.sessionManager.saveCurrentSession(
+      this.chatMessages,
+      this.messageBus.getMessages(),
+      this.getFirstUserMessage()
+    );
+  }
+
+  /** 恢复指定会话（保存当前 → 加载目标 → 恢复状态） */
+  restoreSession(sessionId: string): boolean {
+    this.saveSession();
+    const data = this.sessionManager.switchToSession(sessionId);
+    if (!data) return false;
+
+    this.chatMessages = data.chatMessages;
+    this.messageBus.restoreMessages(data.uiMessages);
+    this.confirmBus.resetSession();
+    return true;
+  }
+
+  /** 开始新对话会话（保存当前 → 新建空白） */
+  newSession(): void {
+    this.saveSession();
+    this.sessionManager.startNewSession();
+    this.clearMemory();
+    this.messageBus.clearMessages();
+    this.confirmBus.resetSession();
+    this.messageBus.createAIMessage();
+    this.messageBus.ai("🧹 已开启新对话");
+  }
+
   /** 清理后台进程 */
   cleanup(): void {
     this.processManager.cleanup();
@@ -380,6 +429,7 @@ export class Agent {
 
   /** 释放资源，取消事件监听 */
   dispose(): void {
+    this.saveSession();
     this.unsubModelChange();
   }
 }

@@ -5,6 +5,7 @@ import InputBox from "./components/InputBox.tsx";
 import StatusBar from "./components/StatusBar.tsx";
 import CommandSuggestions from "./components/CommandSuggestions.tsx";
 import ModelSelector from "./components/ModelSelector.tsx";
+import HistorySelector, { NEW_SESSION_ID } from "./components/HistorySelector.tsx";
 import FileSuggestions, { getFilteredFiles } from "./components/FileSuggestions.tsx";
 import DiffConfirm from "./components/DiffConfirm.tsx";
 import { commands } from "@/core/commands.ts";
@@ -29,6 +30,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
   const [inputValue, setInputValue] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSelectingModel, setIsSelectingModel] = useState(false);
+  const [isSelectingHistory, setIsSelectingHistory] = useState(false);
   const [showCommandSuggestions, setShowCommandSuggestions] = useState(false);
   const [commandSelectedIndex, setCommandSelectedIndex] = useState(0);
   const [showFileSuggestions, setShowFileSuggestions] = useState(false);
@@ -53,6 +55,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
 
     const result = agent.executeCommand(commandValue);
     if (result.action === "select_model") setIsSelectingModel(true);
+    if (result.action === "show_history") setIsSelectingHistory(true);
     if (result.action === "exit") setTimeout(() => handleExit(), 500);
   }, [handleExit, agent]);
 
@@ -127,6 +130,15 @@ const App: React.FC<AppProps> = ({ agent }) => {
     setIsSelectingModel(false);
   }, [agent]);
 
+  const handleHistorySelect = useCallback((sessionId: string) => {
+    if (sessionId === NEW_SESSION_ID) {
+      agent.newSession();
+    } else {
+      agent.restoreSession(sessionId);
+    }
+    setIsSelectingHistory(false);
+  }, [agent]);
+
   const handleInputChange = useCallback((value: string) => {
     setInputValue(value);
     if (value.startsWith("/")) {
@@ -154,6 +166,12 @@ const App: React.FC<AppProps> = ({ agent }) => {
     <Box flexDirection="column" height="100%" padding={1}>
       {showDiffConfirm && pendingChange ? (
         <DiffConfirm change={pendingChange} onConfirm={handleDiffConfirm} editorOpened={diffEditorOpened} />
+      ) : isSelectingHistory ? (
+        <HistorySelector
+          agent={agent}
+          onSelect={handleHistorySelect}
+          onCancel={() => setIsSelectingHistory(false)}
+        />
       ) : isSelectingModel ? (
         <ModelSelector
           agent={agent}

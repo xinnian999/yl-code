@@ -37,17 +37,23 @@ export function useMessages(agent: Agent) {
       setMessages([]);
     };
 
+    const handleRestore = (restoredMessages: Message[]) => {
+      setMessages([...restoredMessages]);
+    };
+
     const { messageBus } = agent;
     messageBus.on("message", handleMessage);
     messageBus.on("message:update", handleMessageUpdate);
     messageBus.on("thinking", handleThinking);
     messageBus.on("clear", handleClear);
+    messageBus.on("restore", handleRestore);
 
     return () => {
       messageBus.off("message", handleMessage);
       messageBus.off("message:update", handleMessageUpdate);
       messageBus.off("thinking", handleThinking);
       messageBus.off("clear", handleClear);
+      messageBus.off("restore", handleRestore);
     };
   }, [agent]);
 

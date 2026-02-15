@@ -35,6 +35,7 @@ interface MessageBusEvents {
   "message:update": (message: Message) => void;
   thinking: (status: ThinkingState) => void;
   clear: () => void;
+  restore: (messages: Message[]) => void;
 }
 
 // ============ 消息总线 ============
@@ -147,6 +148,13 @@ export class MessageBus extends EventEmitter implements MessagePort {
   clearMessages(): void {
     this.messages = [];
     this.emit("clear");
+  }
+
+  /** 恢复消息列表（用于会话切换） */
+  restoreMessages(messages: Message[]): void {
+    this.messages = [...messages];
+    this.messageIdCounter = messages.length;
+    this.emit("restore", this.messages);
   }
 
   // 类型安全的事件方法
