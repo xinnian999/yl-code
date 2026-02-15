@@ -12,7 +12,7 @@ export function useDiffConfirm(agent: Agent) {
   const [showDiffConfirm, setShowDiffConfirm] = useState(false);
   const [pendingChange, setPendingChange] = useState<PendingChange | null>(null);
   const [diffEditorOpened, setDiffEditorOpened] = useState<EditorType | null>(null);
-  const [diffTempFile, setDiffTempFile] = useState<string | null>(null);
+  const [diffTempFiles, setDiffTempFiles] = useState<string[] | null>(null);
 
   useEffect(() => {
     const handlePendingChange = (change: PendingChange) => {
@@ -20,14 +20,14 @@ export function useDiffConfirm(agent: Agent) {
         const result = tryOpenDiff(change.filePath, change.newContent);
         if (result) {
           setDiffEditorOpened(result.editor);
-          setDiffTempFile(result.tempPath);
+          setDiffTempFiles(result.tempFiles);
         } else {
           setDiffEditorOpened(null);
-          setDiffTempFile(null);
+          setDiffTempFiles(null);
         }
       } else {
         setDiffEditorOpened(null);
-        setDiffTempFile(null);
+        setDiffTempFiles(null);
       }
 
       setPendingChange(change);
@@ -47,16 +47,16 @@ export function useDiffConfirm(agent: Agent) {
         agent.confirmBus.resolveChange(pendingChange.id, result);
       }
 
-      if (diffTempFile) {
-        cleanupTempFile(diffTempFile);
-        setDiffTempFile(null);
+      if (diffTempFiles) {
+        diffTempFiles.forEach(cleanupTempFile);
+        setDiffTempFiles(null);
       }
 
       setShowDiffConfirm(false);
       setPendingChange(null);
       setDiffEditorOpened(null);
     },
-    [pendingChange, diffTempFile, agent]
+    [pendingChange, diffTempFiles, agent]
   );
 
   return {
