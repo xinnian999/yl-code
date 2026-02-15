@@ -16,14 +16,6 @@ import type { Agent } from "@/core/agent.ts";
 import { extractAtFilter, parseAtReferences, getFileContent } from "./features/file-picker/file-scanner.ts";
 import { join } from "path";
 
-const welcomeMessage = `您好老板！
-
-我是《牛码》；
-
-我擅长写代码、改BUG等；
-
-有什么可以为您效劳的？😊`;
-
 export interface AppProps {
   agent: Agent;
 }
@@ -32,7 +24,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
   const { messageBus, confirmBus, config } = agent;
 
   const { exit } = useApp();
-  const { messages, thinkingStatus } = useMessages(messageBus, welcomeMessage);
+  const { messages, thinkingStatus } = useMessages(messageBus);
   const { showDiffConfirm, pendingChange, diffEditorOpened, handleDiffConfirm } = useDiffConfirm(confirmBus);
   const { pushHistory, navigateUp, navigateDown, resetNavigation } = useHistory();
 

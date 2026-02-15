@@ -24,6 +24,14 @@ import {
   type ToolArgs,
 } from "./agent-helpers.ts";
 
+const WELCOME_MESSAGE = `您好老板！
+
+我是《牛码》；
+
+我擅长写代码、改BUG等；
+
+有什么可以为您效劳的？😊`;
+
 export class Agent {
   readonly messageBus = new MessageBus();
   readonly confirmBus = new ConfirmBus();
@@ -44,6 +52,8 @@ export class Agent {
     this.unsubModelChange = this.config.onModelChange(() => {
       this.currentModel = null;
     });
+
+    this.messageBus.ai(WELCOME_MESSAGE);
   }
 
   private getModel() {

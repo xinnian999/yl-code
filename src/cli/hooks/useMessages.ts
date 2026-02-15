@@ -8,8 +8,8 @@ export type { Message } from "@/core/message-bus.ts";
  * 消息状态管理 hook
  * 订阅 messageBus 事件，管理消息列表和思考状态
  */
-export function useMessages(messageBus: MessageBus, welcomeMessage?: string) {
-  const [messages, setMessages] = useState<Message[]>([]);
+export function useMessages(messageBus: MessageBus) {
+  const [messages, setMessages] = useState<Message[]>(() => messageBus.getMessages());
   const [thinkingStatus, setThinkingStatus] = useState<ThinkingState>({
     status: ThinkingStatus.IDLE,
     detail: "",
@@ -40,11 +40,6 @@ export function useMessages(messageBus: MessageBus, welcomeMessage?: string) {
     messageBus.on("message:update", handleMessageUpdate);
     messageBus.on("thinking", handleThinking);
     messageBus.on("clear", handleClear);
-
-    // 监听器注册完成后再发送欢迎消息
-    if (welcomeMessage) {
-      messageBus.ai(welcomeMessage);
-    }
 
     return () => {
       messageBus.off("message", handleMessage);
