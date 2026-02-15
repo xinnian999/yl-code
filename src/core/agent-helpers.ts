@@ -1,6 +1,7 @@
 import { readFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import { ThinkingStatus } from "./types.ts";
 
 // ============ 辅助类型 ============
 
@@ -79,4 +80,20 @@ export function loadSystemPrompt(): string {
   const __dirname = dirname(__filename);
   const template = readFileSync(join(__dirname, "system.md"), "utf-8");
   return template.replace("${process.cwd()}", process.cwd());
+}
+
+/** 根据思考状态获取默认显示文本 */
+export function getStatusText(status: string, detail: string): string {
+  if (detail) return detail;
+
+  switch (status) {
+    case ThinkingStatus.THINKING:
+      return "玩命思考中...";
+    case ThinkingStatus.TOOL_CALLING:
+      return "正在执行工具...";
+    case ThinkingStatus.WAITING:
+      return "等待响应中...";
+    default:
+      return "";
+  }
 }

@@ -1,8 +1,8 @@
 import React, { useState, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
 import SelectInput from "ink-select-input";
-import type { ConfigManager, ModelConfig } from "@/core/config.ts";
-import type { MessageBus } from "@/core/message-bus.ts";
+import type { Agent } from "@/core/agent.ts";
+import type { ModelConfig } from "@/core/types.ts";
 import ModelForm, { type ModelFormData } from "./ModelForm.tsx";
 import ConfirmDialog from "./ConfirmDialog.tsx";
 
@@ -11,8 +11,7 @@ type ViewState = "list" | "add" | "edit" | "delete" | "copy";
 
 /** 模型选择组件属性 */
 interface Props {
-  configManager: ConfigManager;
-  messageBus: MessageBus;
+  agent: Agent;
   onSelect: (model: ModelConfig) => void;
   onCancel?: () => void;
 }
@@ -23,15 +22,14 @@ interface Props {
  * 内部管理添加、编辑、删除模型的表单状态
  * 支持快捷键：a 添加、c 复制、e 编辑、d 删除
  */
-const ModelSelector: React.FC<Props> = ({ configManager, messageBus, onSelect, onCancel }) => {
+const ModelSelector: React.FC<Props> = ({ agent, onSelect, onCancel }) => {
   const [viewState, setViewState] = useState<ViewState>("list");
   const [editingModel, setEditingModel] = useState<ModelConfig | null>(null);
   const [deletingModel, setDeletingModel] = useState<ModelConfig | null>(null);
   const [copyingModel, setCopyingModel] = useState<ModelConfig | null>(null);
 
-  const getModels = () => configManager.getModels();
-  const currentId = configManager.getCurrentModelId();
-  const models = getModels();
+  const models = agent.getModels();
+  const currentId = agent.getCurrentModelId();
 
   const initialIndex = Math.max(
     0,
@@ -74,8 +72,7 @@ const ModelSelector: React.FC<Props> = ({ configManager, messageBus, onSelect, o
       const model = models[highlightedIndex];
       if (model) {
         if (model.id === currentId) {
-          messageBus.createAIMessage();
-          messageBus.ai("⚠️ 不能删除当前正在使用的模型，请先切换到其他模型");
+          agent.notify("⚠️ 不能删除当前正在使用的模型，请先切换到其他模型");
           onCancel?.();
           return;
         }
@@ -108,33 +105,16 @@ const ModelSelector: React.FC<Props> = ({ configManager, messageBus, onSelect, o
   const handleFormSubmit = useCallback(
     (data: ModelFormData) => {
       if (viewState === "add" || viewState === "copy") {
-        const newModel: ModelConfig = {
-          id: `model_${Date.now()}`,
-          name: data.name,
-          baseUrl: data.baseUrl,
-          apiKey: data.apiKey,
-          modelName: data.modelName,
-        };
-        configManager.addModel(newModel);
-        configManager.setCurrentModel(newModel.id);
-        messageBus.createAIMessage();
-        messageBus.ai(`✅ 模型 "${data.name}" 添加成功，已自动切换`);
+        agent.addModel(data);
         setCopyingModel(null);
         onCancel?.();
       } else if (viewState === "edit" && editingModel) {
-        configManager.updateModel(editingModel.id, {
-          name: data.name,
-          baseUrl: data.baseUrl,
-          apiKey: data.apiKey,
-          modelName: data.modelName,
-        });
-        messageBus.createAIMessage();
-        messageBus.ai(`✅ 模型 "${data.name}" 更新成功`);
+        agent.updateModel(editingModel.id, data);
         setEditingModel(null);
         setViewState("list");
       }
     },
-    [viewState, editingModel, onCancel, configManager, messageBus]
+    [viewState, editingModel, onCancel, agent]
   );
 
   const handleFormCancel = useCallback(() => {
@@ -145,13 +125,11 @@ const ModelSelector: React.FC<Props> = ({ configManager, messageBus, onSelect, o
 
   const handleDeleteConfirm = useCallback(() => {
     if (deletingModel) {
-      configManager.removeModel(deletingModel.id);
-      messageBus.createAIMessage();
-      messageBus.ai(`✅ 模型 "${deletingModel.name}" 已删除`);
+      agent.removeModel(deletingModel.id);
       setDeletingModel(null);
       onCancel?.();
     }
-  }, [deletingModel, onCancel, configManager, messageBus]);
+  }, [deletingModel, onCancel, agent]);
 
   const handleDeleteCancel = useCallback(() => {
     setDeletingModel(null);

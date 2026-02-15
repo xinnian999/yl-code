@@ -2,34 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Box, Text } from "ink";
 import Spinner from "ink-spinner";
 import { ThinkingStatus, type ThinkingState } from "@/core/types.ts";
-
-/**
- * 格式化耗时
- */
-const formatDuration = (ms: number): string => {
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-};
-
-/**
- * 根据状态获取默认显示文本
- */
-const getStatusText = (status: string, detail: string): string => {
-  if (detail) {
-    return detail;
-  }
-
-  switch (status) {
-    case ThinkingStatus.THINKING:
-      return "玩命思考中...";
-    case ThinkingStatus.TOOL_CALLING:
-      return "正在执行工具...";
-    case ThinkingStatus.WAITING:
-      return "等待响应中...";
-    default:
-      return "";
-  }
-};
+import { formatDuration, getStatusText } from "@/core/agent-helpers.ts";
 
 /** 状态栏组件属性 */
 interface StatusBarProps {

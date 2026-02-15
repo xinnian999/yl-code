@@ -1,15 +1,16 @@
 import { useState, useEffect } from "react";
 import { ThinkingStatus, type ThinkingState } from "@/core/types.ts";
-import type { MessageBus, Message } from "@/core/message-bus.ts";
+import type { Message } from "@/core/message-bus.ts";
+import type { Agent } from "@/core/agent.ts";
 
 export type { Message } from "@/core/message-bus.ts";
 
 /**
  * 消息状态管理 hook
- * 订阅 messageBus 事件，管理消息列表和思考状态
+ * 订阅 agent 消息事件，管理消息列表和思考状态
  */
-export function useMessages(messageBus: MessageBus) {
-  const [messages, setMessages] = useState<Message[]>(() => messageBus.getMessages());
+export function useMessages(agent: Agent) {
+  const [messages, setMessages] = useState<Message[]>(() => agent.messageBus.getMessages());
   const [thinkingStatus, setThinkingStatus] = useState<ThinkingState>({
     status: ThinkingStatus.IDLE,
     detail: "",
@@ -36,6 +37,7 @@ export function useMessages(messageBus: MessageBus) {
       setMessages([]);
     };
 
+    const { messageBus } = agent;
     messageBus.on("message", handleMessage);
     messageBus.on("message:update", handleMessageUpdate);
     messageBus.on("thinking", handleThinking);
@@ -47,7 +49,7 @@ export function useMessages(messageBus: MessageBus) {
       messageBus.off("thinking", handleThinking);
       messageBus.off("clear", handleClear);
     };
-  }, []);
+  }, [agent]);
 
   return { messages, thinkingStatus };
 }

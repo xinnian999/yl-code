@@ -1,13 +1,14 @@
 import { useState, useEffect, useCallback } from "react";
-import type { ConfirmBus, PendingChange } from "@/core/confirm-bus.ts";
+import type { PendingChange } from "@/core/confirm-bus.ts";
 import { tryOpenDiff, cleanupTempFile, type EditorType } from "@/core/editor-detector.ts";
 import type { ConfirmResult } from "@/core/types.ts";
+import type { Agent } from "@/core/agent.ts";
 
 /**
  * Diff 确认状态管理 hook
- * 订阅 confirmBus 事件，管理确认弹窗状态
+ * 订阅 agent 确认事件，管理确认弹窗状态
  */
-export function useDiffConfirm(confirmBus: ConfirmBus) {
+export function useDiffConfirm(agent: Agent) {
   const [showDiffConfirm, setShowDiffConfirm] = useState(false);
   const [pendingChange, setPendingChange] = useState<PendingChange | null>(null);
   const [diffEditorOpened, setDiffEditorOpened] = useState<EditorType | null>(null);
@@ -33,16 +34,17 @@ export function useDiffConfirm(confirmBus: ConfirmBus) {
       setShowDiffConfirm(true);
     };
 
+    const { confirmBus } = agent;
     confirmBus.on("pending-change", handlePendingChange);
     return () => {
       confirmBus.off("pending-change", handlePendingChange);
     };
-  }, [confirmBus]);
+  }, [agent]);
 
   const handleDiffConfirm = useCallback(
     (result: ConfirmResult) => {
       if (pendingChange) {
-        confirmBus.resolveChange(pendingChange.id, result);
+        agent.confirmBus.resolveChange(pendingChange.id, result);
       }
 
       if (diffTempFile) {
@@ -54,7 +56,7 @@ export function useDiffConfirm(confirmBus: ConfirmBus) {
       setPendingChange(null);
       setDiffEditorOpened(null);
     },
-    [pendingChange, diffTempFile, confirmBus]
+    [pendingChange, diffTempFile, agent]
   );
 
   return {

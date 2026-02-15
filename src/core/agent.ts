@@ -13,7 +13,11 @@ import { ConfirmBus } from "./confirm-bus.ts";
 import { ConfigManager } from "./config.ts";
 import { ProcessManager } from "./process-manager.ts";
 import { ThinkingStatus } from "./types.ts";
+import type { ModelConfig } from "./types.ts";
 import type { BaseMessage } from "@langchain/core/messages";
+import { HELP_TEXT, type CommandAction } from "./commands.ts";
+import { parseAtReferences, getFileContent } from "./file-scanner.ts";
+import { join } from "path";
 import {
   loadSystemPrompt,
   formatDuration,
@@ -260,6 +264,113 @@ export class Agent {
         );
       }
     }
+  }
+
+  /** 执行斜杠命令，返回 UI 需要响应的动作 */
+  executeCommand(command: string): CommandAction {
+    switch (command) {
+      case "model":
+        return { action: "select_model" };
+      case "clear":
+        this.messageBus.clearMessages();
+        this.clearMemory();
+        this.confirmBus.resetSession();
+        this.messageBus.createAIMessage();
+        this.messageBus.ai("🧹 对话和记忆已清空");
+        return { action: "none" };
+      case "help":
+        this.messageBus.createAIMessage();
+        this.messageBus.ai(HELP_TEXT);
+        return { action: "none" };
+      case "exit":
+        this.messageBus.ai("👋 再见！");
+        return { action: "exit" };
+      default:
+        return { action: "none" };
+    }
+  }
+
+  /** 切换当前模型并发送提示消息 */
+  switchModel(model: ModelConfig): void {
+    this.config.setCurrentModel(model.id);
+    this.messageBus.createAIMessage();
+    this.messageBus.ai(`✅ 已切换到: ${model.name}`);
+  }
+
+  /** 完整对话入口：解析文件引用 → 发送消息 → 调用 AI → 处理错误 */
+  async chat(query: string): Promise<void> {
+    const fileContext = this.buildFileContext(query);
+    this.messageBus.user(query);
+
+    try {
+      await this.run(query, fileContext);
+    } catch (error) {
+      this.messageBus.createAIMessage();
+      const err = error as Error;
+      this.messageBus.error(err?.message || String(error));
+    } finally {
+      this.messageBus.setThinkingStatus(ThinkingStatus.IDLE);
+    }
+  }
+
+  /** 从用户输入中解析 @ 引用并构建文件上下文 */
+  private buildFileContext(query: string): string {
+    const atRefs = parseAtReferences(query);
+    if (atRefs.length === 0) return "";
+
+    const contents = atRefs.map((ref) => {
+      const fullPath = join(process.cwd(), ref);
+      return `--- 文件: ${ref} ---\n${getFileContent(fullPath)}\n--- 文件结束 ---`;
+    });
+    return "\n\n" + contents.join("\n\n");
+  }
+
+  /** 添加模型配置并自动切换 */
+  addModel(data: { name: string; baseUrl: string; apiKey: string; modelName: string }): void {
+    const newModel: ModelConfig = {
+      id: `model_${Date.now()}`,
+      name: data.name,
+      baseUrl: data.baseUrl,
+      apiKey: data.apiKey,
+      modelName: data.modelName,
+    };
+    this.config.addModel(newModel);
+    this.config.setCurrentModel(newModel.id);
+    this.notify(`✅ 模型 "${data.name}" 添加成功，已自动切换`);
+  }
+
+  /** 更新模型配置 */
+  updateModel(modelId: string, data: { name: string; baseUrl: string; apiKey: string; modelName: string }): void {
+    this.config.updateModel(modelId, data);
+    this.notify(`✅ 模型 "${data.name}" 更新成功`);
+  }
+
+  /** 删除模型配置（不能删除当前使用的模型） */
+  removeModel(modelId: string): boolean {
+    if (modelId === this.config.getCurrentModelId()) {
+      this.notify("⚠️ 不能删除当前正在使用的模型，请先切换到其他模型");
+      return false;
+    }
+    const model = this.config.getModels().find((m) => m.id === modelId);
+    this.config.removeModel(modelId);
+    this.notify(`✅ 模型 "${model?.name}" 已删除`);
+    return true;
+  }
+
+  /** 获取所有模型配置 */
+  getModels(): ModelConfig[] {
+    return this.config.getModels();
+  }
+
+  /** 获取当前模型 ID */
+  getCurrentModelId(): string {
+    return this.config.getCurrentModelId();
+  }
+
+  /** 发送系统通知消息 */
+  notify(message: string): void {
+    this.messageBus.createAIMessage();
+    this.messageBus.ai(message);
   }
 
   /** 清理后台进程 */

@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Text } from "ink";
-import { commands } from "@/cli/commands.ts";
+import { commands } from "@/core/commands.ts";
 
 /** 命令补全列表组件属性 */
 interface Props {

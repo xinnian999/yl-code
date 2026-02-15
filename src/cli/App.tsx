@@ -7,14 +7,13 @@ import CommandSuggestions from "./components/CommandSuggestions.tsx";
 import ModelSelector from "./components/ModelSelector.tsx";
 import FileSuggestions, { getFilteredFiles } from "./components/FileSuggestions.tsx";
 import DiffConfirm from "./components/DiffConfirm.tsx";
-import { commands } from "./commands.ts";
+import { commands } from "@/core/commands.ts";
 import { useMessages } from "./hooks/useMessages.ts";
 import { useDiffConfirm } from "./hooks/useDiffConfirm.ts";
 import { useHistory } from "./hooks/useHistory.ts";
-import { ThinkingStatus, type ModelConfig } from "@/core/types.ts";
+import { extractAtFilter } from "@/core/file-scanner.ts";
+import type { ModelConfig } from "@/core/types.ts";
 import type { Agent } from "@/core/agent.ts";
-import { extractAtFilter, parseAtReferences, getFileContent } from "@/core/file-scanner.ts";
-import { join } from "path";
 
 /** 主应用组件属性 */
 export interface AppProps {
@@ -22,11 +21,9 @@ export interface AppProps {
 }
 
 const App: React.FC<AppProps> = ({ agent }) => {
-  const { messageBus, confirmBus, config } = agent;
-
   const { exit } = useApp();
-  const { messages, thinkingStatus } = useMessages(messageBus);
-  const { showDiffConfirm, pendingChange, diffEditorOpened, handleDiffConfirm } = useDiffConfirm(confirmBus);
+  const { messages, thinkingStatus } = useMessages(agent);
+  const { showDiffConfirm, pendingChange, diffEditorOpened, handleDiffConfirm } = useDiffConfirm(agent);
   const { pushHistory, navigateUp, navigateDown, resetNavigation } = useHistory();
 
   const [inputValue, setInputValue] = useState("");
@@ -54,38 +51,10 @@ const App: React.FC<AppProps> = ({ agent }) => {
     setInputValue("");
     setCommandSelectedIndex(0);
 
-    switch (commandValue) {
-      case "model":
-        setIsSelectingModel(true);
-        break;
-      case "clear":
-        messageBus.clearMessages();
-        agent.clearMemory();
-        confirmBus.resetSession();
-        messageBus.createAIMessage();
-        messageBus.ai("🧹 对话和记忆已清空");
-        break;
-      case "help":
-        messageBus.createAIMessage();
-        messageBus.ai(`📖 可用命令：
-
-/model  - 切换 AI 模型
-/clear  - 清空对话历史
-/help   - 显示帮助信息
-/exit   - 退出程序
-
-其他：
-- 输入 exit 或 quit 也可退出
-- 按 ↑↓ 键可切换历史命令
-- 按 Ctrl+C 强制退出
-- 输入 @ 可引用文件/目录`);
-        break;
-      case "exit":
-        messageBus.ai("👋 再见！");
-        setTimeout(() => handleExit(), 500);
-        break;
-    }
-  }, [handleExit, agent, messageBus, confirmBus]);
+    const result = agent.executeCommand(commandValue);
+    if (result.action === "select_model") setIsSelectingModel(true);
+    if (result.action === "exit") setTimeout(() => handleExit(), 500);
+  }, [handleExit, agent]);
 
   useInput((input, key) => {
     if (key.ctrl && input === "c") { handleExit(); }
@@ -140,7 +109,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
     if (!trimmedValue || isProcessing) return;
 
     if (trimmedValue.toLowerCase() === "exit" || trimmedValue.toLowerCase() === "quit") {
-      messageBus.ai("👋 再见！");
+      agent.executeCommand("exit");
       setTimeout(() => handleExit(), 500);
       return;
     }
@@ -149,36 +118,14 @@ const App: React.FC<AppProps> = ({ agent }) => {
     setIsProcessing(true);
     pushHistory(trimmedValue);
 
-    const atRefs = parseAtReferences(trimmedValue);
-    let fileContext = "";
-    if (atRefs.length > 0) {
-      const contents = atRefs.map((ref) => {
-        const fullPath = join(process.cwd(), ref);
-        return `--- 文件: ${ref} ---\n${getFileContent(fullPath)}\n--- 文件结束 ---`;
-      });
-      fileContext = "\n\n" + contents.join("\n\n");
-    }
-
-    messageBus.user(trimmedValue);
-
-    try {
-      await agent.run(trimmedValue, fileContext);
-    } catch (error) {
-      messageBus.createAIMessage();
-      const err = error as Error;
-      messageBus.error(err?.message || String(error));
-    } finally {
-      setIsProcessing(false);
-      messageBus.setThinkingStatus(ThinkingStatus.IDLE);
-    }
-  }, [isProcessing, handleExit, showCommandSuggestions, showFileSuggestions, agent, pushHistory, messageBus]);
+    await agent.chat(trimmedValue);
+    setIsProcessing(false);
+  }, [isProcessing, handleExit, showCommandSuggestions, showFileSuggestions, agent, pushHistory]);
 
   const handleModelSelect = useCallback((model: ModelConfig) => {
-    config.setCurrentModel(model.id);
-    messageBus.createAIMessage();
-    messageBus.ai(`✅ 已切换到: ${model.name}`);
+    agent.switchModel(model);
     setIsSelectingModel(false);
-  }, [config, messageBus]);
+  }, [agent]);
 
   const handleInputChange = useCallback((value: string) => {
     setInputValue(value);
@@ -209,8 +156,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
         <DiffConfirm change={pendingChange} onConfirm={handleDiffConfirm} editorOpened={diffEditorOpened} />
       ) : isSelectingModel ? (
         <ModelSelector
-          configManager={config}
-          messageBus={messageBus}
+          agent={agent}
           onSelect={handleModelSelect}
           onCancel={() => setIsSelectingModel(false)}
         />
