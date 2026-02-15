@@ -6,6 +6,7 @@ import type { ConfigPort, ModelConfig } from "./types.ts";
 
 export type { ModelConfig } from "./types.ts";
 
+/** 应用配置（持久化到文件） */
 export interface AppConfig {
   currentModel: string;
   models: ModelConfig[];
@@ -13,6 +14,7 @@ export interface AppConfig {
 
 // ============ 事件类型 ============
 
+/** 配置管理器事件定义 */
 interface ConfigManagerEvents {
   "model:change": (model: ModelConfig) => void;
   "config:change": () => void;
@@ -40,6 +42,7 @@ export class ConfigManager extends EventEmitter implements ConfigPort {
     this.config = this.loadConfig();
   }
 
+  /** 从文件加载配置，失败则返回默认配置 */
   private loadConfig(): AppConfig {
     if (existsSync(this.configPath)) {
       try {
@@ -58,12 +61,14 @@ export class ConfigManager extends EventEmitter implements ConfigPort {
     return defaultConfig;
   }
 
+  /** 将配置持久化到文件 */
   private saveConfig(config: AppConfig): void {
     writeFileSync(this.configPath, JSON.stringify(config, null, 2));
   }
 
   // --- ConfigPort 接口 ---
 
+  /** 获取当前激活的模型配置 */
   getCurrentModel(): ModelConfig {
     if (this.config.models.length === 0) {
       throw new Error("请先配置模型：输入 /model 然后按 a 添加");
@@ -81,6 +86,7 @@ export class ConfigManager extends EventEmitter implements ConfigPort {
     return model;
   }
 
+  /** 监听模型变更事件，返回取消订阅函数 */
   onModelChange(callback: () => void): () => void {
     this.on("model:change", callback);
     return () => this.off("model:change", callback);
@@ -88,18 +94,22 @@ export class ConfigManager extends EventEmitter implements ConfigPort {
 
   // --- 完整 CRUD ---
 
+  /** 是否已配置模型 */
   hasModels(): boolean {
     return this.config.models.length > 0;
   }
 
+  /** 获取所有模型配置的副本 */
   getModels(): ModelConfig[] {
     return [...this.config.models];
   }
 
+  /** 获取当前模型 ID */
   getCurrentModelId(): string {
     return this.config.currentModel;
   }
 
+  /** 切换当前模型 */
   setCurrentModel(modelId: string): void {
     const model = this.config.models.find((m) => m.id === modelId);
     if (!model) {
@@ -111,6 +121,7 @@ export class ConfigManager extends EventEmitter implements ConfigPort {
     this.emit("config:change");
   }
 
+  /** 添加新模型配置 */
   addModel(model: ModelConfig): void {
     if (this.config.models.some((m) => m.id === model.id)) {
       throw new Error(`Model ${model.id} already exists`);
@@ -120,6 +131,7 @@ export class ConfigManager extends EventEmitter implements ConfigPort {
     this.emit("config:change");
   }
 
+  /** 删除模型配置（不能删除当前使用的模型） */
   removeModel(modelId: string): void {
     if (modelId === this.config.currentModel) {
       throw new Error("Cannot remove current model");
@@ -129,6 +141,7 @@ export class ConfigManager extends EventEmitter implements ConfigPort {
     this.emit("config:change");
   }
 
+  /** 更新模型配置 */
   updateModel(modelId: string, updates: Partial<ModelConfig>): void {
     const index = this.config.models.findIndex((m) => m.id === modelId);
     if (index === -1) {
@@ -142,10 +155,12 @@ export class ConfigManager extends EventEmitter implements ConfigPort {
     this.emit("config:change");
   }
 
+  /** 判断指定模型是否为当前模型 */
   isCurrentModel(modelId: string): boolean {
     return modelId === this.config.currentModel;
   }
 
+  /** 获取配置文件路径 */
   getConfigPath(): string {
     return this.configPath;
   }

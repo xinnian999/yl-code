@@ -2,6 +2,7 @@ import React from "react";
 import { Form, type FormProps } from "ink-form";
 import { Box, Text, useInput } from "ink";
 
+/** 模型表单数据 */
 export interface ModelFormData {
   name: string;
   baseUrl: string;
@@ -9,6 +10,7 @@ export interface ModelFormData {
   modelName: string;
 }
 
+/** 模型表单组件属性 */
 interface Props {
   mode: "add" | "edit";
   initialValues?: ModelFormData;

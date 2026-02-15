@@ -1,7 +1,8 @@
 import React, { useMemo } from "react";
 import { Box, Text } from "ink";
-import { scanDirectory, type FileItem } from "./file-scanner.ts";
+import { scanDirectory, type FileItem } from "@/core/file-scanner.ts";
 
+/** 文件补全列表组件属性 */
 interface Props {
   selectedIndex: number;
   filter: string;

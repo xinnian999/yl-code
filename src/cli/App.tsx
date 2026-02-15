@@ -4,18 +4,19 @@ import MessageList from "./components/MessageList.tsx";
 import InputBox from "./components/InputBox.tsx";
 import StatusBar from "./components/StatusBar.tsx";
 import CommandSuggestions from "./components/CommandSuggestions.tsx";
-import ModelSelector from "./features/model/ModelSelector.tsx";
-import FileSuggestions, { getFilteredFiles } from "./features/file-picker/FileSuggestions.tsx";
-import DiffConfirm from "./features/diff/DiffConfirm.tsx";
+import ModelSelector from "./components/ModelSelector.tsx";
+import FileSuggestions, { getFilteredFiles } from "./components/FileSuggestions.tsx";
+import DiffConfirm from "./components/DiffConfirm.tsx";
 import { commands } from "./commands.ts";
 import { useMessages } from "./hooks/useMessages.ts";
 import { useDiffConfirm } from "./hooks/useDiffConfirm.ts";
 import { useHistory } from "./hooks/useHistory.ts";
 import { ThinkingStatus, type ModelConfig } from "@/core/types.ts";
 import type { Agent } from "@/core/agent.ts";
-import { extractAtFilter, parseAtReferences, getFileContent } from "./features/file-picker/file-scanner.ts";
+import { extractAtFilter, parseAtReferences, getFileContent } from "@/core/file-scanner.ts";
 import { join } from "path";
 
+/** 主应用组件属性 */
 export interface AppProps {
   agent: Agent;
 }

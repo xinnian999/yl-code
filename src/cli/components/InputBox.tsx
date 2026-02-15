@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Text } from "ink";
 import TextInput from "ink-text-input";
 
+/** 输入框组件属性 */
 interface InputBoxProps {
   value: string;
   onChange: (value: string) => void;

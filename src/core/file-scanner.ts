@@ -1,6 +1,7 @@
 import { readdirSync, statSync, readFileSync, existsSync } from "fs";
 import { join, dirname, basename, relative } from "path";
 
+/** 文件/目录信息 */
 export interface FileItem {
   name: string;
   path: string;
@@ -34,42 +35,50 @@ function shouldIgnore(name: string): boolean {
 }
 
 /**
+ * 扫描单个目录条目，返回 FileItem（失败返回 null）
+ */
+function scanEntry(basePath: string, fullPath: string, entry: string, currentPath: string): FileItem | null {
+  try {
+    const entryFullPath = join(fullPath, entry);
+    const entryRelativePath = currentPath ? join(currentPath, entry) : entry;
+    const stat = statSync(entryFullPath);
+
+    return {
+      name: entry,
+      path: entryFullPath,
+      relativePath: entryRelativePath,
+      isDirectory: stat.isDirectory(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * 递归扫描目录，返回所有文件和目录
  */
 function scanAllFiles(basePath: string, currentPath: string = ""): FileItem[] {
-  const results: FileItem[] = [];
   const fullPath = currentPath ? join(basePath, currentPath) : basePath;
 
+  let entries: string[];
   try {
-    const entries = readdirSync(fullPath);
-
-    for (const entry of entries) {
-      if (shouldIgnore(entry)) continue;
-
-      const entryFullPath = join(fullPath, entry);
-      const entryRelativePath = currentPath ? join(currentPath, entry) : entry;
-
-      try {
-        const stat = statSync(entryFullPath);
-        const isDir = stat.isDirectory();
-
-        results.push({
-          name: entry,
-          path: entryFullPath,
-          relativePath: entryRelativePath,
-          isDirectory: isDir,
-        });
-
-        // 递归扫描子目录
-        if (isDir) {
-          results.push(...scanAllFiles(basePath, entryRelativePath));
-        }
-      } catch {
-        // 忽略无法访问的文件
-      }
-    }
+    entries = readdirSync(fullPath);
   } catch {
-    // 目录不存在或无法访问
+    return [];
+  }
+
+  const results: FileItem[] = [];
+
+  for (const entry of entries) {
+    if (shouldIgnore(entry)) continue;
+
+    const item = scanEntry(basePath, fullPath, entry, currentPath);
+    if (!item) continue;
+
+    results.push(item);
+    if (item.isDirectory) {
+      results.push(...scanAllFiles(basePath, item.relativePath));
+    }
   }
 
   return results;
@@ -198,6 +207,29 @@ export function getFileContent(
 }
 
 /**
+ * 格式化单个目录条目为树形文本行
+ */
+function formatTreeEntry(
+  dirPath: string, entry: string, prefix: string, isLast: boolean, maxDepth: number
+): string[] {
+  const connector = isLast ? "└── " : "├── ";
+  const fullPath = join(dirPath, entry);
+
+  try {
+    const stat = statSync(fullPath);
+    const isDir = stat.isDirectory();
+    const line = `${prefix}${connector}${entry}${isDir ? "/" : ""}`;
+
+    if (!isDir || maxDepth <= 1) return [line];
+
+    const newPrefix = prefix + (isLast ? "    " : "│   ");
+    return [line, getDirectoryTree(fullPath, newPrefix, maxDepth - 1)];
+  } catch {
+    return [`${prefix}${connector}${entry} [无法访问]`];
+  }
+}
+
+/**
  * 获取目录树结构
  * @param dirPath 目录路径
  * @param prefix 前缀（用于缩进）
@@ -206,34 +238,18 @@ export function getFileContent(
 function getDirectoryTree(dirPath: string, prefix: string = "", maxDepth: number = 2): string {
   if (maxDepth <= 0) return prefix + "...\n";
 
-  const lines: string[] = [];
-  
+  let entries: string[];
   try {
-    const entries = readdirSync(dirPath);
-    const filtered = entries.filter((e) => !shouldIgnore(e));
-    
-    filtered.forEach((entry, index) => {
-      const isLast = index === filtered.length - 1;
-      const connector = isLast ? "└── " : "├── ";
-      const fullPath = join(dirPath, entry);
-      
-      try {
-        const stat = statSync(fullPath);
-        const isDir = stat.isDirectory();
-        
-        lines.push(`${prefix}${connector}${entry}${isDir ? "/" : ""}`);
-        
-        if (isDir && maxDepth > 1) {
-          const newPrefix = prefix + (isLast ? "    " : "│   ");
-          lines.push(getDirectoryTree(fullPath, newPrefix, maxDepth - 1));
-        }
-      } catch {
-        lines.push(`${prefix}${connector}${entry} [无法访问]`);
-      }
-    });
+    entries = readdirSync(dirPath);
   } catch {
     return prefix + "[无法读取目录]\n";
   }
+
+  const filtered = entries.filter((e) => !shouldIgnore(e));
+  const lines = filtered.flatMap((entry, index) => {
+    const isLast = index === filtered.length - 1;
+    return formatTreeEntry(dirPath, entry, prefix, isLast, maxDepth);
+  });
 
   return lines.join("\n");
 }

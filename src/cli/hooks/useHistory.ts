@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { loadHistory, addToHistory } from "@/cli/features/history/history.ts";
+import { loadHistory, addToHistory } from "@/core/history.ts";
 
 /**
  * 历史命令管理 hook

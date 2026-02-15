@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Text, useInput } from "ink";
 
+/** 确认对话框组件属性 */
 interface Props {
   message: string;
   onConfirm: () => void;

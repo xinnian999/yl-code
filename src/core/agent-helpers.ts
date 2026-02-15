@@ -4,17 +4,20 @@ import { dirname, join } from "path";
 
 // ============ 辅助类型 ============
 
+/** 流式工具调用的分片数据 */
 export interface ToolCallChunk {
   name?: string;
   args?: string;
 }
 
+/** 完整的工具调用信息 */
 export interface ToolCall {
   id: string;
   name: string;
   args: Record<string, unknown>;
 }
 
+/** 工具参数，用于生成描述文本 */
 export interface ToolArgs {
   filePath?: string;
   directoryPath?: string;
@@ -23,11 +26,13 @@ export interface ToolArgs {
 
 // ============ 纯辅助函数 ============
 
+/** 从流式分片中提取工具名称 */
 export function getToolNameFromChunk(toolCallChunks: ToolCallChunk[]): string | null {
   if (!toolCallChunks || toolCallChunks.length === 0) return null;
   return toolCallChunks[0].name || null;
 }
 
+/** 从流式分片中预览工具参数（文件路径或命令） */
 export function getToolArgsPreview(toolCallChunks: ToolCallChunk[]): string | null {
   if (!toolCallChunks || toolCallChunks.length === 0) return null;
   const argsStr = toolCallChunks[0].args;
@@ -46,11 +51,13 @@ export function getToolArgsPreview(toolCallChunks: ToolCallChunk[]): string | nu
   return null;
 }
 
+/** 将毫秒数格式化为可读时间 */
 export function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
+/** 根据工具名称和参数生成中文描述 */
 export function getToolDescription(toolName: string, args: ToolArgs): string {
   switch (toolName) {
     case "read_file":
@@ -66,6 +73,7 @@ export function getToolDescription(toolName: string, args: ToolArgs): string {
   }
 }
 
+/** 加载 system.md 模板并注入当前工作目录 */
 export function loadSystemPrompt(): string {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = dirname(__filename);

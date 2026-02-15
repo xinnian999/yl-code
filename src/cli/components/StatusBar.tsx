@@ -31,6 +31,7 @@ const getStatusText = (status: string, detail: string): string => {
   }
 };
 
+/** 状态栏组件属性 */
 interface StatusBarProps {
   thinkingStatus: ThinkingState;
 }

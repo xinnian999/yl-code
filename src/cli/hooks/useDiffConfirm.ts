@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import type { ConfirmBus, PendingChange } from "@/core/confirm-bus.ts";
-import { tryOpenDiff, cleanupTempFile, type EditorType } from "@/cli/features/diff/editor-detector.ts";
+import { tryOpenDiff, cleanupTempFile, type EditorType } from "@/core/editor-detector.ts";
 import type { ConfirmResult } from "@/core/types.ts";
 
 /**

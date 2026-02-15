@@ -7,6 +7,7 @@ import type {
   AIMessage as AIMessageType,
 } from "@/core/message-bus.ts";
 
+/** 用户消息组件属性 */
 interface UserMessageProps {
   message: UserMessageType;
 }
@@ -32,6 +33,7 @@ const UserMessage: React.FC<UserMessageProps> = ({ message }) => {
   );
 };
 
+/** AI 消息组件属性 */
 interface AIMessageProps {
   message: AIMessageType;
 }
@@ -67,6 +69,7 @@ const AIMessageComponent: React.FC<AIMessageProps> = ({ message }) => {
   );
 };
 
+/** 单条消息组件属性 */
 interface MessageItemProps {
   message: Message;
 }
@@ -86,6 +89,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message }) => {
   return null;
 };
 
+/** 消息列表组件属性 */
 interface MessageListProps {
   messages: Message[];
 }

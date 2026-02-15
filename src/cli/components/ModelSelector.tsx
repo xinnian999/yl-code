@@ -4,11 +4,12 @@ import SelectInput from "ink-select-input";
 import type { ConfigManager, ModelConfig } from "@/core/config.ts";
 import type { MessageBus } from "@/core/message-bus.ts";
 import ModelForm, { type ModelFormData } from "./ModelForm.tsx";
-import ConfirmDialog from "@/cli/components/ConfirmDialog.tsx";
+import ConfirmDialog from "./ConfirmDialog.tsx";
 
-// 内部视图状态
+/** 内部视图状态 */
 type ViewState = "list" | "add" | "edit" | "delete" | "copy";
 
+/** 模型选择组件属性 */
 interface Props {
   configManager: ConfigManager;
   messageBus: MessageBus;

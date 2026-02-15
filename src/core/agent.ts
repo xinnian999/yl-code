@@ -24,6 +24,7 @@ import {
   type ToolArgs,
 } from "./agent-helpers.ts";
 
+/** 欢迎消息文本 */
 const WELCOME_MESSAGE = `您好老板！
 
 我是《牛码》；
@@ -32,16 +33,28 @@ const WELCOME_MESSAGE = `您好老板！
 
 有什么可以为您效劳的？😊`;
 
+/**
+ * Agent 核心类 - 管理对话、工具调用和子系统
+ */
 export class Agent {
+  /** 消息总线 */
   readonly messageBus = new MessageBus();
+  /** 确认总线 */
   readonly confirmBus = new ConfirmBus();
+  /** 配置管理器 */
   readonly config = new ConfigManager();
+  /** 后台进程管理器 */
   private processManager = new ProcessManager();
 
+  /** 对话消息历史 */
   private chatMessages: BaseMessage[];
+  /** 当前绑定工具的模型实例 */
   private currentModel: ReturnType<ChatOpenAI["bindTools"]> | null = null;
+  /** 系统提示词 */
   private systemPrompt: string;
+  /** 工具列表 */
   private tools: ReturnType<typeof createTools>;
+  /** 模型变更事件的取消订阅函数 */
   private unsubModelChange: (() => void);
 
   constructor() {
@@ -56,6 +69,7 @@ export class Agent {
     this.messageBus.ai(WELCOME_MESSAGE);
   }
 
+  /** 获取或创建绑定工具的模型实例 */
   private getModel() {
     if (!this.currentModel) {
       const modelConfig = this.config.getCurrentModel();
@@ -71,11 +85,13 @@ export class Agent {
     return this.currentModel;
   }
 
+  /** 清空对话历史，仅保留系统提示词 */
   clearMemory(): void {
     this.chatMessages.length = 0;
     this.chatMessages.push(new SystemMessage(this.systemPrompt));
   }
 
+  /** 执行一次对话，支持多轮工具调用 */
   async run(query: string, fileContext: string = "", maxIterations = 30): Promise<string> {
     const startTime = Date.now();
 
@@ -123,6 +139,7 @@ export class Agent {
     return typeof lastMessage.content === "string" ? lastMessage.content : "";
   }
 
+  /** 流式调用模型并实时更新思考状态 */
   private async streamResponse(): Promise<any> {
     const model = this.getModel();
     const stream = await model.stream(this.chatMessages);
@@ -159,6 +176,7 @@ export class Agent {
     return response;
   }
 
+  /** 标准化响应，确保空内容时有占位文本 */
   private normalizeResponse(response: any): BaseMessage {
     const hasEmptyContent =
       !response.content ||
@@ -175,6 +193,7 @@ export class Agent {
     return response;
   }
 
+  /** 处理 API 调用错误，附加配置诊断信息 */
   private handleApiError(error: unknown): never {
     const err = error as any;
     const errorMessage = err?.message || err?.error?.message || String(error);
@@ -198,6 +217,7 @@ export class Agent {
     throw detailedError;
   }
 
+  /** 执行响应中的工具调用列表 */
   private async executeToolCalls(response: any, iterationStartTime: number): Promise<void> {
     for (const toolCall of response.tool_calls as ToolCall[]) {
       const contentText = response.content?.toString().replaceAll("\n", "") || "";
@@ -242,10 +262,12 @@ export class Agent {
     }
   }
 
+  /** 清理后台进程 */
   cleanup(): void {
     this.processManager.cleanup();
   }
 
+  /** 释放资源，取消事件监听 */
   dispose(): void {
     this.unsubModelChange();
   }
