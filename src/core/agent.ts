@@ -100,6 +100,12 @@ export class Agent {
       });
       const tools = getToolsForMode(this.tools, this.mode);
       this.currentModel = llm.bindTools(tools);
+
+      if (this.debugMode) {
+        this.messageBus.debug(`模型: ${modelConfig.modelName}`);
+        this.messageBus.debug(`baseURL: ${modelConfig.baseUrl}`);
+        this.messageBus.debug(`绑定工具数: ${tools.length} | 名称: ${tools.map((t) => t.name).join(", ")}`);
+      }
     }
     return this.currentModel;
   }
@@ -127,6 +133,7 @@ export class Agent {
 
     this.abortController = new AbortController();
     this.confirmBus.resetSkipConfirm();
+    this.todoBus.clearTodos();
 
     let messageContent = query;
     if (fileContext) {
@@ -247,6 +254,7 @@ export class Agent {
 
     if (this.debugMode) {
       this.messageBus.debug(`流式完成，共 ${chunkIndex} 个 chunk`);
+      this.logResponseDebug(response);
     }
 
     return response;
@@ -272,6 +280,32 @@ export class Agent {
     if (parts.length > 1) {
       this.messageBus.debug(parts.join(" | "));
     }
+  }
+
+  /** 输出完整响应的调试信息，用于排查工具调用问题 */
+  private logResponseDebug(response: any): void {
+    const toolCalls = response.tool_calls;
+    const kwargs = response.additional_kwargs;
+
+    this.messageBus.debug(`tool_calls: ${toolCalls ? JSON.stringify(toolCalls).slice(0, 300) : "无"}`);
+
+    if (kwargs) {
+      const kwargKeys = Object.keys(kwargs);
+      this.messageBus.debug(`additional_kwargs keys: [${kwargKeys.join(", ")}]`);
+      if (kwargs.tool_calls) {
+        this.messageBus.debug(`kwargs.tool_calls: ${JSON.stringify(kwargs.tool_calls).slice(0, 300)}`);
+      }
+    }
+
+    if (response.response_metadata) {
+      const meta = response.response_metadata;
+      const finishReason = meta.finish_reason || meta.stop_reason || "未知";
+      this.messageBus.debug(`finish_reason: ${finishReason}`);
+    }
+
+    const contentType = typeof response.content;
+    const contentLen = contentType === "string" ? response.content.length : JSON.stringify(response.content).length;
+    this.messageBus.debug(`content 类型: ${contentType} | 长度: ${contentLen}`);
   }
 
   /** 标准化响应，确保空内容时有占位文本 */
