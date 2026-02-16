@@ -12,6 +12,7 @@ import { commands } from "@/core/commands.ts";
 import { useMessages } from "./hooks/useMessages.ts";
 import { useDiffConfirm } from "./hooks/useDiffConfirm.ts";
 import { useHistory } from "./hooks/useHistory.ts";
+import { useTodos } from "./hooks/useTodos.ts";
 import { extractAtFilter } from "@/core/file-scanner.ts";
 import { AgentMode, AGENT_MODES } from "@/core/types.ts";
 import type { ModelConfig, AgentModeValue } from "@/core/types.ts";
@@ -25,6 +26,7 @@ export interface AppProps {
 const App: React.FC<AppProps> = ({ agent }) => {
   const { exit } = useApp();
   const { messages, thinkingStatus } = useMessages(agent);
+  const { todos } = useTodos(agent);
   const { showDiffConfirm, pendingChange, diffEditorOpened, handleDiffConfirm } = useDiffConfirm(agent);
   const { pushHistory, navigateUp, navigateDown, resetNavigation } = useHistory();
 
@@ -200,7 +202,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
         />
       ) : (
         <>
-          <MessageList messages={messages} thinkingStatus={thinkingStatus} />
+          <MessageList messages={messages} thinkingStatus={thinkingStatus} todos={todos} />
           {showCommandSuggestions && <CommandSuggestions selectedIndex={commandSelectedIndex} filter={inputValue} />}
           {showFileSuggestions && <FileSuggestions selectedIndex={fileSelectedIndex} filter={fileFilter} />}
           <InputBox value={inputValue} onChange={handleInputChange} onSubmit={handleSubmit} isDisabled={isProcessing} inputKey={inputKey} />

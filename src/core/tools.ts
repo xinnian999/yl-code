@@ -5,7 +5,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { z } from "zod";
 import { AgentMode } from "./types.ts";
-import type { ConfirmPort, ProcessPort, AgentModeValue } from "./types.ts";
+import type { ConfirmPort, ProcessPort, TodoPort, TodoItem, AgentModeValue } from "./types.ts";
 
 // ============ 类型定义 ============
 
@@ -22,11 +22,20 @@ export function getToolsForMode(tools: ModeTool[], mode: AgentModeValue): Struct
   return tools.filter((t) => t.modes.includes(mode)).map((t) => t.tool);
 }
 
+/** 构建任务摘要文本 */
+function buildTodoSummary(todos: Array<{ status: string }>): string {
+  const total = todos.length;
+  const completed = todos.filter((t) => t.status === "completed").length;
+  const inProgress = todos.filter((t) => t.status === "in_progress").length;
+  const pending = todos.filter((t) => t.status === "pending").length;
+  return `共 ${total} 项: ${completed} 完成, ${inProgress} 进行中, ${pending} 待处理`;
+}
+
 /**
  * 创建工具集，通过端口注入确认和进程管理能力
  * 每个工具绑定支持的模式标签，用于按模式筛选
  */
-export function createTools(confirm: ConfirmPort, processPort: ProcessPort): ModeTool[] {
+export function createTools(confirm: ConfirmPort, processPort: ProcessPort, todoPort: TodoPort): ModeTool[] {
   const readFileTool = tool(
     async ({ filePath }: { filePath: string }): Promise<string> => {
       const resolvedPath = path.resolve(filePath);
@@ -193,10 +202,38 @@ export function createTools(confirm: ConfirmPort, processPort: ProcessPort): Mod
     }
   );
 
+  const todoWriteTool = tool(
+    async ({ todos }: { todos: Array<{ content: string; status: string; activeForm: string }> }): Promise<string> => {
+      const validStatuses = ["pending", "in_progress", "completed"];
+      for (const item of todos) {
+        if (!validStatuses.includes(item.status)) {
+          return `无效的任务状态: "${item.status}"，有效值为: ${validStatuses.join(", ")}`;
+        }
+      }
+
+      todoPort.updateTodos(todos as TodoItem[]);
+      return `任务列表已更新。${buildTodoSummary(todos)}`;
+    },
+    {
+      name: "todo_write",
+      description: "创建或更新任务列表，用于跟踪多步骤任务的进度。每次调用传入完整的任务列表（全量替换）。",
+      schema: z.object({
+        todos: z.array(
+          z.object({
+            content: z.string().describe("任务描述（祈使句，如'运行测试'）"),
+            status: z.enum(["pending", "in_progress", "completed"]).describe("任务状态"),
+            activeForm: z.string().describe("进行中的描述（现在进行时，如'正在运行测试'）"),
+          })
+        ).describe("完整的任务列表"),
+      }),
+    }
+  );
+
   return [
     { tool: readFileTool,       modes: [AgentMode.ASK, AgentMode.BUILD] },
     { tool: listDirectoryTool,  modes: [AgentMode.ASK, AgentMode.BUILD] },
     { tool: writeFileTool,      modes: [AgentMode.BUILD] },
     { tool: executeCommandTool, modes: [AgentMode.BUILD] },
+    { tool: todoWriteTool,      modes: [AgentMode.ASK, AgentMode.BUILD] },
   ];
 }

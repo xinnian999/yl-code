@@ -70,6 +70,8 @@ export function getToolDescription(toolName: string, args: ToolArgs): string {
       return `执行命令: ${args.command}`;
     case "list_directory":
       return `查看目录: ${args.directoryPath}`;
+    case "todo_write":
+      return "更新任务列表";
     default:
       return `调用工具: ${toolName}`;
   }
@@ -88,7 +90,7 @@ export function getModeInstructions(mode: AgentModeValue): string {
     case AgentMode.ASK:
       return [
         "当前是 **问答模式（Ask）**。",
-        "你只能使用 `read_file` 和 `list_directory` 工具来阅读代码、回答问题。",
+        "你只能使用 `read_file`、`list_directory` 和 `todo_write` 工具来阅读代码、回答问题、跟踪任务。",
         "**严禁调用 `write_file` 或 `execute_command`**，即使用户要求也不行，请告知用户切换到 Build 模式。",
       ].join("\n");
     case AgentMode.BUILD:

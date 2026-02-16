@@ -13,6 +13,7 @@ import { MessageBus } from "./message-bus.ts";
 import { ConfirmBus } from "./confirm-bus.ts";
 import { ConfigManager } from "./config.ts";
 import { ProcessManager } from "./process-manager.ts";
+import { TodoBus } from "./todo-bus.ts";
 import { AgentMode, ThinkingStatus } from "./types.ts";
 import type { ModelConfig, AgentModeValue } from "./types.ts";
 import type { BaseMessage } from "@langchain/core/messages";
@@ -46,6 +47,8 @@ export class Agent {
   readonly messageBus = new MessageBus();
   /** 确认总线 */
   readonly confirmBus = new ConfirmBus();
+  /** 任务总线 */
+  readonly todoBus = new TodoBus();
   /** 配置管理器 */
   readonly config = new ConfigManager();
   /** 会话管理器 */
@@ -74,7 +77,7 @@ export class Agent {
     this.systemTemplate = loadSystemTemplate();
     const systemPrompt = buildSystemPrompt(this.systemTemplate, this.mode);
     this.chatMessages = [new SystemMessage(systemPrompt)];
-    this.tools = createTools(this.confirmBus, this.processManager);
+    this.tools = createTools(this.confirmBus, this.processManager, this.todoBus);
 
     this.unsubModelChange = this.config.onModelChange(() => {
       this.currentModel = null;
@@ -160,6 +163,7 @@ export class Agent {
 
       if (!response.tool_calls || response.tool_calls.length === 0) {
         this.messageBus.setThinkingStatus(ThinkingStatus.IDLE);
+        this.todoBus.completeAll();
         const totalDuration = Date.now() - startTime - this.confirmBus.totalWaitTime;
         this.messageBus.ai(`\n🕒 总耗时: ${formatDuration(totalDuration)}`);
         return response.content || "";
@@ -177,6 +181,9 @@ export class Agent {
     }
 
     this.messageBus.setThinkingStatus(ThinkingStatus.IDLE);
+    if (!this.abortController?.signal.aborted) {
+      this.todoBus.completeAll();
+    }
     const totalDuration = Date.now() - startTime - this.confirmBus.totalWaitTime;
     this.messageBus.ai(`\n🕒 总耗时: ${formatDuration(totalDuration)}`);
 
@@ -547,6 +554,7 @@ export class Agent {
     this.clearMemory();
     this.messageBus.clearMessages();
     this.confirmBus.resetSession();
+    this.todoBus.clearTodos();
     this.messageBus.createAIMessage();
     this.messageBus.ai("🧹 已开启新对话");
   }

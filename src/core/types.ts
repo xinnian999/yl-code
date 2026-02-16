@@ -26,6 +26,38 @@ export interface ThinkingState {
 
 export type ConfirmResult = "accept" | "accept_all" | "reject";
 
+// ============ Todo 任务 ============
+
+/** 任务状态 */
+export const TodoStatus = {
+  PENDING: "pending",
+  IN_PROGRESS: "in_progress",
+  COMPLETED: "completed",
+} as const;
+
+/** 任务状态值类型 */
+export type TodoStatusValue = (typeof TodoStatus)[keyof typeof TodoStatus];
+
+/** 单个任务项 */
+export interface TodoItem {
+  /** 任务描述（祈使句，如"运行测试"） */
+  content: string;
+  /** 任务状态 */
+  status: TodoStatusValue;
+  /** 进行中的描述（现在进行时，如"正在运行测试"） */
+  activeForm: string;
+}
+
+/** Todo 端口 - core 通过此接口管理任务列表 */
+export interface TodoPort {
+  /** 更新整个任务列表（全量替换） */
+  updateTodos(todos: TodoItem[]): void;
+  /** 获取当前任务列表 */
+  getTodos(): TodoItem[];
+  /** 清空任务列表 */
+  clearTodos(): void;
+}
+
 // ============ Agent 模式 ============
 
 /** Agent 工作模式 */

@@ -14,6 +14,7 @@
 | `write_file` | 写入文件内容 |
 | `execute_command` | 执行系统命令（支持 workingDirectory 参数） |
 | `list_directory` | 列出目录内容 |
+| `todo_write` | 创建/更新任务列表，跟踪多步骤任务进度 |
 
 ## @ 文件引用
 
@@ -82,6 +83,51 @@
 ## 当前工作模式
 
 ${mode_instructions}
+
+## 📋 任务列表管理（todo_write）
+
+**重要：用户可以在界面上实时看到任务列表的进度变化，这是你展示工作进度的关键方式。你必须频繁调用 `todo_write` 来保持任务状态的实时更新。**
+
+### 何时使用
+- 任务需要 **3 个或以上** 步骤时
+- 用户要求实现多个功能时
+- 需要系统性地逐步完成复杂任务时
+
+### 何时不使用
+- 单一简单任务（如回答问题、修改一处代码）
+- 可以一步完成的操作
+
+### 使用规范
+1. **开始任务前**：调用 `todo_write` 创建完整的任务列表，将第一个任务标记为 `in_progress`
+2. **完成一个步骤后**：**必须立即**调用 `todo_write`，将该任务标记为 `completed`，并将下一个任务标记为 `in_progress`
+3. **同一时间只有一个 `in_progress` 任务**
+4. 每次调用传入 **完整的** 任务列表（全量替换，不是增量更新）
+5. **绝不能**只在开头创建列表却不更新——每完成一步都必须调用 `todo_write` 更新状态
+
+### 调用时机示例
+
+假设有 3 个任务：A、B、C，正确的调用流程是：
+
+```
+第 1 次调用 todo_write: A=in_progress, B=pending, C=pending
+  → 执行任务 A
+第 2 次调用 todo_write: A=completed, B=in_progress, C=pending
+  → 执行任务 B
+第 3 次调用 todo_write: A=completed, B=completed, C=in_progress
+  → 执行任务 C
+第 4 次调用 todo_write: A=completed, B=completed, C=completed
+```
+
+### 参数格式
+```json
+{
+  "todos": [
+    { "content": "创建组件文件", "status": "completed", "activeForm": "正在创建组件文件" },
+    { "content": "编写单元测试", "status": "in_progress", "activeForm": "正在编写单元测试" },
+    { "content": "运行测试验证", "status": "pending", "activeForm": "正在运行测试验证" }
+  ]
+}
+```
 
 ## 回复规范
 
