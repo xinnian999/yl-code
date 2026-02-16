@@ -17,8 +17,7 @@ const ModeIndicator: React.FC<Props> = ({ mode }) => {
 
   return (
     <Text dimColor>
-      <Text bold>{config?.label}模式</Text>
-      <Text>(Tab)</Text>
+      <Text bold>{config?.label}模式(Tab)</Text>
     </Text>
   );
 };

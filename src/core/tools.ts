@@ -29,8 +29,9 @@ export function getToolsForMode(tools: ModeTool[], mode: AgentModeValue): Struct
 export function createTools(confirm: ConfirmPort, processPort: ProcessPort): ModeTool[] {
   const readFileTool = tool(
     async ({ filePath }: { filePath: string }): Promise<string> => {
+      const resolvedPath = path.resolve(filePath);
       try {
-        const content = await fs.readFile(filePath, "utf-8");
+        const content = await fs.readFile(resolvedPath, "utf-8");
         return `文件内容:\n${content}`;
       } catch (error) {
         const err = error as Error;
@@ -48,32 +49,33 @@ export function createTools(confirm: ConfirmPort, processPort: ProcessPort): Mod
 
   const writeFileTool = tool(
     async ({ filePath, content }: { filePath: string; content: string }): Promise<string> => {
+      const resolvedPath = path.resolve(filePath);
       try {
         let originalContent = "";
         try {
-          originalContent = await fs.readFile(filePath, "utf-8");
+          originalContent = await fs.readFile(resolvedPath, "utf-8");
         } catch {
           // 文件不存在，视为新文件
         }
 
         if (originalContent === content) {
-          return `文件内容未变化，无需写入: ${filePath}`;
+          return `文件内容未变化，无需写入: ${resolvedPath}`;
         }
 
-        const result = await confirm.requestConfirm(filePath, originalContent, content);
+        const result = await confirm.requestConfirm(resolvedPath, originalContent, content);
 
         if (result === "reject") {
-          return `用户拒绝了对 ${filePath} 的修改，请根据情况调整方案或询问用户意见`;
+          return `用户拒绝了对 ${resolvedPath} 的修改，请根据情况调整方案或询问用户意见`;
         }
 
-        const dir = path.dirname(filePath);
+        const dir = path.dirname(resolvedPath);
         await fs.mkdir(dir, { recursive: true });
-        await fs.writeFile(filePath, content, "utf-8");
+        await fs.writeFile(resolvedPath, content, "utf-8");
 
         const isNewFile = originalContent === "";
         return isNewFile
-          ? `文件创建成功: ${filePath}`
-          : `文件写入成功: ${filePath}`;
+          ? `文件创建成功: ${resolvedPath}`
+          : `文件写入成功: ${resolvedPath}`;
       } catch (error) {
         const err = error as Error;
         return `写入文件失败: ${err.message}`;

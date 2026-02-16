@@ -2,7 +2,6 @@ import React, { useState, useCallback } from "react";
 import { Box, useApp, useInput } from "ink";
 import MessageList from "./components/MessageList.tsx";
 import InputBox from "./components/InputBox.tsx";
-import StatusBar from "./components/StatusBar.tsx";
 import CommandSuggestions from "./components/CommandSuggestions.tsx";
 import ModelSelector from "./components/ModelSelector.tsx";
 import HistorySelector, { NEW_SESSION_ID } from "./components/HistorySelector.tsx";
@@ -192,12 +191,11 @@ const App: React.FC<AppProps> = ({ agent }) => {
         />
       ) : (
         <>
-          <MessageList messages={messages} />
+          <MessageList messages={messages} thinkingStatus={thinkingStatus} />
           {showCommandSuggestions && <CommandSuggestions selectedIndex={commandSelectedIndex} filter={inputValue} />}
           {showFileSuggestions && <FileSuggestions selectedIndex={fileSelectedIndex} filter={fileFilter} />}
           <InputBox value={inputValue} onChange={handleInputChange} onSubmit={handleSubmit} isDisabled={isProcessing} inputKey={inputKey} />
-          <Box marginTop={1} justifyContent="space-between" paddingX={1}>
-            <StatusBar thinkingStatus={thinkingStatus} />
+          <Box paddingX={1} justifyContent="flex-end">
             <ModeIndicator mode={currentMode} />
           </Box>
         </>
