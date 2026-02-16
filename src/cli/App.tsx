@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import { Box, useApp, useInput } from "ink";
+import { Box, Text, useApp, useInput } from "ink";
 import MessageList from "./components/MessageList.tsx";
 import InputBox from "./components/InputBox.tsx";
 import CommandSuggestions from "./components/CommandSuggestions.tsx";
@@ -7,7 +7,7 @@ import ModelSelector from "./components/ModelSelector.tsx";
 import HistorySelector, { NEW_SESSION_ID } from "./components/HistorySelector.tsx";
 import FileSuggestions, { getFilteredFiles } from "./components/FileSuggestions.tsx";
 import DiffConfirm from "./components/DiffConfirm.tsx";
-import ModeIndicator from "./components/ModeIndicator.tsx";
+import FooterBar from "./components/FooterBar.tsx";
 import { commands } from "@/core/commands.ts";
 import { useMessages } from "./hooks/useMessages.ts";
 import { useDiffConfirm } from "./hooks/useDiffConfirm.ts";
@@ -40,6 +40,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
   const [atStartIndex, setAtStartIndex] = useState(-1);
   const [inputKey, setInputKey] = useState(0);
   const [currentMode, setCurrentMode] = useState<AgentModeValue>(AgentMode.BUILD);
+  const [debugMode, setDebugMode] = useState(false);
 
   const handleExit = useCallback(() => {
     agent.dispose();
@@ -56,6 +57,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
     setCommandSelectedIndex(0);
 
     const result = agent.executeCommand(commandValue);
+    setDebugMode(agent.isDebugMode());
     if (result.action === "select_model") setIsSelectingModel(true);
     if (result.action === "show_history") setIsSelectingHistory(true);
     if (result.action === "exit") setTimeout(() => handleExit(), 500);
@@ -116,7 +118,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
 
     // Tab 切换工作模式
     if (key.tab && !showCommandSuggestions && !showFileSuggestions
-        && !isSelectingModel && !isSelectingHistory && !showDiffConfirm) {
+      && !isSelectingModel && !isSelectingHistory && !showDiffConfirm) {
       const currentIndex = AGENT_MODES.findIndex((m) => m.value === currentMode);
       const nextMode = AGENT_MODES[(currentIndex + 1) % AGENT_MODES.length].value;
       setCurrentMode(nextMode);
@@ -202,9 +204,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
           {showCommandSuggestions && <CommandSuggestions selectedIndex={commandSelectedIndex} filter={inputValue} />}
           {showFileSuggestions && <FileSuggestions selectedIndex={fileSelectedIndex} filter={fileFilter} />}
           <InputBox value={inputValue} onChange={handleInputChange} onSubmit={handleSubmit} isDisabled={isProcessing} inputKey={inputKey} />
-          <Box paddingX={1} justifyContent="flex-end">
-            <ModeIndicator mode={currentMode} />
-          </Box>
+          <FooterBar mode={currentMode} debugMode={debugMode} />
         </>
       )}
     </Box>

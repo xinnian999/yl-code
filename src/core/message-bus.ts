@@ -104,6 +104,23 @@ export class MessageBus extends EventEmitter implements MessagePort {
     this.emit("message:update", msg);
   }
 
+  /** 创建一个文本块并返回块索引（用于后续流式追加） */
+  createTextBlock(content: string = ""): number {
+    let msg = this.getLastAIMessage();
+    if (!msg) msg = this.createAIMessage();
+    msg.blocks.push(content);
+    this.emit("message:update", msg);
+    return msg.blocks.length - 1;
+  }
+
+  /** 向指定块追加文本（用于流式输出） */
+  appendToBlock(blockIndex: number, content: string): void {
+    const msg = this.getLastAIMessage();
+    if (!msg || blockIndex >= msg.blocks.length) return;
+    msg.blocks[blockIndex] += content;
+    this.emit("message:update", msg);
+  }
+
   /** 追加工具调用内容块 */
   tool(content: string): void {
     let msg = this.getLastAIMessage();
@@ -125,6 +142,14 @@ export class MessageBus extends EventEmitter implements MessagePort {
     let msg = this.getLastAIMessage();
     if (!msg) msg = this.createAIMessage();
     msg.blocks.push("⚠️  " + content);
+    this.emit("message:update", msg);
+  }
+
+  /** 追加调试内容块 */
+  debug(content: string): void {
+    let msg = this.getLastAIMessage();
+    if (!msg) msg = this.createAIMessage();
+    msg.blocks.push("🐛 " + content);
     this.emit("message:update", msg);
   }
 

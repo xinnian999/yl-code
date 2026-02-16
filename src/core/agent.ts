@@ -67,6 +67,8 @@ export class Agent {
   private unsubModelChange: (() => void);
   /** 中断控制器，用于取消正在进行的 AI 请求 */
   private abortController: AbortController | null = null;
+  /** 调试模式开关，开启后实时输出流式 chunk 详情 */
+  private debugMode = false;
 
   constructor() {
     this.systemTemplate = loadSystemTemplate();
@@ -97,6 +99,11 @@ export class Agent {
       this.currentModel = llm.bindTools(tools);
     }
     return this.currentModel;
+  }
+
+  /** 获取调试模式状态 */
+  isDebugMode(): boolean {
+    return this.debugMode;
   }
 
   /** 中断当前正在进行的 AI 请求 */
@@ -153,7 +160,6 @@ export class Agent {
 
       if (!response.tool_calls || response.tool_calls.length === 0) {
         this.messageBus.setThinkingStatus(ThinkingStatus.IDLE);
-        this.messageBus.ai(response.content || "");
         const totalDuration = Date.now() - startTime - this.confirmBus.totalWaitTime;
         this.messageBus.ai(`\n🕒 总耗时: ${formatDuration(totalDuration)}`);
         return response.content || "";
@@ -178,7 +184,7 @@ export class Agent {
     return typeof lastMessage.content === "string" ? lastMessage.content : "";
   }
 
-  /** 流式调用模型并实时更新思考状态 */
+  /** 流式调用模型并实时输出文本到 UI */
   private async streamResponse(signal: AbortSignal): Promise<any> {
     const model = this.getModel();
     const stream = await model.stream(this.chatMessages, { signal });
@@ -186,9 +192,29 @@ export class Agent {
     let response: any;
     let currentToolName: string | null = null;
     let currentToolArgs: string | null = null;
+    let chunkIndex = 0;
+    let streamBlockIndex = -1;
 
     for await (const chunk of stream) {
       response = response ? concat(response, chunk) : chunk;
+
+      // 流式输出文本内容到 UI
+      if (chunk.content) {
+        const text = typeof chunk.content === "string" ? chunk.content : String(chunk.content);
+        if (text) {
+          if (streamBlockIndex === -1) {
+            this.messageBus.setThinkingStatus(ThinkingStatus.IDLE);
+            streamBlockIndex = this.messageBus.createTextBlock(text);
+          } else {
+            this.messageBus.appendToBlock(streamBlockIndex, text);
+          }
+        }
+      }
+
+      if (this.debugMode) {
+        this.logChunkDebug(chunk, chunkIndex);
+        chunkIndex++;
+      }
 
       const chunkAny = chunk as any;
       if (chunkAny.tool_call_chunks?.length > 0) {
@@ -212,7 +238,33 @@ export class Agent {
       }
     }
 
+    if (this.debugMode) {
+      this.messageBus.debug(`流式完成，共 ${chunkIndex} 个 chunk`);
+    }
+
     return response;
+  }
+
+  /** 输出单个 chunk 的调试信息 */
+  private logChunkDebug(chunk: any, index: number): void {
+    const parts: string[] = [`#${index}`];
+
+    if (chunk.content) {
+      const text = typeof chunk.content === "string" ? chunk.content : JSON.stringify(chunk.content);
+      parts.push(`text: "${text}"`);
+    }
+
+    if (chunk.tool_call_chunks?.length > 0) {
+      for (const tc of chunk.tool_call_chunks) {
+        if (tc.name) parts.push(`tool: ${tc.name}`);
+        if (tc.args) parts.push(`args: ${tc.args}`);
+      }
+    }
+
+    // 只在有实质内容时输出，跳过空 chunk
+    if (parts.length > 1) {
+      this.messageBus.debug(parts.join(" | "));
+    }
   }
 
   /** 标准化响应，确保空内容时有占位文本 */
@@ -261,13 +313,13 @@ export class Agent {
     const allowedTools = getToolsForMode(this.tools, this.mode);
 
     for (const toolCall of response.tool_calls as ToolCall[]) {
-      const contentText = response.content?.toString().replaceAll("\n", "") || "";
-      if (contentText) {
-        this.messageBus.ai(contentText);
-      }
-
       const foundTool = allowedTools.find((t) => t.name === toolCall.name);
       const toolDesc = getToolDescription(toolCall.name, toolCall.args as ToolArgs);
+
+      if (this.debugMode) {
+        this.messageBus.debug(`工具调用: ${toolCall.name} | id: ${toolCall.id}`);
+        this.messageBus.debug(`参数: ${JSON.stringify(toolCall.args)}`);
+      }
 
       this.messageBus.setThinkingStatus(ThinkingStatus.TOOL_CALLING, `执行中: ${toolDesc}`);
 
@@ -293,6 +345,13 @@ export class Agent {
         const toolDuration = Date.now() - toolStartTime - waitTimeAdded;
 
         this.messageBus.tool(`${toolDesc} (耗时: ${formatDuration(toolDuration)})`);
+
+        if (this.debugMode) {
+          const resultStr = String(toolResult);
+          const preview = resultStr.length > 500 ? resultStr.slice(0, 500) + "...(截断)" : resultStr;
+          this.messageBus.debug(`返回结果 (${resultStr.length}字符): ${preview}`);
+        }
+
         this.chatMessages.push(
           new ToolMessage({ content: toolResult as string, tool_call_id: toolCall.id })
         );
@@ -321,6 +380,11 @@ export class Agent {
         return { action: "select_model" };
       case "clear":
         this.newSession();
+        return { action: "none" };
+      case "debug":
+        this.debugMode = !this.debugMode;
+        this.messageBus.createAIMessage();
+        this.messageBus.ai(this.debugMode ? "🐛 调试模式已开启" : "🐛 调试模式已关闭");
         return { action: "none" };
       case "help":
         this.messageBus.createAIMessage();
