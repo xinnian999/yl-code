@@ -44,11 +44,11 @@ const StatusBar: React.FC<StatusBarProps> = ({ thinkingStatus }) => {
 
   return (
     <Box>
-      {/* 思考状态 */}
       <Text color="yellow">
         {isActive && <><Spinner type="dots" /> </>}
         {statusText}
         {isActive && elapsed > 0 && <Text color="gray"> ({formatDuration(elapsed)})</Text>}
+        {isActive && <Text color="gray" dimColor> - 按 Esc 中断</Text>}
       </Text>
     </Box>
   );

@@ -64,6 +64,13 @@ const App: React.FC<AppProps> = ({ agent }) => {
   useInput((input, key) => {
     if (key.ctrl && input === "c") { handleExit(); }
 
+    // 处理中时按 Esc 中断 AI 输出
+    if (key.escape && isProcessing) {
+      agent.abort();
+      setIsProcessing(false);
+      return;
+    }
+
     // 文件补全键盘处理
     if (showFileSuggestions && !isSelectingModel) {
       const filteredFiles = getFilteredFiles(fileFilter);

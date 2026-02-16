@@ -65,6 +65,8 @@ export class Agent {
   private mode: AgentModeValue = AgentMode.BUILD;
   /** 模型变更事件的取消订阅函数 */
   private unsubModelChange: (() => void);
+  /** 中断控制器，用于取消正在进行的 AI 请求 */
+  private abortController: AbortController | null = null;
 
   constructor() {
     this.systemTemplate = loadSystemTemplate();
@@ -97,6 +99,11 @@ export class Agent {
     return this.currentModel;
   }
 
+  /** 中断当前正在进行的 AI 请求 */
+  abort(): void {
+    this.abortController?.abort();
+  }
+
   /** 清空对话历史，仅保留系统提示词 */
   clearMemory(): void {
     this.chatMessages.length = 0;
@@ -108,6 +115,7 @@ export class Agent {
   async run(query: string, fileContext: string = "", maxIterations = 30): Promise<string> {
     const startTime = Date.now();
 
+    this.abortController = new AbortController();
     this.confirmBus.resetSkipConfirm();
 
     let messageContent = query;
@@ -119,13 +127,24 @@ export class Agent {
     this.messageBus.createAIMessage();
 
     for (let i = 0; i < maxIterations; i++) {
+      // 检查是否已中断
+      if (this.abortController.signal.aborted) {
+        this.messageBus.ai("\n⚠️ 已中断");
+        break;
+      }
+
       const iterationStartTime = Date.now();
       this.messageBus.setThinkingStatus(ThinkingStatus.THINKING, "玩命思考中...🐂🐎");
 
       let response: any;
       try {
-        response = await this.streamResponse();
+        response = await this.streamResponse(this.abortController.signal);
       } catch (error) {
+        // 中断引起的错误，正常退出
+        if (this.abortController.signal.aborted) {
+          this.messageBus.ai("\n⚠️ 已中断");
+          break;
+        }
         this.messageBus.setThinkingStatus(ThinkingStatus.IDLE);
         this.handleApiError(error);
       }
@@ -141,6 +160,13 @@ export class Agent {
       }
 
       await this.executeToolCalls(response, iterationStartTime);
+
+      // 工具调用后再次检查中断
+      if (this.abortController.signal.aborted) {
+        this.messageBus.ai("\n⚠️ 已中断");
+        break;
+      }
+
       this.messageBus.setThinkingStatus(ThinkingStatus.WAITING, "等待 AI 响应...");
     }
 
@@ -153,9 +179,9 @@ export class Agent {
   }
 
   /** 流式调用模型并实时更新思考状态 */
-  private async streamResponse(): Promise<any> {
+  private async streamResponse(signal: AbortSignal): Promise<any> {
     const model = this.getModel();
-    const stream = await model.stream(this.chatMessages);
+    const stream = await model.stream(this.chatMessages, { signal });
 
     let response: any;
     let currentToolName: string | null = null;
@@ -327,6 +353,7 @@ export class Agent {
       const err = error as Error;
       this.messageBus.error(err?.message || String(error));
     } finally {
+      this.abortController = null;
       this.messageBus.setThinkingStatus(ThinkingStatus.IDLE);
       this.saveSession();
     }
