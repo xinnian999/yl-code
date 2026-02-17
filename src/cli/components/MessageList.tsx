@@ -77,8 +77,8 @@ const AIMessageComponent: React.FC<AIMessageProps> = ({ message, thinkingStatus,
           <Text>{block}</Text>
         </Box>
       ))}
-      {hasTodos && <TodoList todos={todos} />}
       {isActive && <StatusBar thinkingStatus={thinkingStatus} />}
+      {hasTodos && <TodoList todos={todos} />}
     </Box>
   );
 };

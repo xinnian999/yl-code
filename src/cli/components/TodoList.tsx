@@ -26,10 +26,12 @@ const TodoList: React.FC<TodoListProps> = ({ todos }) => {
   const completed = todos.filter((t) => t.status === "completed").length;
 
   return (
-    <Box flexDirection="column" marginBottom={1} paddingX={1}>
-      <Text bold color="cyan">
-        📋 任务进度 ({completed}/{todos.length})
-      </Text>
+    <Box flexDirection="column" marginTop={1} paddingX={1} borderStyle="round" borderColor="cyan">
+      <Box marginBottom={1}>
+        <Text bold color="cyan">
+          📋 任务进度 ({completed}/{todos.length})
+        </Text>
+      </Box>
       <TaskList>
         {todos.map((todo, index) => {
           const state = mapState(todo.status);
