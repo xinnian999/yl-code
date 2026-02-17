@@ -69,11 +69,13 @@ export class McpManager extends EventEmitter {
     for (const server of servers) {
       const transport = getTransport(server);
       if (transport === "stdio" && server.command) {
-        mcpServers[server.name] = {
+        const config: Record<string, any> = {
           transport: "stdio",
           command: server.command,
           args: server.args || [],
         };
+        if (server.env) config.env = server.env;
+        mcpServers[server.name] = config;
       } else if (transport === "sse") {
         const url = getServerUrl(server);
         if (!url) continue;

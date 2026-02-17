@@ -20,6 +20,8 @@ export interface McpServerEntry {
   command?: string;
   /** stdio 模式的命令参数 */
   args?: string[];
+  /** stdio 模式的环境变量 */
+  env?: Record<string, string>;
   /** sse 模式的 URL */
   url?: string;
   /** sse 模式的 URL（baseUrl 别名，兼容 Trae 等工具） */
