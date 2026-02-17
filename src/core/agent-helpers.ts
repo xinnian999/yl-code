@@ -3,6 +3,37 @@ import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 import { AgentMode, ThinkingStatus } from "./types.ts";
 import type { AgentModeValue } from "./types.ts";
+import type { BaseMessage } from "@langchain/core/messages";
+import type { MessageBus } from "./message-bus.ts";
+import type { ConfirmBus } from "./confirm-bus.ts";
+import type { TodoBus } from "./todo-bus.ts";
+import type { ContextBus } from "./context/context-bus.ts";
+import type { ConfigManager } from "./config.ts";
+import type { ModeTool } from "./tools.ts";
+
+// ============ Agent 上下文接口 ============
+
+/** Agent 内部状态的访问接口，供拆分模块使用 */
+export interface AgentContext {
+  /** 消息总线 */
+  readonly messageBus: MessageBus;
+  /** 确认总线 */
+  readonly confirmBus: ConfirmBus;
+  /** 任务总线 */
+  readonly todoBus: TodoBus;
+  /** 上下文总线 */
+  readonly contextBus: ContextBus;
+  /** 配置管理器 */
+  readonly config: ConfigManager;
+  /** 对话消息历史 */
+  chatMessages: BaseMessage[];
+  /** 调试模式开关 */
+  debugMode: boolean;
+  /** 当前工作模式 */
+  mode: AgentModeValue;
+  /** 带模式标签的工具列表 */
+  tools: ModeTool[];
+}
 
 // ============ 辅助类型 ============
 

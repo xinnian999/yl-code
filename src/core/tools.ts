@@ -234,6 +234,6 @@ export function createTools(confirm: ConfirmPort, processPort: ProcessPort, todo
     { tool: listDirectoryTool,  modes: [AgentMode.ASK, AgentMode.BUILD] },
     { tool: writeFileTool,      modes: [AgentMode.BUILD] },
     { tool: executeCommandTool, modes: [AgentMode.BUILD] },
-    { tool: todoWriteTool,      modes: [AgentMode.ASK, AgentMode.BUILD] },
+    { tool: todoWriteTool,      modes: [AgentMode.BUILD] },
   ];
 }

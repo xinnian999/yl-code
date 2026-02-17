@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "
 import { homedir } from "os";
 import { join } from "path";
 import type { StoredMessage } from "@langchain/core/messages";
-import type { Message, UserMessage, AIMessage } from "./message-bus.ts";
+import type { Message, UserMessage, AIMessage } from "../message-bus.ts";
 
 // ============ 常量 ============
 

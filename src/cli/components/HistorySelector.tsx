@@ -2,7 +2,7 @@ import React, { useState, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
 import SelectInput from "ink-select-input";
 import type { Agent } from "@/core/agent.ts";
-import type { SessionMeta } from "@/core/session-store.ts";
+import type { SessionMeta } from "@/core/session/session-store.ts";
 import ConfirmDialog from "./ConfirmDialog.tsx";
 
 /** 内部视图状态 */

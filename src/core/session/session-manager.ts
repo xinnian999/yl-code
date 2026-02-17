@@ -4,7 +4,7 @@ import {
   mapStoredMessagesToChatMessages,
 } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
-import type { Message } from "./message-bus.ts";
+import type { Message } from "../message-bus.ts";
 import {
   type SessionMeta,
   type SessionIndex,
