@@ -16,9 +16,9 @@ interface UserMessageProps {
 }
 
 /**
- * 用户消息组件
+ * 用户消息组件（memo 避免无关重渲染）
  */
-const UserMessage: React.FC<UserMessageProps> = ({ message }) => {
+const UserMessage = React.memo<UserMessageProps>(({ message }) => {
   return (
     <Box
       flexDirection="column"
@@ -34,7 +34,7 @@ const UserMessage: React.FC<UserMessageProps> = ({ message }) => {
       <Text color="cyan">{message.content}</Text>
     </Box>
   );
-};
+});
 
 /** AI 消息组件属性 */
 interface AIMessageProps {
@@ -46,10 +46,10 @@ interface AIMessageProps {
 }
 
 /**
- * AI 消息组件（支持多内容块）
+ * AI 消息组件（memo 避免无关重渲染）
  * 每条 AI 消息显示自己绑定的任务列表，最后一条显示思考状态
  */
-const AIMessageComponent: React.FC<AIMessageProps> = ({ message, thinkingStatus, todos }) => {
+const AIMessageComponent = React.memo<AIMessageProps>(({ message, thinkingStatus, todos }) => {
   const hasBlocks = message.blocks && message.blocks.length > 0;
   const isActive = thinkingStatus?.status !== undefined && thinkingStatus.status !== ThinkingStatus.IDLE;
   const hasTodos = todos && todos.length > 0;
@@ -79,7 +79,7 @@ const AIMessageComponent: React.FC<AIMessageProps> = ({ message, thinkingStatus,
       {hasTodos && <TodoList todos={todos} />}
     </Box>
   );
-};
+});
 
 /** 单条消息组件属性 */
 interface MessageItemProps {
@@ -89,9 +89,9 @@ interface MessageItemProps {
 }
 
 /**
- * 单条消息组件
+ * 单条消息组件（memo 避免无关重渲染）
  */
-const MessageItem: React.FC<MessageItemProps> = ({ message, thinkingStatus, todos }) => {
+const MessageItem = React.memo<MessageItemProps>(({ message, thinkingStatus, todos }) => {
   if (message.type === MessageType.USER) {
     return <UserMessage message={message as UserMessageType} />;
   }
@@ -107,7 +107,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, thinkingStatus, todo
   }
 
   return null;
-};
+});
 
 /** 消息列表组件属性 */
 interface MessageListProps {
@@ -117,10 +117,10 @@ interface MessageListProps {
 }
 
 /**
- * 消息列表组件
+ * 消息列表组件（memo 避免输入框变化导致的无关重渲染）
  * 渲染所有历史消息，每条 AI 消息显示自己绑定的任务列表
  */
-const MessageList: React.FC<MessageListProps> = ({ messages, thinkingStatus, todosMap }) => {
+const MessageList = React.memo<MessageListProps>(({ messages, thinkingStatus, todosMap }) => {
   let lastAIIndex = -1;
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].type === MessageType.AI) {
@@ -145,6 +145,6 @@ const MessageList: React.FC<MessageListProps> = ({ messages, thinkingStatus, tod
       })}
     </Box>
   );
-};
+});
 
 export default MessageList;
