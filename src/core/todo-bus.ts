@@ -5,9 +5,9 @@ import type { TodoPort, TodoItem } from "./types.ts";
 
 /** Todo 总线事件定义 */
 interface TodoBusEvents {
-  /** 任务列表更新时触发 */
-  "todo:update": (todos: TodoItem[]) => void;
-  /** 任务列表被清空时触发 */
+  /** 任务列表更新时触发，携带消息 ID 和对应的任务列表 */
+  "todo:update": (messageId: string, todos: TodoItem[]) => void;
+  /** 所有任务列表被清空时触发（新会话） */
   "todo:clear": () => void;
 }
 
@@ -15,37 +15,61 @@ interface TodoBusEvents {
 
 /**
  * Todo 总线 - 管理任务列表状态和事件通知
- * AI 通过 todo_write 工具调用此总线更新任务，UI 通过事件订阅实时渲染
+ * 以 messageId 为 key 存储每轮对话的任务列表，支持多轮共存
  */
 export class TodoBus extends EventEmitter implements TodoPort {
-  /** 当前任务列表 */
-  private todos: TodoItem[] = [];
+  /** 消息 ID → 任务列表 的映射 */
+  private todosMap: Map<string, TodoItem[]> = new Map();
+  /** 当前轮次绑定的 AI 消息 ID */
+  private currentMessageId: string | null = null;
 
-  /** 更新整个任务列表（全量替换），并通知 UI */
+  /** 设置当前轮次的消息 ID，后续 updateTodos 会写入该 ID */
+  setCurrentMessageId(id: string): void {
+    this.currentMessageId = id;
+  }
+
+  /** 更新当前轮次的任务列表（全量替换），并通知 UI */
   updateTodos(todos: TodoItem[]): void {
-    this.todos = todos.map((t) => ({ ...t }));
-    this.emit("todo:update", this.getTodos());
+    if (!this.currentMessageId) return;
+    const copied = todos.map((t) => ({ ...t }));
+    this.todosMap.set(this.currentMessageId, copied);
+    this.emit("todo:update", this.currentMessageId, this.getTodos());
   }
 
-  /** 获取当前任务列表的副本 */
+  /** 获取当前轮次的任务列表副本 */
   getTodos(): TodoItem[] {
-    return this.todos.map((t) => ({ ...t }));
+    if (!this.currentMessageId) return [];
+    return (this.todosMap.get(this.currentMessageId) || []).map((t) => ({ ...t }));
   }
 
-  /** 清空任务列表并通知 UI */
+  /** 获取所有轮次的任务列表映射副本（UI 渲染用） */
+  getAllTodos(): Map<string, TodoItem[]> {
+    const result = new Map<string, TodoItem[]>();
+    for (const [id, todos] of this.todosMap) {
+      result.set(id, todos.map((t) => ({ ...t })));
+    }
+    return result;
+  }
+
+  /** 清空所有任务列表（新会话时调用） */
   clearTodos(): void {
-    this.todos = [];
+    this.todosMap.clear();
+    this.currentMessageId = null;
     this.emit("todo:clear");
   }
 
-  /** 将所有未完成的任务标记为 completed，并通知 UI */
+  /** 将当前轮次的未完成任务标记为 completed */
   completeAll(): void {
-    if (this.todos.length === 0) return;
-    const hasIncomplete = this.todos.some((t) => t.status !== "completed");
+    if (!this.currentMessageId) return;
+    const todos = this.todosMap.get(this.currentMessageId);
+    if (!todos || todos.length === 0) return;
+
+    const hasIncomplete = todos.some((t) => t.status !== "completed");
     if (!hasIncomplete) return;
 
-    this.todos = this.todos.map((t) => ({ ...t, status: "completed" as const }));
-    this.emit("todo:update", this.getTodos());
+    const completed = todos.map((t) => ({ ...t, status: "completed" as const }));
+    this.todosMap.set(this.currentMessageId, completed);
+    this.emit("todo:update", this.currentMessageId, completed.map((t) => ({ ...t })));
   }
 
   /** 类型安全的事件订阅 */

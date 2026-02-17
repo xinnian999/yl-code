@@ -1,8 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import { MessageType, ThinkingStatus } from "@/core/types.ts";
-import type { ThinkingState } from "@/core/types.ts";
-import type { TodoItem } from "@/core/types.ts";
+import type { ThinkingState, TodoItem } from "@/core/types.ts";
 import type {
   Message,
   UserMessage as UserMessageType,
@@ -42,20 +41,19 @@ interface AIMessageProps {
   message: AIMessageType;
   /** 思考状态，仅最后一条 AI 消息传入 */
   thinkingStatus?: ThinkingState;
-  /** 任务列表，仅最后一条 AI 消息传入 */
+  /** 该消息绑定的任务列表 */
   todos?: TodoItem[];
 }
 
 /**
  * AI 消息组件（支持多内容块）
- * 最后一条 AI 消息会在内部尾部显示状态栏和任务列表
+ * 每条 AI 消息显示自己绑定的任务列表，最后一条显示思考状态
  */
 const AIMessageComponent: React.FC<AIMessageProps> = ({ message, thinkingStatus, todos }) => {
   const hasBlocks = message.blocks && message.blocks.length > 0;
   const isActive = thinkingStatus?.status !== undefined && thinkingStatus.status !== ThinkingStatus.IDLE;
   const hasTodos = todos && todos.length > 0;
 
-  // 没有内容块且没有活跃状态且没有任务时不渲染
   if (!hasBlocks && !isActive && !hasTodos) {
     return null;
   }
@@ -86,9 +84,7 @@ const AIMessageComponent: React.FC<AIMessageProps> = ({ message, thinkingStatus,
 /** 单条消息组件属性 */
 interface MessageItemProps {
   message: Message;
-  /** 思考状态，仅最后一条 AI 消息传入 */
   thinkingStatus?: ThinkingState;
-  /** 任务列表，仅最后一条 AI 消息传入 */
   todos?: TodoItem[];
 }
 
@@ -117,15 +113,14 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, thinkingStatus, todo
 interface MessageListProps {
   messages: Message[];
   thinkingStatus: ThinkingState;
-  todos: TodoItem[];
+  todosMap: Map<string, TodoItem[]>;
 }
 
 /**
  * 消息列表组件
- * 渲染所有历史消息，最后一条 AI 消息内部显示当前状态和任务列表
+ * 渲染所有历史消息，每条 AI 消息显示自己绑定的任务列表
  */
-const MessageList: React.FC<MessageListProps> = ({ messages, thinkingStatus, todos }) => {
-  // 找到最后一条 AI 消息的索引
+const MessageList: React.FC<MessageListProps> = ({ messages, thinkingStatus, todosMap }) => {
   let lastAIIndex = -1;
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].type === MessageType.AI) {
@@ -138,12 +133,13 @@ const MessageList: React.FC<MessageListProps> = ({ messages, thinkingStatus, tod
     <Box flexDirection="column" flexGrow={1}>
       {messages.map((msg, index) => {
         const isLastAI = index === lastAIIndex;
+        const todos = todosMap.get(msg.id);
         return (
           <MessageItem
             key={msg.id}
             message={msg}
             thinkingStatus={isLastAI ? thinkingStatus : undefined}
-            todos={isLastAI ? todos : undefined}
+            todos={todos}
           />
         );
       })}

@@ -4,18 +4,20 @@ import type { Agent } from "@/core/agent.ts";
 
 /**
  * 任务列表状态管理 hook
- * 订阅 agent.todoBus 事件，管理任务列表状态
+ * 订阅 agent.todoBus 事件，以 Map<messageId, TodoItem[]> 管理多轮任务列表
  */
 export function useTodos(agent: Agent) {
-  const [todos, setTodos] = useState<TodoItem[]>(() => agent.todoBus.getTodos());
+  const [todosMap, setTodosMap] = useState<Map<string, TodoItem[]>>(
+    () => agent.todoBus.getAllTodos()
+  );
 
   useEffect(() => {
-    const handleUpdate = (updatedTodos: TodoItem[]) => {
-      setTodos([...updatedTodos]);
+    const handleUpdate = (messageId: string, todos: TodoItem[]) => {
+      setTodosMap((prev) => new Map(prev).set(messageId, todos));
     };
 
     const handleClear = () => {
-      setTodos([]);
+      setTodosMap(new Map());
     };
 
     const { todoBus } = agent;
@@ -28,5 +30,5 @@ export function useTodos(agent: Agent) {
     };
   }, [agent]);
 
-  return { todos };
+  return { todosMap };
 }

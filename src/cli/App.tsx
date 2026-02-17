@@ -26,7 +26,7 @@ export interface AppProps {
 const App: React.FC<AppProps> = ({ agent }) => {
   const { exit } = useApp();
   const { messages, thinkingStatus } = useMessages(agent);
-  const { todos } = useTodos(agent);
+  const { todosMap } = useTodos(agent);
   const { showDiffConfirm, pendingChange, diffEditorOpened, handleDiffConfirm } = useDiffConfirm(agent);
   const { pushHistory, navigateUp, navigateDown, resetNavigation } = useHistory();
 
@@ -202,7 +202,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
         />
       ) : (
         <>
-          <MessageList messages={messages} thinkingStatus={thinkingStatus} todos={todos} />
+          <MessageList messages={messages} thinkingStatus={thinkingStatus} todosMap={todosMap} />
           {showCommandSuggestions && <CommandSuggestions selectedIndex={commandSelectedIndex} filter={inputValue} />}
           {showFileSuggestions && <FileSuggestions selectedIndex={fileSelectedIndex} filter={fileFilter} />}
           <InputBox value={inputValue} onChange={handleInputChange} onSubmit={handleSubmit} isDisabled={isProcessing} inputKey={inputKey} />

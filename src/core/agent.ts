@@ -133,7 +133,6 @@ export class Agent {
 
     this.abortController = new AbortController();
     this.confirmBus.resetSkipConfirm();
-    this.todoBus.clearTodos();
 
     let messageContent = query;
     if (fileContext) {
@@ -141,7 +140,8 @@ export class Agent {
     }
 
     this.chatMessages.push(new HumanMessage(messageContent));
-    this.messageBus.createAIMessage();
+    const aiMessage = this.messageBus.createAIMessage();
+    this.todoBus.setCurrentMessageId(aiMessage.id);
 
     for (let i = 0; i < maxIterations; i++) {
       // 检查是否已中断
