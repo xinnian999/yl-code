@@ -207,3 +207,61 @@ export function tryOpenDiff(
 
   return { editor, tempFiles };
 }
+
+/**
+ * 在编辑器中打开单个文件进行编辑
+ * 优先使用检测到的编辑器，否则使用 $EDITOR 或系统默认方式
+ * @param filePath 要打开的文件路径
+ * @returns 使用的编辑器名称，失败返回 null
+ */
+export function openFileInEditor(filePath: string): string | null {
+  // 优先使用检测到的编辑器（VS Code / Cursor / IDEA / WebStorm / Neovim）
+  const editor = detectEditor();
+  if (editor) {
+    const config = EDITORS[editor];
+    try {
+      const child = spawn(config.cmd, [filePath], { detached: true, stdio: "ignore" });
+      child.unref();
+      return config.name;
+    } catch {
+      // 继续尝试其他方式
+    }
+  }
+
+  // 尝试使用 $EDITOR 环境变量（非终端编辑器）
+  const envEditor = process.env.EDITOR || "";
+  const terminalEditors = ["vi", "vim", "nvim", "nano", "emacs"];
+  if (envEditor && !terminalEditors.includes(basename(envEditor))) {
+    try {
+      const child = spawn(envEditor, [filePath], { detached: true, stdio: "ignore" });
+      child.unref();
+      return basename(envEditor);
+    } catch {
+      // 继续尝试
+    }
+  }
+
+  // macOS 兜底：用系统默认应用打开
+  if (process.platform === "darwin") {
+    try {
+      const child = spawn("open", ["-t", filePath], { detached: true, stdio: "ignore" });
+      child.unref();
+      return "系统编辑器";
+    } catch {
+      return null;
+    }
+  }
+
+  // Linux 兜底：xdg-open
+  if (process.platform === "linux") {
+    try {
+      const child = spawn("xdg-open", [filePath], { detached: true, stdio: "ignore" });
+      child.unref();
+      return "系统编辑器";
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}

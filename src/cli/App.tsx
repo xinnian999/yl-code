@@ -1,10 +1,11 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { Box, Text, useApp, useInput } from "ink";
 import MessageList from "./components/MessageList.tsx";
 import InputBox from "./components/InputBox.tsx";
 import CommandSuggestions from "./components/CommandSuggestions.tsx";
 import ModelSelector from "./components/ModelSelector.tsx";
 import HistorySelector, { NEW_SESSION_ID } from "./components/HistorySelector.tsx";
+import McpManagerView from "./components/McpManager.tsx";
 import FileSuggestions, { getFilteredFiles } from "./components/FileSuggestions.tsx";
 import DiffConfirm from "./components/DiffConfirm.tsx";
 import FooterBar from "./components/FooterBar.tsx";
@@ -36,6 +37,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSelectingModel, setIsSelectingModel] = useState(false);
   const [isSelectingHistory, setIsSelectingHistory] = useState(false);
+  const [isManagingMcp, setIsManagingMcp] = useState(false);
   const [showCommandSuggestions, setShowCommandSuggestions] = useState(false);
   const [commandSelectedIndex, setCommandSelectedIndex] = useState(0);
   const [showFileSuggestions, setShowFileSuggestions] = useState(false);
@@ -45,6 +47,9 @@ const App: React.FC<AppProps> = ({ agent }) => {
   const [inputKey, setInputKey] = useState(0);
   const [currentMode, setCurrentMode] = useState<AgentModeValue>(AgentMode.BUILD);
   const [debugMode, setDebugMode] = useState(false);
+
+  // 启动时自动连接 MCP 服务器
+  useEffect(() => { agent.init(); }, [agent]);
 
   const handleExit = useCallback(() => {
     agent.dispose();
@@ -64,6 +69,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
     setDebugMode(agent.isDebugMode());
     if (result.action === "select_model") setIsSelectingModel(true);
     if (result.action === "show_history") setIsSelectingHistory(true);
+    if (result.action === "manage_mcp") setIsManagingMcp(true);
     if (result.action === "exit") setTimeout(() => handleExit(), 500);
   }, [handleExit, agent]);
 
@@ -122,7 +128,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
 
     // Tab 切换工作模式
     if (key.tab && !showCommandSuggestions && !showFileSuggestions
-      && !isSelectingModel && !isSelectingHistory && !showDiffConfirm) {
+      && !isSelectingModel && !isSelectingHistory && !isManagingMcp && !showDiffConfirm) {
       const currentIndex = AGENT_MODES.findIndex((m) => m.value === currentMode);
       const nextMode = AGENT_MODES[(currentIndex + 1) % AGENT_MODES.length].value;
       setCurrentMode(nextMode);
@@ -190,6 +196,8 @@ const App: React.FC<AppProps> = ({ agent }) => {
     <Box flexDirection="column" height="100%" padding={1}>
       {showDiffConfirm && pendingChange ? (
         <DiffConfirm change={pendingChange} onConfirm={handleDiffConfirm} editorOpened={diffEditorOpened} />
+      ) : isManagingMcp ? (
+        <McpManagerView agent={agent} onClose={() => setIsManagingMcp(false)} />
       ) : isSelectingHistory ? (
         <HistorySelector
           agent={agent}

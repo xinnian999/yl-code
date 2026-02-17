@@ -15,6 +15,7 @@ import { AgentMode, ThinkingStatus } from "./types.ts";
 import type { ModelConfig, AgentModeValue } from "./types.ts";
 import type { CommandAction } from "./commands.ts";
 import { SessionManager } from "./session/session-manager.ts";
+import { McpConfigManager, McpManager } from "./mcp/index.ts";
 import { loadSystemTemplate, buildSystemPrompt, formatDuration } from "./agent-helpers.ts";
 import { createBoundModel, checkAndSummarize } from "./agent-model.ts";
 import { streamModelResponse } from "./agent-stream.ts";
@@ -49,6 +50,10 @@ export class Agent {
   readonly config = new ConfigManager();
   /** 会话管理器 */
   readonly sessionManager = new SessionManager();
+  /** MCP 配置管理器 */
+  readonly mcpConfig = new McpConfigManager();
+  /** MCP 连接管理器 */
+  readonly mcpManager = new McpManager(this.mcpConfig);
   /** 后台进程管理器 */
   private processManager = new ProcessManager();
 
@@ -58,7 +63,9 @@ export class Agent {
   private currentModel: ReturnType<ChatOpenAI["bindTools"]> | null = null;
   /** 系统提示词原始模板 */
   systemTemplate: string;
-  /** 带模式标签的工具列表 */
+  /** 内置工具列表（不含 MCP） */
+  private builtinTools: ModeTool[];
+  /** 合并后的工具列表（内置 + MCP） */
   tools: ModeTool[];
   /** 当前工作模式 */
   mode: AgentModeValue = AgentMode.BUILD;
@@ -72,7 +79,8 @@ export class Agent {
   constructor() {
     this.systemTemplate = loadSystemTemplate();
     this.chatMessages = [new SystemMessage(buildSystemPrompt(this.systemTemplate, this.mode))];
-    this.tools = createTools(this.confirmBus, this.processManager, this.todoBus);
+    this.builtinTools = createTools(this.confirmBus, this.processManager, this.todoBus);
+    this.tools = [...this.builtinTools];
     this.unsubModelChange = this.config.onModelChange(() => { this.currentModel = null; });
     this.messageBus.ai(WELCOME_MESSAGE);
   }
@@ -96,6 +104,33 @@ export class Agent {
     this.chatMessages.length = 0;
     this.chatMessages.push(new SystemMessage(buildSystemPrompt(this.systemTemplate, this.mode)));
     this.contextBus.reset();
+  }
+
+  /** 异步初始化（启动时调用，静默连接 MCP 服务器） */
+  async init(): Promise<void> {
+    const servers = this.mcpConfig.getEnabledServers();
+    if (servers.length === 0) return;
+
+    await this.mcpManager.initialize();
+    this.refreshTools();
+  }
+
+  /** 合并内置工具和 MCP 工具，重置模型绑定 */
+  private refreshTools(): void {
+    const mcpTools: ModeTool[] = this.mcpManager.getTools().map((tool) => ({
+      tool,
+      modes: [AgentMode.BUILD],
+    }));
+    this.tools = [...this.builtinTools, ...mcpTools];
+    this.currentModel = null;
+  }
+
+  /** 重新连接 MCP 服务器并刷新工具（供 UI 调用） */
+  async reconnectMcp(): Promise<void> {
+    this.messageBus.setThinkingStatus(ThinkingStatus.THINKING, "正在重连 MCP 服务器...");
+    await this.mcpManager.reconnect();
+    this.refreshTools();
+    this.messageBus.setThinkingStatus(ThinkingStatus.IDLE);
   }
 
   /** 输出本轮耗时和 token 统计 */
@@ -237,5 +272,9 @@ export class Agent {
   cleanup(): void { this.processManager.cleanup(); }
 
   /** 释放资源 */
-  dispose(): void { this.saveSession(); this.unsubModelChange(); }
+  dispose(): void {
+    this.saveSession();
+    this.unsubModelChange();
+    this.mcpManager.close().catch(() => {});
+  }
 }

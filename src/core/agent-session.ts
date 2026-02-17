@@ -112,6 +112,8 @@ export function executeCommand(command: string, ctx: CommandContext): CommandAct
       return { action: "show_history" };
     case "model":
       return { action: "select_model" };
+    case "mcp":
+      return { action: "manage_mcp" };
     case "debug":
       ctx.setDebugMode(!ctx.debugMode);
       ctx.messageBus.createAIMessage();
