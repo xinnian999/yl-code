@@ -14,6 +14,14 @@ import { ConfirmBus } from "./confirm-bus.ts";
 import { ConfigManager } from "./config.ts";
 import { ProcessManager } from "./process-manager.ts";
 import { TodoBus } from "./todo-bus.ts";
+import { ContextBus } from "./context-bus.ts";
+import {
+  estimateTotalTokens,
+  splitMessages,
+  generateSummary,
+  buildSummaryMessages,
+  SUMMARIZE_THRESHOLD,
+} from "./context-manager.ts";
 import { AgentMode, ThinkingStatus } from "./types.ts";
 import type { ModelConfig, AgentModeValue } from "./types.ts";
 import type { BaseMessage } from "@langchain/core/messages";
@@ -49,6 +57,8 @@ export class Agent {
   readonly confirmBus = new ConfirmBus();
   /** 任务总线 */
   readonly todoBus = new TodoBus();
+  /** 上下文总线 */
+  readonly contextBus = new ContextBus();
   /** 配置管理器 */
   readonly config = new ConfigManager();
   /** 会话管理器 */
@@ -115,6 +125,64 @@ export class Agent {
     return this.debugMode;
   }
 
+  /** 创建不绑定工具的裸模型实例（用于摘要生成） */
+  private createBareModel(): ChatOpenAI {
+    const modelConfig = this.config.getCurrentModel();
+    return new ChatOpenAI({
+      modelName: modelConfig.modelName,
+      apiKey: modelConfig.apiKey,
+      temperature: 0,
+      timeout: 60000,
+      maxRetries: 1,
+      configuration: { baseURL: modelConfig.baseUrl },
+    });
+  }
+
+  /**
+   * 检查 token 用量，必要时触发上下文压缩
+   * 更新 contextBus 使 UI 显示最新百分比
+   */
+  private async checkAndSummarize(): Promise<void> {
+    const tokens = estimateTotalTokens(this.chatMessages);
+    this.contextBus.updateUsage(tokens);
+
+    if (tokens < SUMMARIZE_THRESHOLD) return;
+
+    const split = splitMessages(this.chatMessages);
+    if (!split) return;
+
+    this.contextBus.notifySummarizing();
+    this.messageBus.setThinkingStatus(ThinkingStatus.THINKING, "正在压缩上下文...");
+
+    try {
+      const bareModel = this.createBareModel();
+      const summaryText = await generateSummary(bareModel, split.toSummarize);
+      const [summaryHuman, summaryAI] = buildSummaryMessages(summaryText);
+
+      this.chatMessages = [
+        split.systemMessage,
+        summaryHuman,
+        summaryAI,
+        ...split.toKeep,
+      ];
+
+      const newTokens = estimateTotalTokens(this.chatMessages);
+      this.contextBus.updateUsage(newTokens);
+      this.contextBus.notifySummarized();
+
+      if (this.debugMode) {
+        this.messageBus.debug(
+          `上下文已压缩: ${tokens} → ${newTokens} tokens, ${split.toSummarize.length} 条消息已摘要`
+        );
+      }
+    } catch (error) {
+      if (this.debugMode) {
+        const err = error as Error;
+        this.messageBus.debug(`上下文压缩失败: ${err.message}`);
+      }
+    }
+  }
+
   /** 中断当前正在进行的 AI 请求 */
   abort(): void {
     this.abortController?.abort();
@@ -125,11 +193,13 @@ export class Agent {
     this.chatMessages.length = 0;
     const systemPrompt = buildSystemPrompt(this.systemTemplate, this.mode);
     this.chatMessages.push(new SystemMessage(systemPrompt));
+    this.contextBus.reset();
   }
 
   /** 执行一次对话，支持多轮工具调用 */
   async run(query: string, fileContext: string = "", maxIterations = 30): Promise<string> {
     const startTime = Date.now();
+    const startTokens = estimateTotalTokens(this.chatMessages);
 
     this.abortController = new AbortController();
     this.confirmBus.resetSkipConfirm();
@@ -138,6 +208,9 @@ export class Agent {
     if (fileContext) {
       messageContent = `${query}\n\n【用户引用的文件内容如下，请根据这些内容完成任务】${fileContext}`;
     }
+
+    // 在添加新用户消息前检查上下文
+    await this.checkAndSummarize();
 
     this.chatMessages.push(new HumanMessage(messageContent));
     const aiMessage = this.messageBus.createAIMessage();
@@ -172,11 +245,17 @@ export class Agent {
         this.messageBus.setThinkingStatus(ThinkingStatus.IDLE);
         this.todoBus.completeAll();
         const totalDuration = Date.now() - startTime - this.confirmBus.totalWaitTime;
-        this.messageBus.ai(`\n🕒 总耗时: ${formatDuration(totalDuration)}`);
+        const usedTokens = estimateTotalTokens(this.chatMessages) - startTokens;
+        this.messageBus.ai(`\n🕒 总耗时: ${formatDuration(totalDuration)} | 本轮消耗: ${(usedTokens / 1000).toFixed(1)}K tokens`);
         return response.content || "";
       }
 
       await this.executeToolCalls(response, iterationStartTime);
+
+      // 工具调用后检查上下文（工具结果可能产生大量 token）
+      if (i > 0) {
+        await this.checkAndSummarize();
+      }
 
       // 工具调用后再次检查中断
       if (this.abortController.signal.aborted) {
@@ -192,7 +271,8 @@ export class Agent {
       this.todoBus.completeAll();
     }
     const totalDuration = Date.now() - startTime - this.confirmBus.totalWaitTime;
-    this.messageBus.ai(`\n🕒 总耗时: ${formatDuration(totalDuration)}`);
+    const usedTokens = estimateTotalTokens(this.chatMessages) - startTokens;
+    this.messageBus.ai(`\n🕒 总耗时: ${formatDuration(totalDuration)} | 本轮消耗: ${(usedTokens / 1000).toFixed(1)}K tokens`);
 
     const lastMessage = this.chatMessages[this.chatMessages.length - 1];
     return typeof lastMessage.content === "string" ? lastMessage.content : "";
@@ -576,6 +656,8 @@ export class Agent {
 
     this.chatMessages = data.chatMessages;
     this.updateSystemMessage();
+    // 恢复会话后更新上下文用量
+    this.contextBus.updateUsage(estimateTotalTokens(this.chatMessages));
     this.messageBus.restoreMessages(data.uiMessages);
     this.confirmBus.resetSession();
     return true;
@@ -589,6 +671,7 @@ export class Agent {
     this.messageBus.clearMessages();
     this.confirmBus.resetSession();
     this.todoBus.clearTodos();
+    this.contextBus.reset();
     this.messageBus.createAIMessage();
     this.messageBus.ai("🧹 已开启新对话");
   }

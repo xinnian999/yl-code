@@ -149,3 +149,23 @@ export interface ConfigPort {
 export interface ProcessPort {
   registerBackgroundProcess(info: ProcessInfo): void;
 }
+
+// ============ 上下文管理 ============
+
+/** 上下文使用量信息 */
+export interface ContextUsage {
+  /** 当前预估 token 数 */
+  currentTokens: number;
+  /** 最大 token 数 */
+  maxTokens: number;
+  /** 使用百分比（0-100） */
+  percentage: number;
+}
+
+/** 上下文端口 - core 通过此接口管理上下文状态 */
+export interface ContextPort {
+  /** 获取当前上下文使用量 */
+  getUsage(): ContextUsage;
+  /** 更新当前 token 数 */
+  updateUsage(currentTokens: number): void;
+}

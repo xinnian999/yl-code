@@ -13,6 +13,7 @@ import { useMessages } from "./hooks/useMessages.ts";
 import { useDiffConfirm } from "./hooks/useDiffConfirm.ts";
 import { useHistory } from "./hooks/useHistory.ts";
 import { useTodos } from "./hooks/useTodos.ts";
+import { useContextUsage } from "./hooks/useContextUsage.ts";
 import { extractAtFilter } from "@/core/file-scanner.ts";
 import { AgentMode, AGENT_MODES } from "@/core/types.ts";
 import type { ModelConfig, AgentModeValue } from "@/core/types.ts";
@@ -27,6 +28,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
   const { exit } = useApp();
   const { messages, thinkingStatus } = useMessages(agent);
   const { todosMap } = useTodos(agent);
+  const { usage: contextUsage, isSummarizing } = useContextUsage(agent);
   const { showDiffConfirm, pendingChange, diffEditorOpened, handleDiffConfirm } = useDiffConfirm(agent);
   const { pushHistory, navigateUp, navigateDown, resetNavigation } = useHistory();
 
@@ -206,7 +208,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
           {showCommandSuggestions && <CommandSuggestions selectedIndex={commandSelectedIndex} filter={inputValue} />}
           {showFileSuggestions && <FileSuggestions selectedIndex={fileSelectedIndex} filter={fileFilter} />}
           <InputBox value={inputValue} onChange={handleInputChange} onSubmit={handleSubmit} isDisabled={isProcessing} inputKey={inputKey} />
-          <FooterBar mode={currentMode} debugMode={debugMode} />
+          <FooterBar mode={currentMode} debugMode={debugMode} contextUsage={contextUsage} isSummarizing={isSummarizing} />
         </>
       )}
     </Box>
