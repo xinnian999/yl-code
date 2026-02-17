@@ -27,7 +27,7 @@ export interface AppProps {
 
 const App: React.FC<AppProps> = ({ agent }) => {
   const { exit } = useApp();
-  const { messages, thinkingStatus } = useMessages(agent);
+  const { messages, thinkingStatus, streamingBlockIndex } = useMessages(agent);
   const { todosMap } = useTodos(agent);
   const { usage: contextUsage, isSummarizing } = useContextUsage(agent);
   const { showDiffConfirm, pendingChange, diffEditorOpened, handleDiffConfirm } = useDiffConfirm(agent);
@@ -212,7 +212,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
         />
       ) : (
         <>
-          <MessageList messages={messages} thinkingStatus={thinkingStatus} todosMap={todosMap} />
+          <MessageList messages={messages} thinkingStatus={thinkingStatus} todosMap={todosMap} streamingBlockIndex={streamingBlockIndex} />
           {showCommandSuggestions && <CommandSuggestions selectedIndex={commandSelectedIndex} filter={inputValue} />}
           {showFileSuggestions && <FileSuggestions selectedIndex={fileSelectedIndex} filter={fileFilter} />}
           <InputBox value={inputValue} onChange={handleInputChange} onSubmit={handleSubmit} isDisabled={isProcessing} inputKey={inputKey} />

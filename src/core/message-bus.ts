@@ -34,6 +34,8 @@ interface MessageBusEvents {
   message: (message: Message) => void;
   "message:update": (message: Message) => void;
   thinking: (status: ThinkingState) => void;
+  /** 流式输出状态变更（blockIndex = -1 表示无流式输出） */
+  streaming: (blockIndex: number) => void;
   clear: () => void;
   restore: (messages: Message[]) => void;
 }
@@ -53,6 +55,8 @@ export class MessageBus extends EventEmitter implements MessagePort {
   };
   /** 消息 ID 计数器 */
   private messageIdCounter = 0;
+  /** 当前流式输出的块索引（-1 表示无流式输出） */
+  private _streamingBlockIndex: number = -1;
 
   /** 生成唯一消息 ID */
   private generateId(): string {
@@ -151,6 +155,23 @@ export class MessageBus extends EventEmitter implements MessagePort {
     if (!msg) msg = this.createAIMessage();
     msg.blocks.push("🐛 " + content);
     this.emit("message:update", msg);
+  }
+
+  /** 设置当前流式输出的块索引 */
+  setStreamingBlock(blockIndex: number): void {
+    this._streamingBlockIndex = blockIndex;
+    this.emit("streaming", blockIndex);
+  }
+
+  /** 清除流式输出状态 */
+  clearStreamingBlock(): void {
+    this._streamingBlockIndex = -1;
+    this.emit("streaming", -1);
+  }
+
+  /** 获取当前流式输出的块索引（-1 表示无流式输出） */
+  getStreamingBlockIndex(): number {
+    return this._streamingBlockIndex;
   }
 
   /** 设置思考状态 */

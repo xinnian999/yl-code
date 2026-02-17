@@ -7,7 +7,7 @@ export type { Message } from "@/core/message-bus.ts";
 
 /**
  * 消息状态管理 hook
- * 订阅 agent 消息事件，管理消息列表和思考状态
+ * 订阅 agent 消息事件，管理消息列表、思考状态和流式输出状态
  */
 export function useMessages(agent: Agent) {
   const [messages, setMessages] = useState<Message[]>(() => agent.messageBus.getMessages());
@@ -15,6 +15,10 @@ export function useMessages(agent: Agent) {
     status: ThinkingStatus.IDLE,
     detail: "",
   });
+  /** 当前流式输出的块索引（-1 表示无流式输出） */
+  const [streamingBlockIndex, setStreamingBlockIndex] = useState<number>(
+    () => agent.messageBus.getStreamingBlockIndex()
+  );
 
   useEffect(() => {
     const handleMessage = (message: Message) => {
@@ -33,6 +37,10 @@ export function useMessages(agent: Agent) {
       setThinkingStatus(status);
     };
 
+    const handleStreaming = (blockIndex: number) => {
+      setStreamingBlockIndex(blockIndex);
+    };
+
     const handleClear = () => {
       setMessages([]);
     };
@@ -45,6 +53,7 @@ export function useMessages(agent: Agent) {
     messageBus.on("message", handleMessage);
     messageBus.on("message:update", handleMessageUpdate);
     messageBus.on("thinking", handleThinking);
+    messageBus.on("streaming", handleStreaming);
     messageBus.on("clear", handleClear);
     messageBus.on("restore", handleRestore);
 
@@ -52,10 +61,11 @@ export function useMessages(agent: Agent) {
       messageBus.off("message", handleMessage);
       messageBus.off("message:update", handleMessageUpdate);
       messageBus.off("thinking", handleThinking);
+      messageBus.off("streaming", handleStreaming);
       messageBus.off("clear", handleClear);
       messageBus.off("restore", handleRestore);
     };
   }, [agent]);
 
-  return { messages, thinkingStatus };
+  return { messages, thinkingStatus, streamingBlockIndex };
 }

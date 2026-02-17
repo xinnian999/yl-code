@@ -86,6 +86,7 @@ export async function streamModelResponse(
         if (streamBlockIndex === -1) {
           messageBus.setThinkingStatus(ThinkingStatus.IDLE);
           streamBlockIndex = messageBus.createTextBlock(text);
+          messageBus.setStreamingBlock(streamBlockIndex);
         } else {
           messageBus.appendToBlock(streamBlockIndex, text);
         }
@@ -118,6 +119,9 @@ export async function streamModelResponse(
       }
     }
   }
+
+  // 流式输出结束，清除流式状态
+  messageBus.clearStreamingBlock();
 
   if (debugMode) {
     messageBus.debug(`流式完成，共 ${chunkIndex} 个 chunk`);
