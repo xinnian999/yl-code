@@ -2,13 +2,12 @@ import React from "react";
 import { Box, Text } from "ink";
 import Markdown from "ink-markdown-es";
 import { MessageType, ThinkingStatus } from "@/core/types.ts";
-import type { ThinkingState } from "@/core/types.ts";
+import type { ThinkingState, MessageBlock } from "@/core/types.ts";
 import type {
   Message,
   UserMessage as UserMessageType,
   AIMessage as AIMessageType,
 } from "@/core/message-bus.ts";
-import { isTodoBlock, parseTodoBlock } from "@/core/message-bus.ts";
 import StatusBar from "./StatusBar.tsx";
 import TodoList from "./TodoList.tsx";
 
@@ -38,6 +37,53 @@ const UserMessage = React.memo<UserMessageProps>(({ message }) => {
   );
 });
 
+/** 单个消息块渲染属性 */
+interface BlockRendererProps {
+  block: MessageBlock;
+  /** 是否为流式输出中的块 */
+  isStreaming: boolean;
+}
+
+/**
+ * 按 block.type 分发渲染
+ */
+const BlockRenderer: React.FC<BlockRendererProps> = ({ block, isStreaming }) => {
+  switch (block.type) {
+    case "todo":
+      return <TodoList todos={block.todos} />;
+    case "tool":
+      return (
+        <Box marginBottom={1}>
+          <Text color="gray">{"🔨 "}{block.content}</Text>
+        </Box>
+      );
+    case "error":
+      return (
+        <Box marginBottom={1}>
+          <Text color="red">{"❌ "}{block.content}</Text>
+        </Box>
+      );
+    case "warning":
+      return (
+        <Box marginBottom={1}>
+          <Text color="yellow">{"⚠️  "}{block.content}</Text>
+        </Box>
+      );
+    case "debug":
+      return (
+        <Box marginBottom={1}>
+          <Text color="gray">{"🐛 "}{block.content}</Text>
+        </Box>
+      );
+    case "text":
+      return (
+        <Box marginBottom={1}>
+          {isStreaming ? <Text>{block.content}</Text> : <Markdown>{block.content}</Markdown>}
+        </Box>
+      );
+  }
+};
+
 /** AI 消息组件属性 */
 interface AIMessageProps {
   message: AIMessageType;
@@ -51,8 +97,7 @@ interface AIMessageProps {
 
 /**
  * AI 消息组件（memo 避免无关重渲染）
- * 流式输出中的块使用纯文本渲染，完成后切换为 Markdown 渲染
- * todo 快照块使用 TodoList 组件渲染
+ * 按 block.type 分发渲染各类型内容块
  */
 const AIMessageComponent = React.memo<AIMessageProps>(({ message, thinkingStatus, streamingBlockIndex, isLastAI }) => {
   const hasBlocks = message.blocks && message.blocks.length > 0;
@@ -74,17 +119,13 @@ const AIMessageComponent = React.memo<AIMessageProps>(({ message, thinkingStatus
       borderRight={false}
       padding={1}
     >
-      {hasBlocks && message.blocks.map((block, index) => {
-        if (isTodoBlock(block)) {
-          return <TodoList key={index} todos={parseTodoBlock(block)} />;
-        }
-        const isStreaming = isLastAI && streamingBlockIndex === index;
-        return (
-          <Box key={index} marginBottom={1}>
-            {isStreaming ? <Text>{block}</Text> : <Markdown>{block}</Markdown>}
-          </Box>
-        );
-      })}
+      {hasBlocks && message.blocks.map((block, index) => (
+        <BlockRenderer
+          key={index}
+          block={block}
+          isStreaming={isLastAI && streamingBlockIndex === index}
+        />
+      ))}
       {isActive && <StatusBar thinkingStatus={thinkingStatus} />}
     </Box>
   );
@@ -132,7 +173,7 @@ interface MessageListProps {
 
 /**
  * 消息列表组件（memo 避免输入框变化导致的无关重渲染）
- * 渲染所有历史消息，todo 快照内联在消息块中渲染
+ * 渲染所有历史消息，各类型块内联渲染
  */
 const MessageList = React.memo<MessageListProps>(({ messages, thinkingStatus, streamingBlockIndex }) => {
   let lastAIIndex = -1;

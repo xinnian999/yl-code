@@ -5,22 +5,8 @@ import {
   type ThinkingStatusValue,
   type ThinkingState,
   type TodoItem,
+  type MessageBlock,
 } from "./types.ts";
-
-// ============ Todo 快照编码 ============
-
-/** Todo 快照块的标记前缀 */
-export const TODO_BLOCK_MARKER = "\x00__TODO_SNAPSHOT__:";
-
-/** 判断一个 block 是否为 todo 快照块 */
-export function isTodoBlock(block: string): boolean {
-  return block.startsWith(TODO_BLOCK_MARKER);
-}
-
-/** 解析 todo 快照块，提取任务列表数据 */
-export function parseTodoBlock(block: string): TodoItem[] {
-  return JSON.parse(block.slice(TODO_BLOCK_MARKER.length));
-}
 
 // ============ 消息类型 ============
 
@@ -36,7 +22,7 @@ export interface UserMessage {
 export interface AIMessage {
   id: string;
   type: "ai";
-  blocks: string[];
+  blocks: MessageBlock[];
   timestamp: Date;
 }
 
@@ -120,7 +106,7 @@ export class MessageBus extends EventEmitter implements MessagePort {
   ai(content: string): void {
     let msg = this.getLastAIMessage();
     if (!msg) msg = this.createAIMessage();
-    msg.blocks.push(content);
+    msg.blocks.push({ type: "text", content });
     this.emit("message:update", msg);
   }
 
@@ -128,24 +114,27 @@ export class MessageBus extends EventEmitter implements MessagePort {
   createTextBlock(content: string = ""): number {
     let msg = this.getLastAIMessage();
     if (!msg) msg = this.createAIMessage();
-    msg.blocks.push(content);
+    msg.blocks.push({ type: "text", content });
     this.emit("message:update", msg);
     return msg.blocks.length - 1;
   }
 
-  /** 向指定块追加文本（用于流式输出） */
+  /** 向指定文本块追加内容（用于流式输出） */
   appendToBlock(blockIndex: number, content: string): void {
     const msg = this.getLastAIMessage();
     if (!msg || blockIndex >= msg.blocks.length) return;
-    msg.blocks[blockIndex] += content;
+    const block = msg.blocks[blockIndex];
+    if (block.type === "text") {
+      block.content += content;
+    }
     this.emit("message:update", msg);
   }
 
-  /** 追加 todo 快照块（将任务列表编码为特殊 block） */
+  /** 追加 todo 快照块 */
   todoSnapshot(todos: TodoItem[]): void {
     let msg = this.getLastAIMessage();
     if (!msg) msg = this.createAIMessage();
-    msg.blocks.push(TODO_BLOCK_MARKER + JSON.stringify(todos));
+    msg.blocks.push({ type: "todo", todos: todos.map((t) => ({ ...t })) });
     this.emit("message:update", msg);
   }
 
@@ -153,7 +142,7 @@ export class MessageBus extends EventEmitter implements MessagePort {
   tool(content: string): void {
     let msg = this.getLastAIMessage();
     if (!msg) msg = this.createAIMessage();
-    msg.blocks.push("🔨 " + content);
+    msg.blocks.push({ type: "tool", content });
     this.emit("message:update", msg);
   }
 
@@ -161,7 +150,7 @@ export class MessageBus extends EventEmitter implements MessagePort {
   error(content: string): void {
     let msg = this.getLastAIMessage();
     if (!msg) msg = this.createAIMessage();
-    msg.blocks.push("❌ " + content);
+    msg.blocks.push({ type: "error", content });
     this.emit("message:update", msg);
   }
 
@@ -169,7 +158,7 @@ export class MessageBus extends EventEmitter implements MessagePort {
   warning(content: string): void {
     let msg = this.getLastAIMessage();
     if (!msg) msg = this.createAIMessage();
-    msg.blocks.push("⚠️  " + content);
+    msg.blocks.push({ type: "warning", content });
     this.emit("message:update", msg);
   }
 
@@ -177,7 +166,7 @@ export class MessageBus extends EventEmitter implements MessagePort {
   debug(content: string): void {
     let msg = this.getLastAIMessage();
     if (!msg) msg = this.createAIMessage();
-    msg.blocks.push("🐛 " + content);
+    msg.blocks.push({ type: "debug", content });
     this.emit("message:update", msg);
   }
 

@@ -58,6 +58,17 @@ export interface TodoPort {
   clearTodos(): void;
 }
 
+// ============ 消息块 ============
+
+/** 消息块类型 - AI 消息由多个块组成，按类型渲染 */
+export type MessageBlock =
+  | { type: "text"; content: string }
+  | { type: "tool"; content: string }
+  | { type: "error"; content: string }
+  | { type: "warning"; content: string }
+  | { type: "debug"; content: string }
+  | { type: "todo"; todos: TodoItem[] };
+
 // ============ Agent 模式 ============
 
 /** Agent 工作模式 */

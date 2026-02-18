@@ -3,6 +3,7 @@ import { homedir } from "os";
 import { join } from "path";
 import type { StoredMessage } from "@langchain/core/messages";
 import type { Message, UserMessage, AIMessage } from "../message-bus.ts";
+import type { MessageBlock } from "../types.ts";
 
 // ============ 常量 ============
 
@@ -34,7 +35,7 @@ export interface SessionIndex {
 /** UI 消息的可序列化形式（timestamp 为 ISO 字符串） */
 export type SerializedUIMessage =
   | { id: string; type: "user"; content: string; timestamp: string }
-  | { id: string; type: "ai"; blocks: string[]; timestamp: string };
+  | { id: string; type: "ai"; blocks: MessageBlock[]; timestamp: string };
 
 /** 单个会话完整数据（持久化到 session_xxx.json） */
 export interface SessionData {
