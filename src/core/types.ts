@@ -60,14 +60,19 @@ export interface TodoPort {
 
 // ============ 消息块 ============
 
+/** 消息块基础字段 */
+interface MessageBlockBase {
+  /** 调试信息（JSON 字符串，仅 debug 模式下生成） */
+  debug?: string;
+}
+
 /** 消息块类型 - AI 消息由多个块组成，按类型渲染 */
 export type MessageBlock =
-  | { type: "text"; content: string }
-  | { type: "tool"; content: string }
-  | { type: "error"; content: string }
-  | { type: "warning"; content: string }
-  | { type: "debug"; content: string }
-  | { type: "todo"; todos: TodoItem[] };
+  | (MessageBlockBase & { type: "text"; content: string })
+  | (MessageBlockBase & { type: "tool"; content: string })
+  | (MessageBlockBase & { type: "error"; content: string })
+  | (MessageBlockBase & { type: "warning"; content: string })
+  | (MessageBlockBase & { type: "todo"; todos: TodoItem[] });
 
 // ============ Agent 模式 ============
 

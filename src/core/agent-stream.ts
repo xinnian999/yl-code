@@ -12,52 +12,32 @@ import {
   getToolDescription,
 } from "./agent-helpers.ts";
 
-/** 输出单个 chunk 的调试信息 */
-export function logChunkDebug(messageBus: MessageBus, chunk: any, index: number): void {
-  const parts: string[] = [`#${index}`];
-
-  if (chunk.content) {
-    const text = typeof chunk.content === "string" ? chunk.content : JSON.stringify(chunk.content);
-    parts.push(`text: "${text}"`);
-  }
-
-  if (chunk.tool_call_chunks?.length > 0) {
-    for (const tc of chunk.tool_call_chunks) {
-      if (tc.name) parts.push(`tool: ${tc.name}`);
-      if (tc.args) parts.push(`args: ${tc.args}`);
-    }
-  }
-
-  // 只在有实质内容时输出，跳过空 chunk
-  if (parts.length > 1) {
-    messageBus.debug(parts.join(" | "));
-  }
-}
-
-/** 输出完整响应的调试信息，用于排查工具调用问题 */
-export function logResponseDebug(messageBus: MessageBus, response: any): void {
+/** 从响应中提取调试元数据 */
+function extractResponseMeta(response: any): Record<string, unknown> {
+  const meta: Record<string, unknown> = {};
   const toolCalls = response.tool_calls;
-  const kwargs = response.additional_kwargs;
+  meta.tool_calls = toolCalls ? JSON.stringify(toolCalls).slice(0, 300) : "无";
 
-  messageBus.debug(`tool_calls: ${toolCalls ? JSON.stringify(toolCalls).slice(0, 300) : "无"}`);
-
-  if (kwargs) {
-    const kwargKeys = Object.keys(kwargs);
-    messageBus.debug(`additional_kwargs keys: [${kwargKeys.join(", ")}]`);
+  if (response.additional_kwargs) {
+    const kwargs = response.additional_kwargs;
+    meta.additional_kwargs_keys = Object.keys(kwargs);
     if (kwargs.tool_calls) {
-      messageBus.debug(`kwargs.tool_calls: ${JSON.stringify(kwargs.tool_calls).slice(0, 300)}`);
+      meta.kwargs_tool_calls = JSON.stringify(kwargs.tool_calls).slice(0, 300);
     }
   }
 
   if (response.response_metadata) {
-    const meta = response.response_metadata;
-    const finishReason = meta.finish_reason || meta.stop_reason || "未知";
-    messageBus.debug(`finish_reason: ${finishReason}`);
+    const rm = response.response_metadata;
+    meta.finish_reason = rm.finish_reason || rm.stop_reason || "未知";
   }
 
   const contentType = typeof response.content;
-  const contentLen = contentType === "string" ? response.content.length : JSON.stringify(response.content).length;
-  messageBus.debug(`content 类型: ${contentType} | 长度: ${contentLen}`);
+  const contentRaw = contentType === "string" ? response.content : JSON.stringify(response.content);
+  meta.content_type = contentType;
+  meta.content_length = contentRaw.length;
+  meta.content = contentRaw.length > 1000 ? contentRaw.slice(0, 1000) + "...(截断)" : contentRaw;
+
+  return meta;
 }
 
 /** 流式调用模型并实时输出文本到 UI */
@@ -87,16 +67,18 @@ export async function streamModelResponse(
           messageBus.setThinkingStatus(ThinkingStatus.IDLE);
           streamBlockIndex = messageBus.createTextBlock(text);
           messageBus.setStreamingBlock(streamBlockIndex);
+          // debug 模式：流开始时设置初始 debug 标记
+          if (debugMode) {
+            messageBus.setDebugOnBlock(streamBlockIndex,
+              JSON.stringify({ chunks: 0, status: "streaming" }, null, 2));
+          }
         } else {
           messageBus.appendToBlock(streamBlockIndex, text);
         }
       }
     }
 
-    if (debugMode) {
-      logChunkDebug(messageBus, chunk, chunkIndex);
-      chunkIndex++;
-    }
+    if (debugMode) chunkIndex++;
 
     const chunkAny = chunk as any;
     if (chunkAny.tool_call_chunks?.length > 0) {
@@ -123,9 +105,10 @@ export async function streamModelResponse(
   // 流式输出结束，清除流式状态
   messageBus.clearStreamingBlock();
 
-  if (debugMode) {
-    messageBus.debug(`流式完成，共 ${chunkIndex} 个 chunk`);
-    logResponseDebug(messageBus, response);
+  // debug 模式：用完整元数据替换初始 debug
+  if (debugMode && streamBlockIndex !== -1) {
+    const debugObj = { chunks: chunkIndex, ...extractResponseMeta(response) };
+    messageBus.setDebugOnBlock(streamBlockIndex, JSON.stringify(debugObj, null, 2));
   }
 
   return response;

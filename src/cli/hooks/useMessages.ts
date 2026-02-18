@@ -1,9 +1,19 @@
 import { useState, useEffect } from "react";
 import { ThinkingStatus, type ThinkingState } from "@/core/types.ts";
 import type { Message } from "@/core/message-bus.ts";
+import type { AIMessage } from "@/core/message-bus.ts";
 import type { Agent } from "@/core/agent.ts";
 
 export type { Message } from "@/core/message-bus.ts";
+
+/** 深拷贝消息，确保 AI 消息的 blocks 数组和每个 block 对象都是新引用 */
+function cloneMessage(msg: Message): Message {
+  if (msg.type === "ai") {
+    const aiMsg = msg as AIMessage;
+    return { ...aiMsg, blocks: aiMsg.blocks.map((b) => ({ ...b })) };
+  }
+  return { ...msg };
+}
 
 /**
  * 消息状态管理 hook
@@ -28,7 +38,7 @@ export function useMessages(agent: Agent) {
     const handleMessageUpdate = (updatedMessage: Message) => {
       setMessages((prev) =>
         prev.map((msg) =>
-          msg.id === updatedMessage.id ? { ...updatedMessage } : msg
+          msg.id === updatedMessage.id ? cloneMessage(updatedMessage) : msg
         )
       );
     };

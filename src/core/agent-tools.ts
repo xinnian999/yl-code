@@ -67,11 +67,6 @@ export async function executeToolCalls(
     const foundTool = allowedTools.find((t) => t.name === toolCall.name);
     const toolDesc = getToolDescription(toolCall.name, toolCall.args as ToolArgs);
 
-    if (ctx.debugMode) {
-      ctx.messageBus.debug(`工具调用: ${toolCall.name} | id: ${toolCall.id}`);
-      ctx.messageBus.debug(`参数: ${JSON.stringify(toolCall.args)}`);
-    }
-
     ctx.messageBus.setThinkingStatus(ThinkingStatus.TOOL_CALLING, `执行中: ${toolDesc}`);
 
     if (!foundTool) {
@@ -97,15 +92,21 @@ export async function executeToolCalls(
 
       ctx.messageBus.tool(`${toolDesc} (耗时: ${formatDuration(toolDuration)})`);
 
-      // todo_write 额外追加快照块
-      if (toolCall.name === "todo_write") {
-        ctx.messageBus.todoSnapshot(ctx.todoBus.getTodos());
-      }
-
+      // debug 模式：将工具调用详情附加到 tool block
       if (ctx.debugMode) {
         const resultStr = String(toolResult);
         const preview = resultStr.length > 500 ? resultStr.slice(0, 500) + "...(截断)" : resultStr;
-        ctx.messageBus.debug(`返回结果 (${resultStr.length}字符): ${preview}`);
+        ctx.messageBus.appendDebugToLastBlock(JSON.stringify({
+          tool: toolCall.name,
+          id: toolCall.id,
+          args: toolCall.args,
+          result: `(${resultStr.length}字符) ${preview}`,
+        }, null, 2));
+      }
+
+      // todo_write 额外追加快照块
+      if (toolCall.name === "todo_write") {
+        ctx.messageBus.todoSnapshot(ctx.todoBus.getTodos());
       }
 
       ctx.chatMessages.push(

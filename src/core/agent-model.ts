@@ -38,9 +38,12 @@ export function createBoundModel(
   const bound = llm.bindTools(filteredTools);
 
   if (debugMode) {
-    messageBus.debug(`模型: ${modelConfig.modelName}`);
-    messageBus.debug(`baseURL: ${modelConfig.baseUrl}`);
-    messageBus.debug(`绑定工具数: ${filteredTools.length} | 名称: ${filteredTools.map((t) => t.name).join(", ")}`);
+    messageBus.ai("");
+    messageBus.appendDebugToLastBlock(JSON.stringify({
+      model: modelConfig.modelName,
+      baseURL: modelConfig.baseUrl,
+      tools: filteredTools.map((t) => t.name),
+    }, null, 2));
   }
 
   return bound;
@@ -92,14 +95,14 @@ export async function checkAndSummarize(ctx: AgentContext): Promise<void> {
     ctx.contextBus.notifySummarized();
 
     if (ctx.debugMode) {
-      ctx.messageBus.debug(
+      ctx.messageBus.appendDebugToLastBlock(
         `上下文已压缩: ${tokens} → ${newTokens} tokens, ${split.toSummarize.length} 条消息已摘要`
       );
     }
   } catch (error) {
     if (ctx.debugMode) {
       const err = error as Error;
-      ctx.messageBus.debug(`上下文压缩失败: ${err.message}`);
+      ctx.messageBus.appendDebugToLastBlock(`上下文压缩失败: ${err.message}`);
     }
   }
 }

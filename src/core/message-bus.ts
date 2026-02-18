@@ -162,11 +162,21 @@ export class MessageBus extends EventEmitter implements MessagePort {
     this.emit("message:update", msg);
   }
 
-  /** 追加调试内容块 */
-  debug(content: string): void {
-    let msg = this.getLastAIMessage();
-    if (!msg) msg = this.createAIMessage();
-    msg.blocks.push({ type: "debug", content });
+  /** 向最后一个 block 追加调试信息（多次调用会换行拼接） */
+  appendDebugToLastBlock(info: string): void {
+    const msg = this.getLastAIMessage();
+    if (!msg || msg.blocks.length === 0) return;
+    const lastIndex = msg.blocks.length - 1;
+    const last = msg.blocks[lastIndex];
+    msg.blocks[lastIndex] = { ...last, debug: last.debug ? last.debug + "\n" + info : info };
+    this.emit("message:update", msg);
+  }
+
+  /** 按索引设置指定 block 的调试信息（全量替换） */
+  setDebugOnBlock(blockIndex: number, debug: string): void {
+    const msg = this.getLastAIMessage();
+    if (!msg || blockIndex >= msg.blocks.length) return;
+    msg.blocks[blockIndex] = { ...msg.blocks[blockIndex], debug };
     this.emit("message:update", msg);
   }
 

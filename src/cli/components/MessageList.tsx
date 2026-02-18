@@ -45,43 +45,57 @@ interface BlockRendererProps {
 }
 
 /**
+ * 渲染 block 附带的 debug 信息
+ */
+const DebugInfo: React.FC<{ debug: string }> = ({ debug }) => (
+  <Box
+    marginTop={0}
+    marginBottom={1}
+    paddingX={1}
+    borderStyle="single"
+    borderColor="magenta"
+    flexDirection="column"
+  >
+    <Text color="magenta" bold>{"🐛 DEBUG"}</Text>
+    <Text color="magenta" dimColor>{debug}</Text>
+  </Box>
+);
+
+/**
  * 按 block.type 分发渲染
+ * 所有块正常渲染内容，debug 模式下在内容下方附加 debug 信息
  */
 const BlockRenderer: React.FC<BlockRendererProps> = ({ block, isStreaming }) => {
+  let content: React.ReactNode;
+
   switch (block.type) {
     case "todo":
-      return <TodoList todos={block.todos} />;
+      return (
+        <>
+          <TodoList todos={block.todos} />
+          {block.debug && <DebugInfo debug={block.debug} />}
+        </>
+      );
     case "tool":
-      return (
-        <Box marginBottom={1}>
-          <Text color="gray">{"🔨 "}{block.content}</Text>
-        </Box>
-      );
+      content = <Text color="gray">{"🔨 "}{block.content}</Text>;
+      break;
     case "error":
-      return (
-        <Box marginBottom={1}>
-          <Text color="red">{"❌ "}{block.content}</Text>
-        </Box>
-      );
+      content = <Text color="red">{"❌ "}{block.content}</Text>;
+      break;
     case "warning":
-      return (
-        <Box marginBottom={1}>
-          <Text color="yellow">{"⚠️  "}{block.content}</Text>
-        </Box>
-      );
-    case "debug":
-      return (
-        <Box marginBottom={1}>
-          <Text color="gray">{"🐛 "}{block.content}</Text>
-        </Box>
-      );
+      content = <Text color="yellow">{"⚠️  "}{block.content}</Text>;
+      break;
     case "text":
-      return (
-        <Box marginBottom={1}>
-          {isStreaming ? <Text>{block.content}</Text> : <Markdown>{block.content}</Markdown>}
-        </Box>
-      );
+      content = isStreaming ? <Text>{block.content}</Text> : <Markdown>{block.content}</Markdown>;
+      break;
   }
+
+  return (
+    <>
+      <Box marginBottom={1}>{content}</Box>
+      {block.debug && <DebugInfo debug={block.debug} />}
+    </>
+  );
 };
 
 /** AI 消息组件属性 */
