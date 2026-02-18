@@ -13,7 +13,6 @@ import { commands } from "@/core/commands.ts";
 import { useMessages } from "./hooks/useMessages.ts";
 import { useDiffConfirm } from "./hooks/useDiffConfirm.ts";
 import { useHistory } from "./hooks/useHistory.ts";
-import { useTodos } from "./hooks/useTodos.ts";
 import { useContextUsage } from "./hooks/useContextUsage.ts";
 import { extractAtFilter } from "@/core/file-scanner.ts";
 import { AgentMode, AGENT_MODES } from "@/core/types.ts";
@@ -28,7 +27,6 @@ export interface AppProps {
 const App: React.FC<AppProps> = ({ agent }) => {
   const { exit } = useApp();
   const { messages, thinkingStatus, streamingBlockIndex } = useMessages(agent);
-  const { todosMap } = useTodos(agent);
   const { usage: contextUsage, isSummarizing } = useContextUsage(agent);
   const { showDiffConfirm, pendingChange, diffEditorOpened, handleDiffConfirm } = useDiffConfirm(agent);
   const { pushHistory, navigateUp, navigateDown, resetNavigation } = useHistory();
@@ -212,7 +210,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
         />
       ) : (
         <>
-          <MessageList messages={messages} thinkingStatus={thinkingStatus} todosMap={todosMap} streamingBlockIndex={streamingBlockIndex} />
+          <MessageList messages={messages} thinkingStatus={thinkingStatus} streamingBlockIndex={streamingBlockIndex} />
           {showCommandSuggestions && <CommandSuggestions selectedIndex={commandSelectedIndex} filter={inputValue} />}
           {showFileSuggestions && <FileSuggestions selectedIndex={fileSelectedIndex} filter={fileFilter} />}
           <InputBox value={inputValue} onChange={handleInputChange} onSubmit={handleSubmit} isDisabled={isProcessing} inputKey={inputKey} />

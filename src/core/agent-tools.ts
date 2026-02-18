@@ -97,6 +97,11 @@ export async function executeToolCalls(
 
       ctx.messageBus.tool(`${toolDesc} (耗时: ${formatDuration(toolDuration)})`);
 
+      // todo_write 额外追加快照块
+      if (toolCall.name === "todo_write") {
+        ctx.messageBus.todoSnapshot(ctx.todoBus.getTodos());
+      }
+
       if (ctx.debugMode) {
         const resultStr = String(toolResult);
         const preview = resultStr.length > 500 ? resultStr.slice(0, 500) + "...(截断)" : resultStr;

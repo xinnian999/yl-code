@@ -2,12 +2,13 @@ import React from "react";
 import { Box, Text } from "ink";
 import Markdown from "ink-markdown-es";
 import { MessageType, ThinkingStatus } from "@/core/types.ts";
-import type { ThinkingState, TodoItem } from "@/core/types.ts";
+import type { ThinkingState } from "@/core/types.ts";
 import type {
   Message,
   UserMessage as UserMessageType,
   AIMessage as AIMessageType,
 } from "@/core/message-bus.ts";
+import { isTodoBlock, parseTodoBlock } from "@/core/message-bus.ts";
 import StatusBar from "./StatusBar.tsx";
 import TodoList from "./TodoList.tsx";
 
@@ -42,8 +43,6 @@ interface AIMessageProps {
   message: AIMessageType;
   /** 思考状态，仅最后一条 AI 消息传入 */
   thinkingStatus?: ThinkingState;
-  /** 该消息绑定的任务列表 */
-  todos?: TodoItem[];
   /** 当前流式输出的块索引（-1 表示无流式输出） */
   streamingBlockIndex: number;
   /** 是否为最后一条 AI 消息 */
@@ -52,15 +51,14 @@ interface AIMessageProps {
 
 /**
  * AI 消息组件（memo 避免无关重渲染）
- * 每条 AI 消息显示自己绑定的任务列表，最后一条显示思考状态
  * 流式输出中的块使用纯文本渲染，完成后切换为 Markdown 渲染
+ * todo 快照块使用 TodoList 组件渲染
  */
-const AIMessageComponent = React.memo<AIMessageProps>(({ message, thinkingStatus, todos, streamingBlockIndex, isLastAI }) => {
+const AIMessageComponent = React.memo<AIMessageProps>(({ message, thinkingStatus, streamingBlockIndex, isLastAI }) => {
   const hasBlocks = message.blocks && message.blocks.length > 0;
   const isActive = thinkingStatus?.status !== undefined && thinkingStatus.status !== ThinkingStatus.IDLE;
-  const hasTodos = todos && todos.length > 0;
 
-  if (!hasBlocks && !isActive && !hasTodos) {
+  if (!hasBlocks && !isActive) {
     return null;
   }
 
@@ -77,6 +75,9 @@ const AIMessageComponent = React.memo<AIMessageProps>(({ message, thinkingStatus
       padding={1}
     >
       {hasBlocks && message.blocks.map((block, index) => {
+        if (isTodoBlock(block)) {
+          return <TodoList key={index} todos={parseTodoBlock(block)} />;
+        }
         const isStreaming = isLastAI && streamingBlockIndex === index;
         return (
           <Box key={index} marginBottom={1}>
@@ -85,7 +86,6 @@ const AIMessageComponent = React.memo<AIMessageProps>(({ message, thinkingStatus
         );
       })}
       {isActive && <StatusBar thinkingStatus={thinkingStatus} />}
-      {hasTodos && <TodoList todos={todos} />}
     </Box>
   );
 });
@@ -94,7 +94,6 @@ const AIMessageComponent = React.memo<AIMessageProps>(({ message, thinkingStatus
 interface MessageItemProps {
   message: Message;
   thinkingStatus?: ThinkingState;
-  todos?: TodoItem[];
   /** 当前流式输出的块索引 */
   streamingBlockIndex: number;
   /** 是否为最后一条 AI 消息 */
@@ -104,7 +103,7 @@ interface MessageItemProps {
 /**
  * 单条消息组件（memo 避免无关重渲染）
  */
-const MessageItem = React.memo<MessageItemProps>(({ message, thinkingStatus, todos, streamingBlockIndex, isLastAI }) => {
+const MessageItem = React.memo<MessageItemProps>(({ message, thinkingStatus, streamingBlockIndex, isLastAI }) => {
   if (message.type === MessageType.USER) {
     return <UserMessage message={message as UserMessageType} />;
   }
@@ -114,7 +113,6 @@ const MessageItem = React.memo<MessageItemProps>(({ message, thinkingStatus, tod
       <AIMessageComponent
         message={message as AIMessageType}
         thinkingStatus={thinkingStatus}
-        todos={todos}
         streamingBlockIndex={streamingBlockIndex}
         isLastAI={isLastAI}
       />
@@ -128,16 +126,15 @@ const MessageItem = React.memo<MessageItemProps>(({ message, thinkingStatus, tod
 interface MessageListProps {
   messages: Message[];
   thinkingStatus: ThinkingState;
-  todosMap: Map<string, TodoItem[]>;
   /** 当前流式输出的块索引（-1 表示无流式输出） */
   streamingBlockIndex: number;
 }
 
 /**
  * 消息列表组件（memo 避免输入框变化导致的无关重渲染）
- * 渲染所有历史消息，每条 AI 消息显示自己绑定的任务列表
+ * 渲染所有历史消息，todo 快照内联在消息块中渲染
  */
-const MessageList = React.memo<MessageListProps>(({ messages, thinkingStatus, todosMap, streamingBlockIndex }) => {
+const MessageList = React.memo<MessageListProps>(({ messages, thinkingStatus, streamingBlockIndex }) => {
   let lastAIIndex = -1;
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].type === MessageType.AI) {
@@ -150,13 +147,11 @@ const MessageList = React.memo<MessageListProps>(({ messages, thinkingStatus, to
     <Box flexDirection="column" flexGrow={1}>
       {messages.map((msg, index) => {
         const isLastAI = index === lastAIIndex;
-        const todos = todosMap.get(msg.id);
         return (
           <MessageItem
             key={msg.id}
             message={msg}
             thinkingStatus={isLastAI ? thinkingStatus : undefined}
-            todos={todos}
             streamingBlockIndex={streamingBlockIndex}
             isLastAI={isLastAI}
           />

@@ -4,7 +4,23 @@ import {
   type MessagePort,
   type ThinkingStatusValue,
   type ThinkingState,
+  type TodoItem,
 } from "./types.ts";
+
+// ============ Todo 快照编码 ============
+
+/** Todo 快照块的标记前缀 */
+export const TODO_BLOCK_MARKER = "\x00__TODO_SNAPSHOT__:";
+
+/** 判断一个 block 是否为 todo 快照块 */
+export function isTodoBlock(block: string): boolean {
+  return block.startsWith(TODO_BLOCK_MARKER);
+}
+
+/** 解析 todo 快照块，提取任务列表数据 */
+export function parseTodoBlock(block: string): TodoItem[] {
+  return JSON.parse(block.slice(TODO_BLOCK_MARKER.length));
+}
 
 // ============ 消息类型 ============
 
@@ -122,6 +138,14 @@ export class MessageBus extends EventEmitter implements MessagePort {
     const msg = this.getLastAIMessage();
     if (!msg || blockIndex >= msg.blocks.length) return;
     msg.blocks[blockIndex] += content;
+    this.emit("message:update", msg);
+  }
+
+  /** 追加 todo 快照块（将任务列表编码为特殊 block） */
+  todoSnapshot(todos: TodoItem[]): void {
+    let msg = this.getLastAIMessage();
+    if (!msg) msg = this.createAIMessage();
+    msg.blocks.push(TODO_BLOCK_MARKER + JSON.stringify(todos));
     this.emit("message:update", msg);
   }
 
