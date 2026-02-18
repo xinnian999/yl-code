@@ -13,19 +13,23 @@ interface InputBoxProps {
 
 /**
  * 输入框组件
- * 用于接收用户输入
+ * 禁用时卸载 TextInput，彻底避免输入事件处理开销
  */
 const InputBox: React.FC<InputBoxProps> = ({ value, onChange, onSubmit, isDisabled, inputKey = 0 }) => {
   return (
-    <Box borderStyle="single" borderColor="cyan" paddingX={1}>
+    <Box borderStyle="single" borderColor="cyan" paddingX={1} marginLeft={1}>
       <Text color="cyan">❯ </Text>
-      <TextInput
-        key={inputKey}
-        value={value}
-        onChange={onChange}
-        onSubmit={onSubmit}
-        placeholder={isDisabled ? "请等待响应..." : "输入您的问题..."}
-      />
+      {isDisabled ? (
+        <Text dimColor>请等待响应...按 Esc 中断</Text>
+      ) : (
+        <TextInput
+          key={inputKey}
+          value={value}
+          onChange={onChange}
+          onSubmit={onSubmit}
+          placeholder="输入您的问题..."
+        />
+      )}
     </Box>
   );
 };

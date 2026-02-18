@@ -23,7 +23,7 @@ const CommandSuggestions: React.FC<Props> = ({ selectedIndex, filter }) => {
   }
 
   return (
-    <Box flexDirection="column" marginBottom={1}>
+    <Box flexDirection="column" marginBottom={1} paddingLeft={1}>
       {filteredCommands.map((cmd, index) => {
         const isSelected = index === selectedIndex;
         return (

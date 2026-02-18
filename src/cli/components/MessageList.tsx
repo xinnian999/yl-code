@@ -1,5 +1,5 @@
-import React from "react";
-import { Box, Text } from "ink";
+import React, { useRef } from "react";
+import { Box, Text, Static } from "ink";
 import Markdown from "ink-markdown-es";
 import { MessageType, ThinkingStatus } from "@/core/types.ts";
 import type { ThinkingState, MessageBlock } from "@/core/types.ts";
@@ -17,13 +17,14 @@ interface UserMessageProps {
 }
 
 /**
- * 用户消息组件（memo 避免无关重渲染）
+ * 用户消息组件
  */
-const UserMessage = React.memo<UserMessageProps>(({ message }) => {
+const UserMessage: React.FC<UserMessageProps> = ({ message }) => {
   return (
     <Box
       flexDirection="column"
       marginBottom={1}
+      marginLeft={1}
       borderStyle="bold"
       borderColor="cyan"
       borderLeft={true}
@@ -35,7 +36,7 @@ const UserMessage = React.memo<UserMessageProps>(({ message }) => {
       <Text color="cyan">{message.content}</Text>
     </Box>
   );
-});
+};
 
 /** 单个消息块渲染属性 */
 interface BlockRendererProps {
@@ -110,10 +111,10 @@ interface AIMessageProps {
 }
 
 /**
- * AI 消息组件（memo 避免无关重渲染）
+ * AI 消息组件
  * 按 block.type 分发渲染各类型内容块
  */
-const AIMessageComponent = React.memo<AIMessageProps>(({ message, thinkingStatus, streamingBlockIndex, isLastAI }) => {
+const AIMessageComponent: React.FC<AIMessageProps> = ({ message, thinkingStatus, streamingBlockIndex, isLastAI }) => {
   const hasBlocks = message.blocks && message.blocks.length > 0;
   const isActive = thinkingStatus?.status !== undefined && thinkingStatus.status !== ThinkingStatus.IDLE;
 
@@ -125,6 +126,7 @@ const AIMessageComponent = React.memo<AIMessageProps>(({ message, thinkingStatus
     <Box
       flexDirection="column"
       marginBottom={1}
+      marginLeft={1}
       borderStyle="bold"
       borderColor="green"
       borderLeft={true}
@@ -143,7 +145,7 @@ const AIMessageComponent = React.memo<AIMessageProps>(({ message, thinkingStatus
       {isActive && <StatusBar thinkingStatus={thinkingStatus} />}
     </Box>
   );
-});
+};
 
 /** 单条消息组件属性 */
 interface MessageItemProps {
@@ -156,9 +158,9 @@ interface MessageItemProps {
 }
 
 /**
- * 单条消息组件（memo 避免无关重渲染）
+ * 单条消息组件
  */
-const MessageItem = React.memo<MessageItemProps>(({ message, thinkingStatus, streamingBlockIndex, isLastAI }) => {
+const MessageItem: React.FC<MessageItemProps> = ({ message, thinkingStatus, streamingBlockIndex, isLastAI }) => {
   if (message.type === MessageType.USER) {
     return <UserMessage message={message as UserMessageType} />;
   }
@@ -175,7 +177,7 @@ const MessageItem = React.memo<MessageItemProps>(({ message, thinkingStatus, str
   }
 
   return null;
-});
+};
 
 /** 消息列表组件属性 */
 interface MessageListProps {
@@ -186,10 +188,37 @@ interface MessageListProps {
 }
 
 /**
- * 消息列表组件（memo 避免输入框变化导致的无关重渲染）
- * 渲染所有历史消息，各类型块内联渲染
+ * 消息列表组件
+ * 使用 Ink Static 将已完成消息从 yoga 布局树中移除，
+ * 仅保留最近 2 条消息参与动态布局，解决长列表导致的输入卡顿
  */
 const MessageList = React.memo<MessageListProps>(({ messages, thinkingStatus, streamingBlockIndex }) => {
+  /** 已提交到 Static 的消息数量（单调递增，Static 渲染后不可撤回） */
+  const committedRef = useRef(0);
+
+  // 判断当前是否有活跃输出（流式输出中或思考中）
+  const isOutputting = streamingBlockIndex !== -1 ||
+    (thinkingStatus?.status !== undefined && thinkingStatus.status !== ThinkingStatus.IDLE);
+
+  // 活跃时保留最后 2 条消息为动态区域（处理思考状态在 AI 消息创建前的间隙）
+  // 空闲时全部提交到 Static，让动态区域清空，输入零开销
+  const safeCommitBoundary = isOutputting
+    ? Math.max(0, messages.length - 2)
+    : messages.length;
+
+  // 消息被清空或恢复时（数量骤降），重置提交计数
+  if (messages.length < committedRef.current) {
+    committedRef.current = 0;
+  }
+
+  // 只增不减：一旦提交到 Static 就不可回退
+  committedRef.current = Math.max(committedRef.current, safeCommitBoundary);
+  const committed = Math.min(committedRef.current, messages.length);
+
+  const staticMessages = messages.slice(0, committed);
+  const activeMessages = messages.slice(committed);
+
+  // 查找最后一条 AI 消息的全局索引
   let lastAIIndex = -1;
   for (let i = messages.length - 1; i >= 0; i--) {
     if (messages[i].type === MessageType.AI) {
@@ -200,14 +229,25 @@ const MessageList = React.memo<MessageListProps>(({ messages, thinkingStatus, st
 
   return (
     <Box flexDirection="column" flexGrow={1}>
-      {messages.map((msg, index) => {
-        const isLastAI = index === lastAIIndex;
+      <Static items={staticMessages}>
+        {(msg) => (
+          <MessageItem
+            key={msg.id}
+            message={msg}
+            streamingBlockIndex={-1}
+            isLastAI={false}
+          />
+        )}
+      </Static>
+      {activeMessages.map((msg, i) => {
+        const globalIndex = committed + i;
+        const isLastAI = globalIndex === lastAIIndex;
         return (
           <MessageItem
             key={msg.id}
             message={msg}
             thinkingStatus={isLastAI ? thinkingStatus : undefined}
-            streamingBlockIndex={streamingBlockIndex}
+            streamingBlockIndex={isLastAI ? streamingBlockIndex : -1}
             isLastAI={isLastAI}
           />
         );

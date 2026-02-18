@@ -24,7 +24,7 @@ const FileSuggestions: React.FC<Props> = ({
 
   if (files.length === 0) {
     return (
-      <Box marginBottom={1}>
+      <Box marginBottom={1} paddingLeft={1}>
         <Text color="gray">没有匹配的文件或目录</Text>
       </Box>
     );
@@ -38,7 +38,7 @@ const FileSuggestions: React.FC<Props> = ({
   const actualSelectedIndex = selectedIndex - startIndex;
 
   return (
-    <Box flexDirection="column" marginBottom={1}>
+    <Box flexDirection="column" marginBottom={1} paddingLeft={1}>
       <Box marginBottom={1}>
         <Text color="gray">
           📂 {filter ? `${process.cwd()}/${filter}` : process.cwd()}
