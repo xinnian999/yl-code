@@ -78,16 +78,16 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block, isStreaming }) => 
         </>
       );
     case "tool":
-      content = <Text color="gray">{"🔨 "}{block.content}</Text>;
+      content = <Text color="gray">{"🔨 "}{block.content.trimEnd()}</Text>;
       break;
     case "error":
-      content = <Text color="red">{"❌ "}{block.content}</Text>;
+      content = <Text color="red">{"❌ "}{block.content.trimEnd()}</Text>;
       break;
     case "warning":
-      content = <Text color="yellow">{"⚠️  "}{block.content}</Text>;
+      content = <Text color="yellow">{"⚠️  "}{block.content.trimEnd()}</Text>;
       break;
     case "text":
-      content = isStreaming ? <Text>{block.content}</Text> : <Markdown>{block.content}</Markdown>;
+      content = isStreaming ? <Text>{block.content}</Text> : <Markdown>{block.content.trimEnd()}</Markdown>;
       break;
   }
 
