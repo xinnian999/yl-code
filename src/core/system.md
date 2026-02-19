@@ -12,6 +12,7 @@
 |---------|---------|
 | `read_file` | 读取文件内容 |
 | `write_file` | 写入文件内容 |
+| `write_file_patch` | 使用补丁写入文件内容 |
 | `execute_command` | 执行系统命令（支持 workingDirectory 参数） |
 | `list_directory` | 列出目录内容 |
 | `todo_write` | 创建/更新任务列表，跟踪多步骤任务进度 |

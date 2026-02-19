@@ -97,6 +97,8 @@ export function getToolDescription(toolName: string, args: ToolArgs): string {
       return `阅读代码: ${args.filePath}`;
     case "write_file":
       return `写入代码: ${args.filePath}`;
+    case "write_file_patch":
+      return `写入补丁: ${args.filePath}`;
     case "execute_command":
       return `执行命令: ${args.command}`;
     case "list_directory":

@@ -3,6 +3,7 @@ import type { StructuredToolInterface } from "@langchain/core/tools";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
+import { applyPatch } from "diff";
 import { z } from "zod";
 import { AgentMode } from "./types.ts";
 import type { ConfirmPort, ProcessPort, TodoPort, TodoItem, AgentModeValue } from "./types.ts";
@@ -96,6 +97,55 @@ export function createTools(confirm: ConfirmPort, processPort: ProcessPort, todo
       schema: z.object({
         filePath: z.string().describe("文件路径"),
         content: z.string().describe("要写入的文件内容"),
+      }),
+    }
+  );
+
+  const writeFilePatchTool = tool(
+    async ({ filePath, patch }: { filePath: string; patch: string }): Promise<string> => {
+      const resolvedPath = path.resolve(filePath);
+      try {
+        let originalContent = "";
+        try {
+          originalContent = await fs.readFile(resolvedPath, "utf-8");
+        } catch {
+          // 文件不存在，视为新文件
+        }
+
+        const patchedContent = applyPatch(originalContent, patch);
+        if (patchedContent === false) {
+          return `补丁应用失败: ${resolvedPath}`;
+        }
+
+        if (patchedContent === originalContent) {
+          return `文件内容未变化，无需写入: ${resolvedPath}`;
+        }
+
+        const result = await confirm.requestConfirm(resolvedPath, originalContent, patchedContent);
+
+        if (result === "reject") {
+          return `用户拒绝了对 ${resolvedPath} 的修改，请根据情况调整方案或询问用户意见`;
+        }
+
+        const dir = path.dirname(resolvedPath);
+        await fs.mkdir(dir, { recursive: true });
+        await fs.writeFile(resolvedPath, patchedContent, "utf-8");
+
+        const isNewFile = originalContent === "";
+        return isNewFile
+          ? `文件创建成功: ${resolvedPath}`
+          : `文件写入成功: ${resolvedPath}`;
+      } catch (error) {
+        const err = error as Error;
+        return `写入文件失败: ${err.message}`;
+      }
+    },
+    {
+      name: "write_file_patch",
+      description: "使用统一 diff 补丁写入文件内容，避免传输完整文件。写入前会请求用户确认。",
+      schema: z.object({
+        filePath: z.string().describe("文件路径"),
+        patch: z.string().describe("统一 diff 格式的补丁内容"),
       }),
     }
   );
@@ -233,6 +283,7 @@ export function createTools(confirm: ConfirmPort, processPort: ProcessPort, todo
     { tool: readFileTool,       modes: [AgentMode.ASK, AgentMode.BUILD] },
     { tool: listDirectoryTool,  modes: [AgentMode.ASK, AgentMode.BUILD] },
     { tool: writeFileTool,      modes: [AgentMode.BUILD] },
+    { tool: writeFilePatchTool, modes: [AgentMode.BUILD] },
     { tool: executeCommandTool, modes: [AgentMode.BUILD] },
     { tool: todoWriteTool,      modes: [AgentMode.BUILD] },
   ];

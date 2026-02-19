@@ -13,7 +13,7 @@ import type { ChatOpenAI } from "@langchain/openai";
 export const DEFAULT_MAX_TOKENS = 128000;
 
 /** 触发摘要的 token 阈值 */
-export const SUMMARIZE_THRESHOLD = 10000;
+export const SUMMARIZE_THRESHOLD = 20000;
 
 /** 摘要提示词 */
 const SUMMARIZE_PROMPT = `请将以下对话历史压缩为简洁的摘要，保留关键信息：
