@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from "react";
 import { Box, Text, useInput } from "ink";
-import SelectInput from "ink-select-input";
+import { ScrollList } from "ink-scroll-list";
 import type { Agent } from "@/core/agent.ts";
 import type { ModelConfig } from "@/core/types.ts";
 import ModelForm, { type ModelFormData } from "./ModelForm.tsx";
@@ -16,9 +16,12 @@ interface Props {
   onCancel?: () => void;
 }
 
+/** 可滚动列表的最大可见高度 */
+const LIST_HEIGHT = 12;
+
 /**
  * 模型选择组件
- * 使用 ink-select-input 实现交互式模型选择
+ * 使用 ink-scroll-list 实现交互式模型选择
  * 内部管理添加、编辑、删除模型的表单状态
  * 支持快捷键：a 添加、c 复制、e 编辑、d 删除
  */
@@ -31,11 +34,8 @@ const ModelSelector: React.FC<Props> = ({ agent, onSelect, onCancel }) => {
   const models = agent.getModels();
   const currentId = agent.getCurrentModelId();
 
-  const initialIndex = Math.max(
-    0,
-    models.findIndex((m) => m.id === currentId)
-  );
-  const [highlightedIndex, setHighlightedIndex] = useState(initialIndex);
+  const initialIndex = Math.max(0, models.findIndex((m) => m.id === currentId));
+  const [selectedIndex, setSelectedIndex] = useState(initialIndex);
 
   useInput((input, key) => {
     if (viewState !== "list") return;
@@ -45,13 +45,30 @@ const ModelSelector: React.FC<Props> = ({ agent, onSelect, onCancel }) => {
       return;
     }
 
+    // 上下键导航
+    if (key.upArrow) {
+      setSelectedIndex((prev) => Math.max(prev - 1, 0));
+      return;
+    }
+    if (key.downArrow) {
+      setSelectedIndex((prev) => Math.min(prev + 1, models.length - 1));
+      return;
+    }
+
+    // Enter 确认选中
+    if (key.return) {
+      const model = models[selectedIndex];
+      if (model) onSelect(model);
+      return;
+    }
+
     if (input.toLowerCase() === "a") {
       setViewState("add");
       return;
     }
 
     if (input.toLowerCase() === "c") {
-      const model = models[highlightedIndex];
+      const model = models[selectedIndex];
       if (model) {
         setCopyingModel(model);
         setViewState("copy");
@@ -60,7 +77,7 @@ const ModelSelector: React.FC<Props> = ({ agent, onSelect, onCancel }) => {
     }
 
     if (input.toLowerCase() === "e") {
-      const model = models[highlightedIndex];
+      const model = models[selectedIndex];
       if (model) {
         setEditingModel(model);
         setViewState("edit");
@@ -69,7 +86,7 @@ const ModelSelector: React.FC<Props> = ({ agent, onSelect, onCancel }) => {
     }
 
     if (input.toLowerCase() === "d") {
-      const model = models[highlightedIndex];
+      const model = models[selectedIndex];
       if (model) {
         if (model.id === currentId) {
           agent.notify("⚠️ 不能删除当前正在使用的模型，请先切换到其他模型");
@@ -83,25 +100,7 @@ const ModelSelector: React.FC<Props> = ({ agent, onSelect, onCancel }) => {
     }
   });
 
-  const items = models.map((model) => ({
-    label: model.id === currentId ? `${model.name} ✓` : model.name,
-    value: model.id,
-  }));
-
-  const handleSelect = (item: { label: string; value: string }) => {
-    const model = models.find((m) => m.id === item.value);
-    if (model) {
-      onSelect(model);
-    }
-  };
-
-  const handleHighlight = (item: { label: string; value: string }) => {
-    const index = models.findIndex((m) => m.id === item.value);
-    if (index !== -1) {
-      setHighlightedIndex(index);
-    }
-  };
-
+  /** 表单提交处理 */
   const handleFormSubmit = useCallback(
     (data: ModelFormData) => {
       if (viewState === "add" || viewState === "copy") {
@@ -117,12 +116,14 @@ const ModelSelector: React.FC<Props> = ({ agent, onSelect, onCancel }) => {
     [viewState, editingModel, onCancel, agent]
   );
 
+  /** 表单取消处理 */
   const handleFormCancel = useCallback(() => {
     setEditingModel(null);
     setCopyingModel(null);
     setViewState("list");
   }, []);
 
+  /** 确认删除模型 */
   const handleDeleteConfirm = useCallback(() => {
     if (deletingModel) {
       agent.removeModel(deletingModel.id);
@@ -131,19 +132,14 @@ const ModelSelector: React.FC<Props> = ({ agent, onSelect, onCancel }) => {
     }
   }, [deletingModel, onCancel, agent]);
 
+  /** 取消删除 */
   const handleDeleteCancel = useCallback(() => {
     setDeletingModel(null);
     setViewState("list");
   }, []);
 
   if (viewState === "add") {
-    return (
-      <ModelForm
-        mode="add"
-        onSubmit={handleFormSubmit}
-        onCancel={handleFormCancel}
-      />
-    );
+    return <ModelForm mode="add" onSubmit={handleFormSubmit} onCancel={handleFormCancel} />;
   }
 
   if (viewState === "copy" && copyingModel) {
@@ -199,16 +195,20 @@ const ModelSelector: React.FC<Props> = ({ agent, onSelect, onCancel }) => {
         borderBottom
         borderLeft={false}
         borderRight={false}
-        padding={1}
         marginTop={1}
         marginBottom={1}
+        height={LIST_HEIGHT}
       >
-        <SelectInput
-          items={items}
-          initialIndex={initialIndex}
-          onSelect={handleSelect}
-          onHighlight={handleHighlight}
-        />
+        <ScrollList selectedIndex={selectedIndex}>
+          {models.map((model, i) => (
+            <Box key={model.id} paddingX={1}>
+              <Text color={i === selectedIndex ? "green" : ""}>
+                {i === selectedIndex ? "> " : "  "}
+                {model.id === currentId ? `${model.name} ✓` : model.name}
+              </Text>
+            </Box>
+          ))}
+        </ScrollList>
       </Box>
       <Box>
         <Text color="gray">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Box, Text, useInput } from "ink";
-import SelectInput from "ink-select-input";
+import { ScrollList } from "ink-scroll-list";
 import type { Agent } from "@/core/agent.ts";
 import { getTransport } from "@/core/mcp/index.ts";
 import type { McpServerConfig } from "@/core/mcp/index.ts";
@@ -18,6 +18,9 @@ const STATUS_TEXT: Record<string, string> = {
   connected: "已连接", connecting: "连接中", error: "错误", disconnected: "未连接",
 };
 
+/** 可滚动列表的最大可见高度 */
+const LIST_HEIGHT = 12;
+
 /**
  * MCP 服务器管理组件
  * 显示服务器列表和连接状态，支持编辑 JSON 配置和重连
@@ -25,7 +28,7 @@ const STATUS_TEXT: Record<string, string> = {
  */
 const McpManager: React.FC<Props> = ({ agent, onClose }) => {
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
-  const [highlightedIndex, setHighlightedIndex] = useState(0);
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [servers, setServers] = useState<McpServerConfig[]>(() => agent.mcpConfig.getServers());
   const { serverStates } = useMcpStatus(agent);
 
@@ -39,8 +42,18 @@ const McpManager: React.FC<Props> = ({ agent, onClose }) => {
   useInput((input, key) => {
     if (key.escape) { onClose(); return; }
 
+    // 上下键导航
+    if (key.upArrow) {
+      setSelectedIndex((prev) => Math.max(prev - 1, 0));
+      return;
+    }
+    if (key.downArrow) {
+      setSelectedIndex((prev) => Math.min(prev + 1, servers.length - 1));
+      return;
+    }
+
     if (input.toLowerCase() === "t" && servers.length > 0) {
-      const server = servers[highlightedIndex];
+      const server = servers[selectedIndex];
       if (server) {
         agent.mcpConfig.toggleServer(server.name);
       }
@@ -66,27 +79,17 @@ const McpManager: React.FC<Props> = ({ agent, onClose }) => {
     }
   });
 
-  // --- 列表视图 ---
-
-  const items = servers.map((server) => {
+  /** 格式化服务器列表项文本 */
+  const formatServerLabel = (server: McpServerConfig): string => {
     if (server.disabled) {
-      return { label: `${server.name} | 已禁用`, value: server.name };
+      return `${server.name} | 已禁用`;
     }
     const state = serverStates.find((s) => s.config.name === server.name);
     const status = state?.status || "disconnected";
     const toolCount = state?.toolCount || 0;
     const transport = getTransport(server);
     const toolInfo = status === "connected" ? ` (${toolCount} 工具)` : "";
-    return {
-      label: `${server.name} | ${transport} | ${STATUS_TEXT[status] || "未连接"}${toolInfo}`,
-      value: server.name,
-    };
-  });
-
-  /** 高亮项变更处理 */
-  const handleHighlight = (item: { label: string; value: string }) => {
-    const index = servers.findIndex((s) => s.name === item.value);
-    if (index !== -1) setHighlightedIndex(index);
+    return `${server.name} | ${transport} | ${STATUS_TEXT[status] || "未连接"}${toolInfo}`;
   };
 
   return (
@@ -98,8 +101,17 @@ const McpManager: React.FC<Props> = ({ agent, onClose }) => {
         <Box marginY={1}><Text color="gray">暂无 MCP 服务器，按 o 编辑 JSON 配置</Text></Box>
       ) : (
         <Box borderStyle="single" borderTop borderBottom borderLeft={false} borderRight={false}
-          padding={1} marginTop={1} marginBottom={1}>
-          <SelectInput items={items} onHighlight={handleHighlight} onSelect={() => {}} />
+          marginTop={1} marginBottom={1} height={LIST_HEIGHT}>
+          <ScrollList selectedIndex={selectedIndex}>
+            {servers.map((server, i) => (
+              <Box key={server.name} paddingX={1}>
+                <Text color={i === selectedIndex ? "green" : ""}>
+                  {i === selectedIndex ? "> " : "  "}
+                  {formatServerLabel(server)}
+                </Text>
+              </Box>
+            ))}
+          </ScrollList>
         </Box>
       )}
       {statusMsg && (

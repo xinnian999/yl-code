@@ -15,6 +15,7 @@
         "ink": "^6.6.0",
         "ink-form": "^2.0.1",
         "ink-markdown-es": "^1.1.0",
+        "ink-scroll-list": "^0.4.1",
         "ink-select-input": "^6.2.0",
         "ink-spinner": "^5.0.0",
         "ink-task-list": "^2.0.0",
@@ -226,6 +227,10 @@
     "ink-form": ["ink-form@2.0.1", "https://registry.npmmirror.com/ink-form/-/ink-form-2.0.1.tgz", { "dependencies": { "ink-select-input": "^5.0.0", "ink-text-input": "^6.0.0" }, "peerDependencies": { "ink": ">=4", "react": ">=18" } }, "sha512-vo0VMwHf+HOOJo7026K4vJEN8xm4sP9iWlQLx4bngNEEY5K8t30CUvVjQCCNAV6Mt2ODt2Aq+2crCuBONReJUg=="],
 
     "ink-markdown-es": ["ink-markdown-es@1.1.0", "https://registry.npmmirror.com/ink-markdown-es/-/ink-markdown-es-1.1.0.tgz", { "dependencies": { "dedent": "^1.7.1", "highlight.js": "^11.11.1", "marked": "^16.4.2" }, "peerDependencies": { "ink": "^6", "react": "^19" } }, "sha512-4ItGYV1zl2w+eNdcSwQawilSsAeSt1hjXFEzWcdw0TSMHMs9U8hZyT1oIrdRa/faB6RedLszHs5mnZOt5APdTA=="],
+
+    "ink-scroll-list": ["ink-scroll-list@0.4.1", "https://registry.npmmirror.com/ink-scroll-list/-/ink-scroll-list-0.4.1.tgz", { "dependencies": { "ink-scroll-view": "^0.3.5" }, "peerDependencies": { "ink": ">=6", "react": ">=19" } }, "sha512-2GcjnBXRe0sTSMC03SCKX6IkNAsYYgcpvAN+ggAiaqeg+s+qA9Ls0iVTOmB+Ize/9AVts8xloG4aRcrOy/7Xxg=="],
+
+    "ink-scroll-view": ["ink-scroll-view@0.3.6", "https://registry.npmmirror.com/ink-scroll-view/-/ink-scroll-view-0.3.6.tgz", { "peerDependencies": { "ink": "^5 || ^6", "react": "^18 || ^19" } }, "sha512-XqLkmFFCA5Ow2lVyvv7q0aVHzB78XojIM8gZMQ3//lvy8ZDpJsXWtTRwsCEsdQHnwvMCDCnKCzgF4xkkzoN8mQ=="],
 
     "ink-select-input": ["ink-select-input@6.2.0", "https://registry.npmmirror.com/ink-select-input/-/ink-select-input-6.2.0.tgz", { "dependencies": { "figures": "^6.1.0", "to-rotated": "^1.0.0" }, "peerDependencies": { "ink": ">=5.0.0", "react": ">=18.0.0" } }, "sha512-304fZXxkpYxJ9si5lxRCaX01GNlmPBgOZumXXRnPYbHW/iI31cgQynqk2tRypGLOF1cMIwPUzL2LSm6q4I5rQQ=="],
 
