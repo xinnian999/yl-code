@@ -106,6 +106,8 @@ export interface ModelConfig {
   apiKey: string;
   baseUrl: string;
   modelName: string;
+  /** 是否为内置模型（内置模型只读，用户不可编辑/删除） */
+  builtin?: boolean;
 }
 
 // ============ 进程信息 ============

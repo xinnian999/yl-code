@@ -3,10 +3,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import type { ConfigPort, ModelConfig } from "./types.ts";
+import { BUILTIN_MODELS } from "./builtin-models.ts";
 
 export type { ModelConfig } from "./types.ts";
 
-/** 应用配置（持久化到文件） */
+/** 应用配置（持久化到文件，仅含用户自定义模型） */
 export interface AppConfig {
   currentModel: string;
   models: ModelConfig[];
@@ -24,6 +25,7 @@ interface ConfigManagerEvents {
 
 /**
  * 配置管理器 - 模型配置的 CRUD、文件持久化、变更通知
+ * 内置模型始终可用且只读，不写入 config.json
  */
 export class ConfigManager extends EventEmitter implements ConfigPort {
   private configDir: string;
@@ -54,7 +56,7 @@ export class ConfigManager extends EventEmitter implements ConfigPort {
     }
 
     const defaultConfig: AppConfig = {
-      currentModel: "",
+      currentModel: BUILTIN_MODELS[0]?.id ?? "",
       models: [],
     };
     this.saveConfig(defaultConfig);
@@ -66,22 +68,23 @@ export class ConfigManager extends EventEmitter implements ConfigPort {
     writeFileSync(this.configPath, JSON.stringify(config, null, 2));
   }
 
+  /** 获取合并后的所有模型（内置 + 用户），内置在前 */
+  private getAllModels(): ModelConfig[] {
+    return [...BUILTIN_MODELS, ...this.config.models];
+  }
+
   // --- ConfigPort 接口 ---
 
   /** 获取当前激活的模型配置 */
   getCurrentModel(): ModelConfig {
-    if (this.config.models.length === 0) {
+    const allModels = this.getAllModels();
+    if (allModels.length === 0) {
       throw new Error("请先配置模型：输入 /model 然后按 a 添加");
     }
 
-    const model = this.config.models.find(
-      (m) => m.id === this.config.currentModel
-    );
+    const model = allModels.find((m) => m.id === this.config.currentModel);
     if (!model) {
-      if (this.config.models.length > 0) {
-        return this.config.models[0];
-      }
-      throw new Error(`Model ${this.config.currentModel} not found`);
+      return allModels[0];
     }
     return model;
   }
@@ -94,24 +97,24 @@ export class ConfigManager extends EventEmitter implements ConfigPort {
 
   // --- 完整 CRUD ---
 
-  /** 是否已配置模型 */
+  /** 是否有可用模型（内置模型始终存在） */
   hasModels(): boolean {
-    return this.config.models.length > 0;
+    return this.getAllModels().length > 0;
   }
 
-  /** 获取所有模型配置的副本 */
+  /** 获取所有模型配置的副本（内置 + 用户） */
   getModels(): ModelConfig[] {
-    return [...this.config.models];
+    return this.getAllModels();
   }
 
   /** 获取当前模型 ID */
   getCurrentModelId(): string {
-    return this.config.currentModel;
+    return this.config.currentModel || BUILTIN_MODELS[0]?.id || "";
   }
 
-  /** 切换当前模型 */
+  /** 切换当前模型（内置和用户模型均可切换） */
   setCurrentModel(modelId: string): void {
-    const model = this.config.models.find((m) => m.id === modelId);
+    const model = this.getAllModels().find((m) => m.id === modelId);
     if (!model) {
       throw new Error(`Model ${modelId} not found`);
     }
@@ -121,9 +124,9 @@ export class ConfigManager extends EventEmitter implements ConfigPort {
     this.emit("config:change");
   }
 
-  /** 添加新模型配置 */
+  /** 添加新模型配置（仅用户模型） */
   addModel(model: ModelConfig): void {
-    if (this.config.models.some((m) => m.id === model.id)) {
+    if (this.getAllModels().some((m) => m.id === model.id)) {
       throw new Error(`Model ${model.id} already exists`);
     }
     this.config.models.push(model);
@@ -131,8 +134,11 @@ export class ConfigManager extends EventEmitter implements ConfigPort {
     this.emit("config:change");
   }
 
-  /** 删除模型配置（不能删除当前使用的模型） */
+  /** 删除模型配置（内置模型不可删除） */
   removeModel(modelId: string): void {
+    if (BUILTIN_MODELS.some((m) => m.id === modelId)) {
+      throw new Error("内置模型不可删除");
+    }
     if (modelId === this.config.currentModel) {
       throw new Error("Cannot remove current model");
     }
@@ -141,8 +147,11 @@ export class ConfigManager extends EventEmitter implements ConfigPort {
     this.emit("config:change");
   }
 
-  /** 更新模型配置 */
+  /** 更新模型配置（内置模型不可修改） */
   updateModel(modelId: string, updates: Partial<ModelConfig>): void {
+    if (BUILTIN_MODELS.some((m) => m.id === modelId)) {
+      throw new Error("内置模型不可修改");
+    }
     const index = this.config.models.findIndex((m) => m.id === modelId);
     if (index === -1) {
       throw new Error(`Model ${modelId} not found`);

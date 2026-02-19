@@ -67,35 +67,35 @@ const ModelSelector: React.FC<Props> = ({ agent, onSelect, onCancel }) => {
       return;
     }
 
+    // 内置模型不支持 c/e/d 操作
+    const selected = models[selectedIndex];
+    if (selected?.builtin) return;
+
     if (input.toLowerCase() === "c") {
-      const model = models[selectedIndex];
-      if (model) {
-        setCopyingModel(model);
+      if (selected) {
+        setCopyingModel(selected);
         setViewState("copy");
       }
       return;
     }
 
     if (input.toLowerCase() === "e") {
-      const model = models[selectedIndex];
-      if (model) {
-        setEditingModel(model);
+      if (selected) {
+        setEditingModel(selected);
         setViewState("edit");
       }
       return;
     }
 
     if (input.toLowerCase() === "d") {
-      const model = models[selectedIndex];
-      if (model) {
-        if (model.id === currentId) {
-          agent.notify("⚠️ 不能删除当前正在使用的模型，请先切换到其他模型");
-          onCancel?.();
-          return;
-        }
-        setDeletingModel(model);
-        setViewState("delete");
+      if (!selected) return;
+      if (selected.id === currentId) {
+        agent.notify("⚠️ 不能删除当前正在使用的模型，请先切换到其他模型");
+        onCancel?.();
+        return;
       }
+      setDeletingModel(selected);
+      setViewState("delete");
       return;
     }
   });
@@ -184,6 +184,8 @@ const ModelSelector: React.FC<Props> = ({ agent, onSelect, onCancel }) => {
     );
   }
 
+  const isBuiltinSelected = models[selectedIndex]?.builtin;
+
   return (
     <Box flexDirection="column" paddingY={1}>
       <Text color="cyan" bold>
@@ -200,20 +202,31 @@ const ModelSelector: React.FC<Props> = ({ agent, onSelect, onCancel }) => {
         height={LIST_HEIGHT}
       >
         <ScrollList selectedIndex={selectedIndex}>
-          {models.map((model, i) => (
-            <Box key={model.id} paddingX={1}>
-              <Text color={i === selectedIndex ? "green" : ""}>
-                {i === selectedIndex ? "> " : "  "}
-                {model.id === currentId ? `${model.name} ✓` : model.name}
-              </Text>
-            </Box>
-          ))}
+          {models.map((model, i) => {
+            const isCurrent = model.id === currentId;
+            const label = model.builtin ? `[免费] ${model.name}` : model.name;
+            const suffix = isCurrent ? " ✓" : "";
+            return (
+              <Box key={model.id} paddingX={1}>
+                <Text color={i === selectedIndex ? "green" : ""}>
+                  {i === selectedIndex ? "> " : "  "}
+                  {label}{suffix}
+                </Text>
+              </Box>
+            );
+          })}
         </ScrollList>
       </Box>
       <Box>
         <Text color="gray">
-          <Text color="cyan">a</Text> 添加 | <Text color="cyan">c</Text> 复制 |{" "}
-          <Text color="cyan">e</Text> 编辑 | <Text color="cyan">d</Text> 删除
+          <Text color="cyan">a</Text> 添加
+          {!isBuiltinSelected && (
+            <>
+              {" | "}<Text color="cyan">c</Text> 复制
+              {" | "}<Text color="cyan">e</Text> 编辑
+              {" | "}<Text color="cyan">d</Text> 删除
+            </>
+          )}
         </Text>
       </Box>
     </Box>
