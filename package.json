@@ -1,12 +1,14 @@
 {
   "name": "niu-code",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
     "niu": "./dist/index.js"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "engines": {
     "node": ">=18.0.0"
   },
@@ -20,7 +22,12 @@
     "verify:pack": "bun run build && npm pack",
     "release": "bun run build && npm version patch && npm publish"
   },
-  "keywords": ["cli", "ai", "terminal", "ink"],
+  "keywords": [
+    "cli",
+    "ai",
+    "terminal",
+    "ink"
+  ],
   "author": "",
   "license": "ISC",
   "description": "终端内 AI 助手 CLI，输入 niu 即可召唤使用",
