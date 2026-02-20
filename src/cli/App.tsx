@@ -115,7 +115,12 @@ const App: React.FC<AppProps> = ({ agent }) => {
         <Box paddingX={1}><ModelSelector agent={agent} onSelect={handleModelSelect} onCancel={() => setIsSelectingModel(false)} /></Box>
       ) : (
         <>
-          <MessageList messages={messages} thinkingStatus={thinkingStatus} streamingBlockIndex={streamingBlockIndex} />
+          <MessageList
+            messages={messages}
+            thinkingStatus={thinkingStatus}
+            streamingBlockIndex={streamingBlockIndex}
+            isProcessing={isProcessing}
+          />
           <InputArea
             isProcessing={isProcessing}
             onSubmit={handleSubmit}

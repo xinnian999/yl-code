@@ -10,6 +10,7 @@ import type {
 } from "@/core/message-bus.ts";
 import StatusBar from "./StatusBar.tsx";
 import TodoList from "./TodoList.tsx";
+import { formatTotalDuration } from "@/core/agent-helpers.ts";
 
 /** 用户消息组件属性 */
 interface UserMessageProps {
@@ -99,6 +100,38 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block, isStreaming }) => 
   );
 };
 
+const TotalDurationBar: React.FC<{ message: AIMessageType; isRunning: boolean }> = ({ message, isRunning }) => {
+  const hasDuration = typeof message.totalDurationMs === "number";
+  if (!isRunning && !hasDuration) {
+    return null;
+  }
+
+  const durationText = hasDuration ? formatTotalDuration(message.totalDurationMs!) : "";
+
+  if (isRunning) {
+    return (
+      <Box marginTop={1}>
+        <Text color="gray">
+          🕒 任务计时中
+          {durationText && `: ${durationText}`}
+        </Text>
+      </Box>
+    );
+  }
+
+  const hasTokens = typeof message.totalTokensK === "number";
+  const tokensText = hasTokens ? ` | 本轮消耗: ${message.totalTokensK!.toFixed(1)}K tokens` : "";
+
+  return (
+    <Box marginTop={1}>
+      <Text color="gray">
+        🕒 总耗时: {durationText}
+        {tokensText}
+      </Text>
+    </Box>
+  );
+};
+
 /** AI 消息组件属性 */
 interface AIMessageProps {
   message: AIMessageType;
@@ -108,13 +141,14 @@ interface AIMessageProps {
   streamingBlockIndex: number;
   /** 是否为最后一条 AI 消息 */
   isLastAI: boolean;
+   isProcessing: boolean;
 }
 
 /**
  * AI 消息组件
  * 按 block.type 分发渲染各类型内容块
  */
-const AIMessageComponent: React.FC<AIMessageProps> = ({ message, thinkingStatus, streamingBlockIndex, isLastAI }) => {
+const AIMessageComponent: React.FC<AIMessageProps> = ({ message, thinkingStatus, streamingBlockIndex, isLastAI, isProcessing }) => {
   const hasBlocks = message.blocks && message.blocks.length > 0;
   const isActive = thinkingStatus?.status !== undefined && thinkingStatus.status !== ThinkingStatus.IDLE;
 
@@ -143,6 +177,7 @@ const AIMessageComponent: React.FC<AIMessageProps> = ({ message, thinkingStatus,
         />
       ))}
       {isActive && <StatusBar thinkingStatus={thinkingStatus} />}
+      <TotalDurationBar message={message} isRunning={isLastAI && isProcessing} />
     </Box>
   );
 };
@@ -155,12 +190,13 @@ interface MessageItemProps {
   streamingBlockIndex: number;
   /** 是否为最后一条 AI 消息 */
   isLastAI: boolean;
+  isProcessing: boolean;
 }
 
 /**
  * 单条消息组件
  */
-const MessageItem: React.FC<MessageItemProps> = ({ message, thinkingStatus, streamingBlockIndex, isLastAI }) => {
+const MessageItem: React.FC<MessageItemProps> = ({ message, thinkingStatus, streamingBlockIndex, isLastAI, isProcessing }) => {
   if (message.type === MessageType.USER) {
     return <UserMessage message={message as UserMessageType} />;
   }
@@ -172,6 +208,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, thinkingStatus, stre
         thinkingStatus={thinkingStatus}
         streamingBlockIndex={streamingBlockIndex}
         isLastAI={isLastAI}
+        isProcessing={isProcessing}
       />
     );
   }
@@ -185,6 +222,7 @@ interface MessageListProps {
   thinkingStatus: ThinkingState;
   /** 当前流式输出的块索引（-1 表示无流式输出） */
   streamingBlockIndex: number;
+  isProcessing: boolean;
 }
 
 /**
@@ -192,7 +230,7 @@ interface MessageListProps {
  * 使用 Ink Static 将已完成消息从 yoga 布局树中移除，
  * 仅保留最近 2 条消息参与动态布局，解决长列表导致的输入卡顿
  */
-const MessageList = React.memo<MessageListProps>(({ messages, thinkingStatus, streamingBlockIndex }) => {
+const MessageList = React.memo<MessageListProps>(({ messages, thinkingStatus, streamingBlockIndex, isProcessing }) => {
   /** 已提交到 Static 的消息数量（单调递增，Static 渲染后不可撤回） */
   const committedRef = useRef(0);
 
@@ -236,6 +274,7 @@ const MessageList = React.memo<MessageListProps>(({ messages, thinkingStatus, st
             message={msg}
             streamingBlockIndex={-1}
             isLastAI={false}
+            isProcessing={false}
           />
         )}
       </Static>
@@ -249,6 +288,7 @@ const MessageList = React.memo<MessageListProps>(({ messages, thinkingStatus, st
             thinkingStatus={isLastAI ? thinkingStatus : undefined}
             streamingBlockIndex={isLastAI ? streamingBlockIndex : -1}
             isLastAI={isLastAI}
+            isProcessing={isProcessing}
           />
         );
       })}

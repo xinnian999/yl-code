@@ -61,6 +61,13 @@ export class ConfirmBus extends EventEmitter implements ConfirmPort {
     return this._totalWaitTime;
   }
 
+  getCurrentWaitTime(): number {
+    if (this._waitStartTime === null) {
+      return this._totalWaitTime;
+    }
+    return this._totalWaitTime + (Date.now() - this._waitStartTime);
+  }
+
   /** 重置会话状态（计数器、跳过标记、等待时间） */
   resetSession(): void {
     this._skipConfirmForSession = false;

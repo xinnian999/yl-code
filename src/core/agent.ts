@@ -137,7 +137,8 @@ export class Agent {
   private reportStats(startTime: number, startTokens: number): void {
     const totalDuration = Date.now() - startTime - this.confirmBus.totalWaitTime;
     const usedTokens = estimateTotalTokens(this.chatMessages) - startTokens;
-    this.messageBus.ai(`\n🕒 总耗时: ${formatDuration(totalDuration)} | 本轮消耗: ${(usedTokens / 1000).toFixed(1)}K tokens`);
+    this.messageBus.setLastAITotalDuration(totalDuration);
+    this.messageBus.setLastAITokenUsage(usedTokens / 1000);
   }
 
   /** 执行一次对话，支持多轮工具调用 */
@@ -147,49 +148,61 @@ export class Agent {
     this.abortController = new AbortController();
     this.confirmBus.resetSkipConfirm();
 
+    const durationTimer = setInterval(() => {
+      const wait = this.confirmBus.getCurrentWaitTime();
+      const elapsed = Date.now() - startTime - wait;
+      if (elapsed >= 0) {
+        this.messageBus.setLastAITotalDuration(elapsed);
+      }
+    }, 100);
+
     let messageContent = query;
     if (fileContext) {
       messageContent = `${query}\n\n【用户引用的文件内容如下，请根据这些内容完成任务】${fileContext}`;
     }
 
-    await checkAndSummarize(this);
-    this.chatMessages.push(new HumanMessage(messageContent));
-    const aiMessage = this.messageBus.createAIMessage();
-    this.todoBus.setCurrentMessageId(aiMessage.id);
+    try {
+      await checkAndSummarize(this);
+      this.chatMessages.push(new HumanMessage(messageContent));
+      const aiMessage = this.messageBus.createAIMessage();
+      this.todoBus.setCurrentMessageId(aiMessage.id);
 
-    for (let i = 0; i < maxIterations; i++) {
-      if (this.abortController.signal.aborted) { this.messageBus.ai("\n⚠️ 已中断"); break; }
-
-      const iterationStartTime = Date.now();
-      this.messageBus.setThinkingStatus(ThinkingStatus.THINKING, "玩命思考中...🐂🐎");
-
-      let response: any;
-      try {
-        response = await streamModelResponse(
-          this.messageBus, this.debugMode, this.getModel(), this.chatMessages, this.abortController.signal
-        );
-      } catch (error) {
+      for (let i = 0; i < maxIterations; i++) {
         if (this.abortController.signal.aborted) { this.messageBus.ai("\n⚠️ 已中断"); break; }
-        this.messageBus.setThinkingStatus(ThinkingStatus.IDLE);
-        handleApiError(this.config, error);
+
+        const iterationStartTime = Date.now();
+        this.messageBus.setThinkingStatus(ThinkingStatus.THINKING, "玩命思考中...🐂🐎");
+
+        let response: any;
+        try {
+          response = await streamModelResponse(
+            this.messageBus, this.debugMode, this.getModel(), this.chatMessages, this.abortController.signal
+          );
+        } catch (error) {
+          if (this.abortController.signal.aborted) { this.messageBus.ai("\n⚠️ 已中断"); break; }
+          this.messageBus.setThinkingStatus(ThinkingStatus.IDLE);
+          handleApiError(this.config, error);
+        }
+
+        this.chatMessages.push(normalizeResponse(response));
+
+        if (!response.tool_calls || response.tool_calls.length === 0) break;
+
+        await executeToolCalls(this, response, iterationStartTime);
+        if (i > 0) await checkAndSummarize(this);
+        if (this.abortController.signal.aborted) { this.messageBus.ai("\n⚠️ 已中断"); break; }
+        this.messageBus.setThinkingStatus(ThinkingStatus.WAITING, "等待 AI 响应...");
       }
 
-      this.chatMessages.push(normalizeResponse(response));
+      this.messageBus.setThinkingStatus(ThinkingStatus.IDLE);
+      if (!this.abortController?.signal.aborted) this.todoBus.completeAll();
+      this.reportStats(startTime, startTokens);
 
-      if (!response.tool_calls || response.tool_calls.length === 0) break;
-
-      await executeToolCalls(this, response, iterationStartTime);
-      if (i > 0) await checkAndSummarize(this);
-      if (this.abortController.signal.aborted) { this.messageBus.ai("\n⚠️ 已中断"); break; }
-      this.messageBus.setThinkingStatus(ThinkingStatus.WAITING, "等待 AI 响应...");
+      const lastMessage = this.chatMessages[this.chatMessages.length - 1];
+      return typeof lastMessage.content === "string" ? lastMessage.content : "";
+    } finally {
+      clearInterval(durationTimer);
     }
-
-    this.messageBus.setThinkingStatus(ThinkingStatus.IDLE);
-    if (!this.abortController?.signal.aborted) this.todoBus.completeAll();
-    this.reportStats(startTime, startTokens);
-
-    const lastMessage = this.chatMessages[this.chatMessages.length - 1];
-    return typeof lastMessage.content === "string" ? lastMessage.content : "";
   }
 
   /** 完整对话入口：解析文件引用 → 发送消息 → 调用 AI → 处理错误 */

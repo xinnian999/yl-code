@@ -24,6 +24,8 @@ export interface AIMessage {
   type: "ai";
   blocks: MessageBlock[];
   timestamp: Date;
+  totalDurationMs?: number;
+  totalTokensK?: number;
 }
 
 /** 消息联合类型 */
@@ -159,6 +161,20 @@ export class MessageBus extends EventEmitter implements MessagePort {
     let msg = this.getLastAIMessage();
     if (!msg) msg = this.createAIMessage();
     msg.blocks.push({ type: "warning", content });
+    this.emit("message:update", msg);
+  }
+
+  setLastAITotalDuration(totalDurationMs: number): void {
+    const msg = this.getLastAIMessage();
+    if (!msg) return;
+    msg.totalDurationMs = totalDurationMs;
+    this.emit("message:update", msg);
+  }
+
+  setLastAITokenUsage(totalTokensK: number): void {
+    const msg = this.getLastAIMessage();
+    if (!msg) return;
+    msg.totalTokensK = totalTokensK;
     this.emit("message:update", msg);
   }
 
