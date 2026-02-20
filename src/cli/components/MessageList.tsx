@@ -110,7 +110,7 @@ const TotalDurationBar: React.FC<{ message: AIMessageType; isRunning: boolean }>
 
   if (isRunning) {
     return (
-      <Box marginTop={1}>
+      <Box marginTop={2}>
         <Text color="gray">
           🕒 任务计时中
           {durationText && `: ${durationText}`}
@@ -123,7 +123,7 @@ const TotalDurationBar: React.FC<{ message: AIMessageType; isRunning: boolean }>
   const tokensText = hasTokens ? ` | 本轮消耗: ${message.totalTokensK!.toFixed(1)}K tokens` : "";
 
   return (
-    <Box marginTop={1}>
+    <Box marginTop={2}>
       <Text color="gray">
         🕒 总耗时: {durationText}
         {tokensText}

@@ -2,6 +2,7 @@ import "dotenv/config";
 import type { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
+import { PromptTemplate } from'@langchain/core/prompts';
 import { createTools } from "./tools.ts";
 import type { ModeTool } from "./tools.ts";
 import { MessageBus } from "./message-bus.ts";
