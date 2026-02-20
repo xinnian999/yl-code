@@ -17,7 +17,8 @@
     "prepublishOnly": "bun run build",
     "typecheck": "tsc --noEmit",
     "verify": "bun run build && node dist/index.js",
-    "verify:pack": "bun run build && npm pack"
+    "verify:pack": "bun run build && npm pack",
+    "release": "bun run build && npm version patch && npm publish"
   },
   "keywords": ["cli", "ai", "terminal", "ink"],
   "author": "",
