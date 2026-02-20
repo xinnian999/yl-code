@@ -88,7 +88,7 @@ const BlockRenderer: React.FC<BlockRendererProps> = ({ block, isStreaming }) => 
       content = <Text color="yellow">{"⚠️  "}{block.content.trimEnd()}</Text>;
       break;
     case "text":
-      content = isStreaming ? <Text>{block.content}</Text> : <Markdown>{block.content.trimEnd()}</Markdown>;
+      content = isStreaming ? <Text>{block.content}</Text> : <Markdown>{block.content}</Markdown>;
       break;
   }
 

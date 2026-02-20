@@ -145,7 +145,8 @@ export function buildSystemPrompt(template: string, mode: AgentModeValue): strin
   return template
     .replace("{workingDirectory}", process.cwd())
     .replace("{workingMode}", mode)
-    .replace("{os}", platform());
+    .replace("{os}", platform())
+    .replace("{currentTime}", new Date().toLocaleString());
 }
 
 /** 根据思考状态获取默认显示文本 */
