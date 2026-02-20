@@ -44,8 +44,6 @@ export interface TodoItem {
   content: string;
   /** 任务状态 */
   status: TodoStatusValue;
-  /** 进行中的描述（现在进行时，如"正在运行测试"） */
-  activeForm: string;
 }
 
 /** Todo 端口 - core 通过此接口管理任务列表 */

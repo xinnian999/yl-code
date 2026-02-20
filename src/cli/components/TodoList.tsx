@@ -35,7 +35,8 @@ const TodoList: React.FC<TodoListProps> = ({ todos }) => {
       <TaskList>
         {todos.map((todo, index) => {
           const state = mapState(todo.status);
-          const label = todo.status === "in_progress" ? todo.activeForm : todo.content;
+          const label =
+            todo.status === "in_progress" ? `正在${todo.content}` : todo.content;
 
           return (
             <Task

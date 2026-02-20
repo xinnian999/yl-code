@@ -85,10 +85,9 @@ export async function executeToolCalls(
 
     try {
       const waitTimeBefore = ctx.confirmBus.totalWaitTime;
-      const toolStartTime = Date.now();
       const toolResult = await (foundTool as any).invoke(toolCall.args);
       const waitTimeAdded = ctx.confirmBus.totalWaitTime - waitTimeBefore;
-      const toolDuration = Date.now() - toolStartTime - waitTimeAdded;
+      const toolDuration = Date.now() - iterationStartTime - waitTimeAdded;
 
       ctx.messageBus.tool(`${toolDesc} (耗时: ${formatDuration(toolDuration)})`);
 

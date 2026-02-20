@@ -85,7 +85,6 @@ export function getToolArgsPreview(toolCallChunks: ToolCallChunk[]): string | nu
   return null;
 }
 
-/** 将毫秒数格式化为可读时间 */
 export function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   return `${(ms / 1000).toFixed(1)}s`;
@@ -93,8 +92,12 @@ export function formatDuration(ms: number): string {
 
 export function formatTotalDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
-  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-  return `${(ms / 60000).toFixed(1)}m`;
+  const totalSeconds = Math.round(ms / 1000);
+  if (totalSeconds < 60) return `${totalSeconds}秒`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (seconds === 0) return `${minutes}分`;
+  return `${minutes}分${seconds}秒`;
 }
 
 /** 根据工具名称和参数生成中文描述 */
@@ -105,7 +108,7 @@ export function getToolDescription(toolName: string, args: ToolArgs): string {
     case "write_file":
       return `写入代码: ${args.filePath}`;
     case "write_file_patch":
-      return `写入补丁: ${args.filePath}`;
+      return `修改代码: ${args.filePath}`;
     case "execute_command":
       return `执行命令: ${args.command}`;
     case "list_directory":

@@ -3,7 +3,7 @@ import type { StructuredToolInterface } from "@langchain/core/tools";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { spawn } from "node:child_process";
-import { applyPatch } from "diff";
+import { applyPatch, type StructuredPatch } from "diff";
 import { z } from "zod";
 import { AgentMode } from "./types.ts";
 import type { ConfirmPort, ProcessPort, TodoPort, TodoItem, AgentModeValue } from "./types.ts";
@@ -23,13 +23,91 @@ export function getToolsForMode(tools: ModeTool[], mode: AgentModeValue): Struct
   return tools.filter((t) => t.modes.includes(mode)).map((t) => t.tool);
 }
 
-/** 构建任务摘要文本 */
 function buildTodoSummary(todos: Array<{ status: string }>): string {
   const total = todos.length;
   const completed = todos.filter((t) => t.status === "completed").length;
   const inProgress = todos.filter((t) => t.status === "in_progress").length;
   const pending = todos.filter((t) => t.status === "pending").length;
   return `共 ${total} 项: ${completed} 完成, ${inProgress} 进行中, ${pending} 待处理`;
+}
+
+function buildStructuredPatch(patchText: string): StructuredPatch | null {
+  const normalized = patchText.replace(/\r\n/g, "\n");
+  const lines = normalized.split("\n");
+  const hunks: any[] = [];
+
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (line.startsWith("@@")) {
+      const match = /@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/.exec(line);
+      const oldStart = match ? parseInt(match[1], 10) : 1;
+      const newStart = match ? parseInt(match[3], 10) : 1;
+      const hunkLines: string[] = [];
+      const delimiters: string[] = [];
+
+      i += 1;
+      while (i < lines.length && !lines[i].startsWith("@@")) {
+        const current = lines[i];
+        if (current === "" && i === lines.length - 1) {
+          i += 1;
+          break;
+        }
+        if (/^[ +\-\\]/.test(current)) {
+          hunkLines.push(current);
+          delimiters.push("\n");
+        }
+        i += 1;
+      }
+
+      const oldLines = hunkLines.filter((l) => l[0] === " " || l[0] === "-").length;
+      const newLines = hunkLines.filter((l) => l[0] === " " || l[0] === "+").length;
+
+      const hunk: any = {
+        oldStart,
+        oldLines,
+        newStart,
+        newLines,
+        lines: hunkLines,
+        linedelimiters: delimiters,
+      };
+      hunks.push(hunk);
+      continue;
+    }
+    i += 1;
+  }
+
+  if (hunks.length === 0) return null;
+
+  const patch: StructuredPatch = {
+    oldFileName: "",
+    newFileName: "",
+    oldHeader: "",
+    newHeader: "",
+    hunks,
+  } as unknown as StructuredPatch;
+
+  return patch;
+}
+
+function applyPatchWithFallback(originalContent: string, patchText: string): string | false {
+  try {
+    const directResult = applyPatch(originalContent, patchText);
+    if (directResult !== false) {
+      return directResult;
+    }
+  } catch {
+  }
+
+  const structured = buildStructuredPatch(patchText);
+  if (!structured) return false;
+
+  try {
+    const structuredResult = applyPatch(originalContent, structured);
+    return structuredResult;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -112,7 +190,7 @@ export function createTools(confirm: ConfirmPort, processPort: ProcessPort, todo
           // 文件不存在，视为新文件
         }
 
-        const patchedContent = applyPatch(originalContent, patch);
+        const patchedContent = applyPatchWithFallback(originalContent, patch);
         if (patchedContent === false) {
           return `补丁应用失败: ${resolvedPath}`;
         }
@@ -142,7 +220,7 @@ export function createTools(confirm: ConfirmPort, processPort: ProcessPort, todo
     },
     {
       name: "write_file_patch",
-      description: "使用统一 diff 补丁写入文件内容，避免传输完整文件。写入前会请求用户确认。",
+      description: "使用统一 diff 补丁写入文件内容，避免传输完整文件。补丁需包含 @@ 片段和以空格/+/− 开头的行，无需精确计算统计数字。写入前会请求用户确认。",
       schema: z.object({
         filePath: z.string().describe("文件路径"),
         patch: z.string().describe("统一 diff 格式的补丁内容"),
@@ -253,7 +331,7 @@ export function createTools(confirm: ConfirmPort, processPort: ProcessPort, todo
   );
 
   const todoWriteTool = tool(
-    async ({ todos }: { todos: Array<{ content: string; status: string; activeForm: string }> }): Promise<string> => {
+    async ({ todos }: { todos: Array<{ content: string; status: string }> }): Promise<string> => {
       const validStatuses = ["pending", "in_progress", "completed"];
       for (const item of todos) {
         if (!validStatuses.includes(item.status)) {
@@ -268,13 +346,16 @@ export function createTools(confirm: ConfirmPort, processPort: ProcessPort, todo
       name: "todo_write",
       description: "创建或更新任务列表，用于跟踪多步骤任务的进度。每次调用传入完整的任务列表（全量替换）。",
       schema: z.object({
-        todos: z.array(
-          z.object({
-            content: z.string().describe("任务描述（祈使句，如'运行测试'）"),
-            status: z.enum(["pending", "in_progress", "completed"]).describe("任务状态"),
-            activeForm: z.string().describe("进行中的描述（现在进行时，如'正在运行测试'）"),
-          })
-        ).describe("完整的任务列表"),
+        todos: z
+          .array(
+            z.object({
+              content: z.string().describe("任务描述（祈使句，如'运行测试'）"),
+              status: z
+                .enum(["pending", "in_progress", "completed"])
+                .describe("任务状态"),
+            })
+          )
+          .describe("完整的任务列表"),
       }),
     }
   );

@@ -87,7 +87,7 @@ export async function streamModelResponse(
 
       if (toolName && toolName !== currentToolName) {
         currentToolName = toolName;
-        messageBus.setThinkingStatus(ThinkingStatus.TOOL_CALLING, `准备调用: ${toolName}`);
+        messageBus.setThinkingStatus(ThinkingStatus.TOOL_CALLING, `正在调用工具: ${toolName}`);
       }
 
       if (toolArgs && toolArgs !== currentToolArgs) {
