@@ -10,6 +10,7 @@ import type { TodoBus } from "./todo-bus.ts";
 import type { ContextBus } from "./context/context-bus.ts";
 import type { ConfigManager } from "./config.ts";
 import type { ModeTool } from "./tools.ts";
+import { platform } from "os";
 
 // ============ Agent 上下文接口 ============
 
@@ -142,8 +143,9 @@ export function getModeInstructions(mode: AgentModeValue): string {
 /** 根据模板和模式构建完整系统提示词 */
 export function buildSystemPrompt(template: string, mode: AgentModeValue): string {
   return template
-    .replace("${process.cwd()}", process.cwd())
-    .replace("${mode_instructions}", getModeInstructions(mode));
+    .replace("{workingDirectory}", process.cwd())
+    .replace("{workingMode}", mode)
+    .replace("{os}", platform());
 }
 
 /** 根据思考状态获取默认显示文本 */
