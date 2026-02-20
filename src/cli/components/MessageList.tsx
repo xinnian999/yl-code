@@ -278,6 +278,15 @@ const MessageList = React.memo<MessageListProps>(({ messages, thinkingStatus, st
           />
         )}
       </Static>
+      {/* {staticMessages.map((msg, i) => (
+        <MessageItem
+          key={msg.id}
+          message={msg}
+          streamingBlockIndex={-1}
+          isLastAI={false}
+          isProcessing={false}
+        />
+      ))} */}
       {activeMessages.map((msg, i) => {
         const globalIndex = committed + i;
         const isLastAI = globalIndex === lastAIIndex;

@@ -55,11 +55,14 @@ export async function streamModelResponse(
   let currentToolArgs: string | null = null;
   let chunkIndex = 0;
   let streamBlockIndex = -1;
+  let pendingText = "";
+  let lastFlushTime = 0;
+  const FLUSH_INTERVAL_MS = 120;
 
   for await (const chunk of stream) {
     response = response ? concat(response, chunk) : chunk;
 
-    // 流式输出文本内容到 UI
+    // 累积文本内容，按时间间隔批量刷新到 UI，减少终端重绘次数
     if (chunk.content) {
       const text = typeof chunk.content === "string" ? chunk.content : String(chunk.content);
       if (text) {
@@ -67,18 +70,34 @@ export async function streamModelResponse(
           messageBus.setThinkingStatus(ThinkingStatus.IDLE);
           streamBlockIndex = messageBus.createTextBlock(text);
           messageBus.setStreamingBlock(streamBlockIndex);
-          // debug 模式：流开始时设置初始 debug 标记
-          if (debugMode) {
-            messageBus.setDebugOnBlock(streamBlockIndex,
-              JSON.stringify({ chunks: 0, status: "streaming" }, null, 2));
-          }
+          lastFlushTime = Date.now();
         } else {
-          messageBus.appendToBlock(streamBlockIndex, text);
+          pendingText += text;
+          const now = Date.now();
+          if (now - lastFlushTime >= FLUSH_INTERVAL_MS) {
+            messageBus.appendToBlock(streamBlockIndex, pendingText);
+            pendingText = "";
+            lastFlushTime = now;
+          }
         }
       }
     }
 
-    if (debugMode) chunkIndex++;
+    if (debugMode) {
+      chunkIndex++;
+      const now = Date.now();
+      if (streamBlockIndex !== -1 && response && now - lastFlushTime >= FLUSH_INTERVAL_MS) {
+        const debugObj = {
+          chunks: chunkIndex,
+          status: "streaming",
+          ...extractResponseMeta(response),
+        };
+        messageBus.setDebugOnBlock(
+          streamBlockIndex,
+          JSON.stringify(debugObj, null, 2)
+        );
+      }
+    }
 
     const chunkAny = chunk as any;
     if (chunkAny.tool_call_chunks?.length > 0) {
@@ -102,12 +121,19 @@ export async function streamModelResponse(
     }
   }
 
-  // 流式输出结束，清除流式状态
+  // 流式输出结束，刷新剩余文本并清除流式状态
+  if (streamBlockIndex !== -1 && pendingText) {
+    messageBus.appendToBlock(streamBlockIndex, pendingText);
+  }
   messageBus.clearStreamingBlock();
 
-  // debug 模式：用完整元数据替换初始 debug
+  // debug 模式：流结束时写入最终元数据快照
   if (debugMode && streamBlockIndex !== -1) {
-    const debugObj = { chunks: chunkIndex, ...extractResponseMeta(response) };
+    const debugObj = {
+      chunks: chunkIndex,
+      status: "done",
+      ...extractResponseMeta(response),
+    };
     messageBus.setDebugOnBlock(streamBlockIndex, JSON.stringify(debugObj, null, 2));
   }
 
