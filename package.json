@@ -30,7 +30,7 @@
   ],
   "author": "",
   "license": "ISC",
-  "description": "终端内 AI 助手 CLI，输入 niu 即可召唤使用",
+  "description": "终端内 AI 助手 CLI，输入 niuma 即可召唤使用",
   "dependencies": {
     "@langchain/core": "^1.1.8",
     "@langchain/mcp-adapters": "^1.1.3",
