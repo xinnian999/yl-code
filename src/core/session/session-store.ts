@@ -8,7 +8,7 @@ import type { MessageBlock } from "../types.ts";
 // ============ 常量 ============
 
 /** 会话存储目录 */
-const SESSIONS_DIR = join(homedir(), ".niu-code", "sessions");
+const SESSIONS_DIR = join(homedir(), ".niuma", "sessions");
 /** 索引文件路径 */
 const INDEX_FILE = join(SESSIONS_DIR, "index.json");
 /** 最大会话数量 */

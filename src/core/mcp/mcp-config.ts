@@ -77,7 +77,7 @@ export class McpConfigManager extends EventEmitter {
 
   constructor() {
     super();
-    const configDir = join(homedir(), ".niu-code");
+    const configDir = join(homedir(), ".niuma");
     this.configPath = join(configDir, "mcp.json");
 
     if (!existsSync(configDir)) {

@@ -2,8 +2,8 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 
-// 历史文件路径：~/.niu-code/history.json
-const CONFIG_DIR = path.join(os.homedir(), ".niu-code");
+// 历史文件路径：~/.niuma/history.json
+const CONFIG_DIR = path.join(os.homedir(), ".niuma");
 const HISTORY_FILE = path.join(CONFIG_DIR, "history.json");
 
 // 最大历史记录条数

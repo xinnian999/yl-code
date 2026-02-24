@@ -34,7 +34,7 @@ export class ConfigManager extends EventEmitter implements ConfigPort {
 
   constructor() {
     super();
-    this.configDir = join(homedir(), ".niu-code");
+    this.configDir = join(homedir(), ".niuma");
     this.configPath = join(this.configDir, "config.json");
 
     if (!existsSync(this.configDir)) {
