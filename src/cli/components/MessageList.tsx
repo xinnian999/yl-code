@@ -10,7 +10,11 @@ import type {
 } from "@/core/message-bus.ts";
 import StatusBar from "./StatusBar.tsx";
 import TodoList from "./TodoList.tsx";
+import DiffConfirm from "./DiffConfirm.tsx";
 import { formatTotalDuration } from "@/core/agent-helpers.ts";
+import type { PendingChange } from "@/core/confirm-bus.ts";
+import type { ConfirmResult } from "@/core/types.ts";
+import type { EditorType } from "@/core/editor-detector.ts";
 
 /** 用户消息组件属性 */
 interface UserMessageProps {
@@ -141,14 +145,28 @@ interface AIMessageProps {
   streamingBlockIndex: number;
   /** 是否为最后一条 AI 消息 */
   isLastAI: boolean;
-   isProcessing: boolean;
+  isProcessing: boolean;
+  showDiffConfirm: boolean;
+  pendingChange: PendingChange | null;
+  diffEditorOpened: EditorType | null;
+  onDiffConfirm: (result: ConfirmResult) => void;
 }
 
 /**
  * AI 消息组件
  * 按 block.type 分发渲染各类型内容块
  */
-const AIMessageComponent: React.FC<AIMessageProps> = ({ message, thinkingStatus, streamingBlockIndex, isLastAI, isProcessing }) => {
+const AIMessageComponent: React.FC<AIMessageProps> = ({
+  message,
+  thinkingStatus,
+  streamingBlockIndex,
+  isLastAI,
+  isProcessing,
+  showDiffConfirm,
+  pendingChange,
+  diffEditorOpened,
+  onDiffConfirm,
+}) => {
   const hasBlocks = message.blocks && message.blocks.length > 0;
   const isActive = thinkingStatus?.status !== undefined && thinkingStatus.status !== ThinkingStatus.IDLE;
 
@@ -177,6 +195,15 @@ const AIMessageComponent: React.FC<AIMessageProps> = ({ message, thinkingStatus,
         />
       ))}
       {isActive && <StatusBar thinkingStatus={thinkingStatus} />}
+      {isLastAI && showDiffConfirm && pendingChange && (
+        <Box marginTop={1}>
+          <DiffConfirm
+            change={pendingChange}
+            onConfirm={onDiffConfirm}
+            editorOpened={diffEditorOpened}
+          />
+        </Box>
+      )}
       <TotalDurationBar message={message} isRunning={isLastAI && isProcessing} />
     </Box>
   );
@@ -191,12 +218,26 @@ interface MessageItemProps {
   /** 是否为最后一条 AI 消息 */
   isLastAI: boolean;
   isProcessing: boolean;
+  showDiffConfirm: boolean;
+  pendingChange: PendingChange | null;
+  diffEditorOpened: EditorType | null;
+  onDiffConfirm: (result: ConfirmResult) => void;
 }
 
 /**
  * 单条消息组件
  */
-const MessageItem: React.FC<MessageItemProps> = ({ message, thinkingStatus, streamingBlockIndex, isLastAI, isProcessing }) => {
+const MessageItem: React.FC<MessageItemProps> = ({
+  message,
+  thinkingStatus,
+  streamingBlockIndex,
+  isLastAI,
+  isProcessing,
+  showDiffConfirm,
+  pendingChange,
+  diffEditorOpened,
+  onDiffConfirm,
+}) => {
   if (message.type === MessageType.USER) {
     return <UserMessage message={message as UserMessageType} />;
   }
@@ -209,6 +250,10 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, thinkingStatus, stre
         streamingBlockIndex={streamingBlockIndex}
         isLastAI={isLastAI}
         isProcessing={isProcessing}
+        showDiffConfirm={showDiffConfirm}
+        pendingChange={pendingChange}
+        diffEditorOpened={diffEditorOpened}
+        onDiffConfirm={onDiffConfirm}
       />
     );
   }
@@ -223,6 +268,10 @@ interface MessageListProps {
   /** 当前流式输出的块索引（-1 表示无流式输出） */
   streamingBlockIndex: number;
   isProcessing: boolean;
+  showDiffConfirm: boolean;
+  pendingChange: PendingChange | null;
+  diffEditorOpened: EditorType | null;
+  onDiffConfirm: (result: ConfirmResult) => void;
 }
 
 /**
@@ -230,7 +279,16 @@ interface MessageListProps {
  * 使用 Ink Static 将已完成消息从 yoga 布局树中移除，
  * 仅保留最近 2 条消息参与动态布局，解决长列表导致的输入卡顿
  */
-const MessageList = React.memo<MessageListProps>(({ messages, thinkingStatus, streamingBlockIndex, isProcessing }) => {
+const MessageList = React.memo<MessageListProps>(({
+  messages,
+  thinkingStatus,
+  streamingBlockIndex,
+  isProcessing,
+  showDiffConfirm,
+  pendingChange,
+  diffEditorOpened,
+  onDiffConfirm,
+}) => {
   /** 已提交到 Static 的消息数量（单调递增，Static 渲染后不可撤回） */
   const committedRef = useRef(0);
 
@@ -275,6 +333,10 @@ const MessageList = React.memo<MessageListProps>(({ messages, thinkingStatus, st
             streamingBlockIndex={-1}
             isLastAI={false}
             isProcessing={false}
+            showDiffConfirm={false}
+            pendingChange={null}
+            diffEditorOpened={null}
+            onDiffConfirm={onDiffConfirm}
           />
         )}
       </Static>
@@ -298,6 +360,10 @@ const MessageList = React.memo<MessageListProps>(({ messages, thinkingStatus, st
             streamingBlockIndex={isLastAI ? streamingBlockIndex : -1}
             isLastAI={isLastAI}
             isProcessing={isProcessing}
+            showDiffConfirm={isLastAI ? showDiffConfirm : false}
+            pendingChange={isLastAI ? pendingChange : null}
+            diffEditorOpened={isLastAI ? diffEditorOpened : null}
+            onDiffConfirm={onDiffConfirm}
           />
         );
       })}

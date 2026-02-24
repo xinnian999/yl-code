@@ -5,7 +5,6 @@ import InputArea from "./components/InputArea.tsx";
 import ModelSelector from "./components/ModelSelector.tsx";
 import HistorySelector, { NEW_SESSION_ID } from "./components/HistorySelector.tsx";
 import McpManagerView from "./components/McpManager.tsx";
-import DiffConfirm from "./components/DiffConfirm.tsx";
 import FooterBar from "./components/FooterBar.tsx";
 import { useMessages } from "./hooks/useMessages.ts";
 import { useDiffConfirm } from "./hooks/useDiffConfirm.ts";
@@ -105,9 +104,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
 
   return (
     <Box flexDirection="column" height="100%" paddingY={1}>
-      {showDiffConfirm && pendingChange ? (
-        <Box paddingX={1}><DiffConfirm change={pendingChange} onConfirm={handleDiffConfirm} editorOpened={diffEditorOpened} /></Box>
-      ) : isManagingMcp ? (
+      {isManagingMcp ? (
         <Box paddingX={1}><McpManagerView agent={agent} onClose={() => setIsManagingMcp(false)} /></Box>
       ) : isSelectingHistory ? (
         <Box paddingX={1}><HistorySelector agent={agent} onSelect={handleHistorySelect} onCancel={() => setIsSelectingHistory(false)} /></Box>
@@ -120,9 +117,13 @@ const App: React.FC<AppProps> = ({ agent }) => {
             thinkingStatus={thinkingStatus}
             streamingBlockIndex={streamingBlockIndex}
             isProcessing={isProcessing}
+            showDiffConfirm={showDiffConfirm}
+            pendingChange={pendingChange}
+            diffEditorOpened={diffEditorOpened}
+            onDiffConfirm={handleDiffConfirm}
           />
           <InputArea
-            isProcessing={isProcessing}
+            isProcessing={isProcessing || showDiffConfirm}
             onSubmit={handleSubmit}
             onAbort={handleAbort}
             onModeSwitch={handleModeSwitch}
