@@ -6,7 +6,7 @@ import { join, basename } from "path";
 /**
  * 支持的编辑器类型
  */
-export type EditorType = "cursor" | "code" | "idea" | "webstorm" | "nvim";
+export type EditorType = "trae" | "cursor" | "code" | "idea" | "webstorm" | "nvim";
 
 /**
  * 编辑器配置
@@ -21,6 +21,11 @@ interface EditorConfig {
  * 编辑器配置表
  */
 const EDITORS: Record<EditorType, EditorConfig> = {
+  trae: {
+    cmd: "trae",
+    name: "Trae",
+    diffArgs: (f1, f2) => ["--diff", f1, f2],
+  },
   cursor: {
     cmd: "cursor",
     name: "Cursor",
@@ -48,6 +53,8 @@ const EDITORS: Record<EditorType, EditorConfig> = {
   },
 };
 
+const PROCESS_TREE_MAX_DEPTH = 8;
+
 /**
  * 检测命令是否可用
  */
@@ -61,6 +68,54 @@ function isCommandAvailable(cmd: string): boolean {
 }
 
 /**
+ * 从进程树中提取可能的编辑器类型（主要用于区分 VS Code 系编辑器）
+ */
+function detectEditorFromProcessTree(): EditorType | null {
+  // 该方式依赖 ps 命令，Windows 下可能不可用
+  if (process.platform === "win32") {
+    return null;
+  }
+
+  let pid = process.ppid;
+  for (let depth = 0; depth < PROCESS_TREE_MAX_DEPTH; depth++) {
+    try {
+      const comm = execSync(`ps -p ${pid} -o comm=`, { encoding: "utf-8" }).trim().toLowerCase();
+      const cmd = basename(comm);
+
+      if (cmd.includes("cursor")) {
+        return "cursor";
+      }
+      if (cmd.includes("trae")) {
+        return "trae";
+      }
+      if (cmd === "code" || cmd === "code-insiders" || cmd.includes("vscode")) {
+        return "code";
+      }
+      if (cmd.includes("webstorm")) {
+        return "webstorm";
+      }
+      if (cmd.includes("idea")) {
+        return "idea";
+      }
+      if (cmd === "nvim") {
+        return "nvim";
+      }
+
+      const ppidRaw = execSync(`ps -p ${pid} -o ppid=`, { encoding: "utf-8" }).trim();
+      const parentPid = Number.parseInt(ppidRaw, 10);
+      if (!Number.isFinite(parentPid) || parentPid <= 1 || parentPid === pid) {
+        break;
+      }
+      pid = parentPid;
+    } catch {
+      break;
+    }
+  }
+
+  return null;
+}
+
+/**
  * 通过环境变量检测当前是否在编辑器内置终端中运行
  * 只有确认在编辑器终端中才返回对应类型，独立终端（Terminal.app、iTerm 等）返回 null
  * @returns 当前环境对应的编辑器类型，不在编辑器终端中则返回 null
@@ -68,12 +123,25 @@ function isCommandAvailable(cmd: string): boolean {
 function detectEditorFromEnv(): EditorType | null {
   const env = process.env;
 
-  // VS Code 和 Cursor 的内置终端都会设置 TERM_PROGRAM=vscode，
-  // 只有确认 TERM_PROGRAM 是 vscode 时，才进一步用 CURSOR_ 前缀变量区分两者
-  // （CURSOR_ 变量可能通过 shell 配置全局存在，不能单独作为判断依据）
+  // VS Code / Cursor / Trae 都可能设置 TERM_PROGRAM=vscode，需做更细粒度识别
   if (env.TERM_PROGRAM === "vscode") {
-    const hasCursorEnv = Object.keys(env).some((key) => key.startsWith("CURSOR_"));
-    return hasCursorEnv ? "cursor" : "code";
+    const envKeys = Object.keys(env);
+    const hasCursorEnv = envKeys.some((key) => key.startsWith("CURSOR_"));
+    const hasTraeEnv = envKeys.some((key) => key.startsWith("TRAE_"));
+
+    // 优先使用进程树判断，规避用户 shell 中注入全局 CURSOR_/TRAE_ 变量导致误判
+    const fromProcessTree = detectEditorFromProcessTree();
+    if (fromProcessTree === "cursor" || fromProcessTree === "trae" || fromProcessTree === "code") {
+      return fromProcessTree;
+    }
+
+    if (hasTraeEnv) {
+      return "trae";
+    }
+    if (hasCursorEnv) {
+      return "cursor";
+    }
+    return "code";
   }
 
   // JetBrains 系列（IDEA / WebStorm）内置终端
@@ -215,7 +283,7 @@ export function tryOpenDiff(
  * @returns 使用的编辑器名称，失败返回 null
  */
 export function openFileInEditor(filePath: string): string | null {
-  // 优先使用检测到的编辑器（VS Code / Cursor / IDEA / WebStorm / Neovim）
+  // 优先使用检测到的编辑器（Trae / VS Code / Cursor / IDEA / WebStorm / Neovim）
   const editor = detectEditor();
   if (editor) {
     const config = EDITORS[editor];
