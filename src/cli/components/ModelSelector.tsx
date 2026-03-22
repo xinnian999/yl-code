@@ -69,7 +69,7 @@ const ModelSelector: React.FC<Props> = ({ agent, onSelect, onCancel }) => {
 
     // 内置模型不支持 c/e/d 操作
     const selected = models[selectedIndex];
-    if (selected?.builtin) return;
+    if (selected?.free) return;
 
     if (input.toLowerCase() === "c") {
       if (selected) {
@@ -184,7 +184,7 @@ const ModelSelector: React.FC<Props> = ({ agent, onSelect, onCancel }) => {
     );
   }
 
-  const isBuiltinSelected = models[selectedIndex]?.builtin;
+  const isFreeSelected = models[selectedIndex]?.free;
 
   return (
     <Box flexDirection="column" paddingY={1}>
@@ -204,7 +204,7 @@ const ModelSelector: React.FC<Props> = ({ agent, onSelect, onCancel }) => {
         <ScrollList selectedIndex={selectedIndex}>
           {models.map((model, i) => {
             const isCurrent = model.id === currentId;
-            const label = model.builtin ? `[免费] ${model.name}` : model.name;
+            const label = model.free ? `[免费] ${model.name}` : model.name;
             const suffix = isCurrent ? " ✓" : "";
             return (
               <Box key={model.id} paddingX={1}>
@@ -220,7 +220,7 @@ const ModelSelector: React.FC<Props> = ({ agent, onSelect, onCancel }) => {
       <Box>
         <Text color="gray">
           <Text color="cyan">a</Text> 添加
-          {!isBuiltinSelected && (
+          {!isFreeSelected && (
             <>
               {" | "}<Text color="cyan">c</Text> 复制
               {" | "}<Text color="cyan">e</Text> 编辑

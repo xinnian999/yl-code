@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { homedir } from "os";
 import { join } from "path";
 import type { ConfigPort, ModelConfig } from "./types.ts";
-import { BUILTIN_MODELS } from "./builtin-models.ts";
+import { FREE_MODELS } from "./free-models.ts";
 
 export type { ModelConfig } from "./types.ts";
 
@@ -56,7 +56,7 @@ export class ConfigManager extends EventEmitter implements ConfigPort {
     }
 
     const defaultConfig: AppConfig = {
-      currentModel: BUILTIN_MODELS[0]?.id ?? "",
+      currentModel: FREE_MODELS[0]?.id ?? "",
       models: [],
     };
     this.saveConfig(defaultConfig);
@@ -70,7 +70,7 @@ export class ConfigManager extends EventEmitter implements ConfigPort {
 
   /** 获取合并后的所有模型（内置 + 用户），内置在前 */
   private getAllModels(): ModelConfig[] {
-    return [...BUILTIN_MODELS, ...this.config.models];
+    return [...FREE_MODELS, ...this.config.models];
   }
 
   // --- ConfigPort 接口 ---
@@ -109,7 +109,7 @@ export class ConfigManager extends EventEmitter implements ConfigPort {
 
   /** 获取当前模型 ID */
   getCurrentModelId(): string {
-    return this.config.currentModel || BUILTIN_MODELS[0]?.id || "";
+    return this.config.currentModel || FREE_MODELS[0]?.id || "";
   }
 
   /** 切换当前模型（内置和用户模型均可切换） */
@@ -136,7 +136,7 @@ export class ConfigManager extends EventEmitter implements ConfigPort {
 
   /** 删除模型配置（内置模型不可删除） */
   removeModel(modelId: string): void {
-    if (BUILTIN_MODELS.some((m) => m.id === modelId)) {
+    if (FREE_MODELS.some((m) => m.id === modelId)) {
       throw new Error("内置模型不可删除");
     }
     if (modelId === this.config.currentModel) {
@@ -149,7 +149,7 @@ export class ConfigManager extends EventEmitter implements ConfigPort {
 
   /** 更新模型配置（内置模型不可修改） */
   updateModel(modelId: string, updates: Partial<ModelConfig>): void {
-    if (BUILTIN_MODELS.some((m) => m.id === modelId)) {
+    if (FREE_MODELS.some((m) => m.id === modelId)) {
       throw new Error("内置模型不可修改");
     }
     const index = this.config.models.findIndex((m) => m.id === modelId);

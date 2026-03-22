@@ -92,7 +92,7 @@ export interface AgentModeConfig {
 
 /** 所有可用模式列表 */
 export const AGENT_MODES: AgentModeConfig[] = [
-  { value: "ask",   label: "Ask",   description: "问答模式" },
+  { value: "ask", label: "Ask", description: "问答模式" },
   { value: "build", label: "Build", description: "构建模式" },
 ];
 
@@ -104,8 +104,8 @@ export interface ModelConfig {
   apiKey: string;
   baseUrl: string;
   modelName: string;
-  /** 是否为内置模型（内置模型只读，用户不可编辑/删除） */
-  builtin?: boolean;
+  /** 是否为免费模型（免费模型只读，用户不可编辑/删除） */
+  free?: boolean;
 }
 
 // ============ 进程信息 ============
