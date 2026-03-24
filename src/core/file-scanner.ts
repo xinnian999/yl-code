@@ -1,5 +1,13 @@
 import { readdirSync, statSync, readFileSync, existsSync } from "fs";
 import { join, dirname, basename, relative } from "path";
+import {
+  DIRECTORY_TREE_MAX_DEPTH,
+  FILE_CONTENT_MAX_SIZE,
+  FILE_MATCH_SCORE,
+  FILE_SCANNER_CACHE_TTL_MS,
+  FILE_SCANNER_IGNORED_PATTERNS,
+  FILE_SUGGESTION_MAX_RESULTS,
+} from "./config/workspace-config.ts";
 
 /** 文件/目录信息 */
 export interface FileItem {
@@ -9,29 +17,16 @@ export interface FileItem {
   isDirectory: boolean;
 }
 
-// 忽略的目录和文件
-const IGNORED_PATTERNS = [
-  "node_modules",
-  ".git",
-  ".DS_Store",
-  "dist",
-  "build",
-  ".next",
-  ".cache",
-  "coverage",
-];
-
 // 缓存扫描结果
 let cachedFiles: FileItem[] | null = null;
 let cacheTime = 0;
-const CACHE_TTL = 5000; // 5秒缓存
 
 /**
  * 判断是否应该忽略该文件/目录
  */
 function shouldIgnore(name: string): boolean {
   if (name.startsWith(".")) return true;
-  return IGNORED_PATTERNS.includes(name);
+  return FILE_SCANNER_IGNORED_PATTERNS.includes(name);
 }
 
 /**
@@ -89,7 +84,7 @@ function scanAllFiles(basePath: string, currentPath: string = ""): FileItem[] {
  */
 function getAllFiles(basePath: string): FileItem[] {
   const now = Date.now();
-  if (cachedFiles && now - cacheTime < CACHE_TTL) {
+  if (cachedFiles && now - cacheTime < FILE_SCANNER_CACHE_TTL_MS) {
     return cachedFiles;
   }
 
@@ -136,23 +131,27 @@ export function scanDirectory(basePath: string, filter: string): FileItem[] {
 
     // 文件名完全匹配（最高优先级）
     if (nameLower === filterLower) {
-      score = 1000;
+      score = FILE_MATCH_SCORE.EXACT_NAME;
     }
     // 文件名前缀匹配
     else if (nameLower.startsWith(filterLower)) {
-      score = 800 + (100 - file.relativePath.length); // 路径短的优先
+      score = FILE_MATCH_SCORE.NAME_PREFIX
+        + (FILE_MATCH_SCORE.PATH_LENGTH_BONUS_BASE - file.relativePath.length);
     }
     // 文件名包含匹配
     else if (nameLower.includes(filterLower)) {
-      score = 600 + (100 - file.relativePath.length);
+      score = FILE_MATCH_SCORE.NAME_CONTAINS
+        + (FILE_MATCH_SCORE.PATH_LENGTH_BONUS_BASE - file.relativePath.length);
     }
     // 完整路径前缀匹配
     else if (pathLower.startsWith(filterLower)) {
-      score = 400 + (100 - file.relativePath.length);
+      score = FILE_MATCH_SCORE.PATH_PREFIX
+        + (FILE_MATCH_SCORE.PATH_LENGTH_BONUS_BASE - file.relativePath.length);
     }
     // 完整路径包含匹配
     else if (pathLower.includes(filterLower)) {
-      score = 200 + (100 - file.relativePath.length);
+      score = FILE_MATCH_SCORE.PATH_CONTAINS
+        + (FILE_MATCH_SCORE.PATH_LENGTH_BONUS_BASE - file.relativePath.length);
     }
 
     return { file, score };
@@ -174,7 +173,7 @@ export function scanDirectory(basePath: string, filter: string): FileItem[] {
       return a.file.name.localeCompare(b.file.name);
     })
     .map((item) => item.file)
-    .slice(0, 50); // 限制返回数量
+    .slice(0, FILE_SUGGESTION_MAX_RESULTS);
 }
 
 /**
@@ -184,14 +183,14 @@ export function scanDirectory(basePath: string, filter: string): FileItem[] {
  */
 export function getFileContent(
   filePath: string,
-  maxSize: number = 100 * 1024
+  maxSize: number = FILE_CONTENT_MAX_SIZE
 ): string {
   try {
     const stat = statSync(filePath);
 
     if (stat.isDirectory()) {
       // 列出目录内容
-      return getDirectoryTree(filePath, "", 2);
+      return getDirectoryTree(filePath, "", DIRECTORY_TREE_MAX_DEPTH);
     }
 
     if (stat.size > maxSize) {
@@ -235,7 +234,11 @@ function formatTreeEntry(
  * @param prefix 前缀（用于缩进）
  * @param maxDepth 最大深度
  */
-function getDirectoryTree(dirPath: string, prefix: string = "", maxDepth: number = 2): string {
+function getDirectoryTree(
+  dirPath: string,
+  prefix: string = "",
+  maxDepth: number = DIRECTORY_TREE_MAX_DEPTH
+): string {
   if (maxDepth <= 0) return prefix + "...\n";
 
   let entries: string[];

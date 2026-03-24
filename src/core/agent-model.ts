@@ -9,12 +9,12 @@ import type { AgentModeValue } from "./types.ts";
 import type { ConfigManager } from "./config.ts";
 import type { MessageBus } from "./message-bus.ts";
 import type { AgentContext } from "./agent-helpers.ts";
+import { SUMMARIZE_THRESHOLD } from "./config/context-config.ts";
 import {
   estimateTotalTokens,
   splitMessages,
   generateSummary,
   buildSummaryMessages,
-  SUMMARIZE_THRESHOLD,
 } from "./context/context-manager.ts";
 
 /** 创建绑定工具的模型实例（根据当前模式筛选工具） */

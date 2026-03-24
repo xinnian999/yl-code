@@ -4,6 +4,7 @@
 import { EventEmitter } from "events";
 import { MultiServerMCPClient } from "@langchain/mcp-adapters";
 import type { DynamicStructuredTool } from "@langchain/core/tools";
+import { MCP_CONNECTION_TIMEOUT_MS } from "../config/mcp-runtime-config.ts";
 import { getTransport, getServerUrl } from "./mcp-config.ts";
 import type { McpConfigManager, McpServerConfig } from "./mcp-config.ts";
 
@@ -28,11 +29,6 @@ export interface McpServerState {
 interface McpManagerEvents {
   "mcp:status-change": (states: McpServerState[]) => void;
 }
-
-// ============ 常量 ============
-
-/** 单个服务器连接超时时间（毫秒） */
-const CONNECTION_TIMEOUT_MS = 30_000;
 
 // ============ 管理器 ============
 
@@ -117,7 +113,7 @@ export class McpManager extends EventEmitter {
 
     try {
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error("连接超时（30s）")), CONNECTION_TIMEOUT_MS);
+        setTimeout(() => reject(new Error("连接超时（30s）")), MCP_CONNECTION_TIMEOUT_MS);
       });
       const toolsPerServer = await Promise.race([
         this.client.initializeConnections(),

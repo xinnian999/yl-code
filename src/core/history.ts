@@ -1,20 +1,12 @@
 import fs from "fs";
-import path from "path";
-import os from "os";
-
-// 历史文件路径：~/.niuma/history.json
-const CONFIG_DIR = path.join(os.homedir(), ".niuma");
-const HISTORY_FILE = path.join(CONFIG_DIR, "history.json");
-
-// 最大历史记录条数
-const MAX_HISTORY = 500;
+import { HISTORY_FILE, MAX_HISTORY, NIUMA_CONFIG_DIR } from "./config/storage-config.ts";
 
 /**
  * 确保配置目录存在
  */
 const ensureConfigDir = (): void => {
-  if (!fs.existsSync(CONFIG_DIR)) {
-    fs.mkdirSync(CONFIG_DIR, { recursive: true });
+  if (!fs.existsSync(NIUMA_CONFIG_DIR)) {
+    fs.mkdirSync(NIUMA_CONFIG_DIR, { recursive: true });
   }
 };
 

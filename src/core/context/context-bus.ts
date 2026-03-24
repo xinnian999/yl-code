@@ -1,6 +1,6 @@
 import { EventEmitter } from "events";
 import type { ContextPort, ContextUsage } from "../types.ts";
-import { SUMMARIZE_THRESHOLD } from "./context-manager.ts";
+import { SUMMARIZE_THRESHOLD } from "../config/context-config.ts";
 
 // ============ 事件类型 ============
 

@@ -2,58 +2,15 @@ import { execSync, spawn } from "child_process";
 import { writeFileSync, unlinkSync, mkdirSync, existsSync } from "fs";
 import { tmpdir } from "os";
 import { join, basename } from "path";
+import {
+  DIFF_TEMP_DIR_NAME,
+  EDITORS,
+  PROCESS_TREE_MAX_DEPTH,
+  TERMINAL_EDITOR_COMMANDS,
+} from "./config/editor-config.ts";
 
-/**
- * 支持的编辑器类型
- */
-export type EditorType = "trae" | "cursor" | "code" | "idea" | "webstorm" | "nvim";
-
-/**
- * 编辑器配置
- */
-interface EditorConfig {
-  cmd: string;
-  name: string;
-  diffArgs: (file1: string, file2: string) => string[];
-}
-
-/**
- * 编辑器配置表
- */
-const EDITORS: Record<EditorType, EditorConfig> = {
-  trae: {
-    cmd: "trae",
-    name: "Trae",
-    diffArgs: (f1, f2) => ["--diff", f1, f2],
-  },
-  cursor: {
-    cmd: "cursor",
-    name: "Cursor",
-    diffArgs: (f1, f2) => ["--diff", f1, f2],
-  },
-  code: {
-    cmd: "code",
-    name: "VS Code",
-    diffArgs: (f1, f2) => ["--diff", f1, f2],
-  },
-  idea: {
-    cmd: "idea",
-    name: "IntelliJ IDEA",
-    diffArgs: (f1, f2) => ["diff", f1, f2],
-  },
-  webstorm: {
-    cmd: "webstorm",
-    name: "WebStorm",
-    diffArgs: (f1, f2) => ["diff", f1, f2],
-  },
-  nvim: {
-    cmd: "nvim",
-    name: "Neovim",
-    diffArgs: (f1, f2) => ["-d", f1, f2],
-  },
-};
-
-const PROCESS_TREE_MAX_DEPTH = 8;
+export type { EditorType } from "./config/editor-config.ts";
+import type { EditorType } from "./config/editor-config.ts";
 
 /**
  * 检测命令是否可用
@@ -189,7 +146,7 @@ export function getEditorName(editor: EditorType): string {
  * @param prefix 文件名前缀，用于区分同时创建的多个临时文件
  */
 function createTempFile(content: string, originalPath: string, prefix = ""): string {
-  const tempDir = join(tmpdir(), "niu-code-diff");
+  const tempDir = join(tmpdir(), DIFF_TEMP_DIR_NAME);
   mkdirSync(tempDir, { recursive: true });
 
   const fileName = `${prefix}${Date.now()}-${basename(originalPath)}`;
@@ -298,8 +255,7 @@ export function openFileInEditor(filePath: string): string | null {
 
   // 尝试使用 $EDITOR 环境变量（非终端编辑器）
   const envEditor = process.env.EDITOR || "";
-  const terminalEditors = ["vi", "vim", "nvim", "nano", "emacs"];
-  if (envEditor && !terminalEditors.includes(basename(envEditor))) {
+  if (envEditor && !TERMINAL_EDITOR_COMMANDS.includes(basename(envEditor))) {
     try {
       const child = spawn(envEditor, [filePath], { detached: true, stdio: "ignore" });
       child.unref();

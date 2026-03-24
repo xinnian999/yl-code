@@ -2,7 +2,6 @@ import "dotenv/config";
 import type { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
-import { PromptTemplate } from'@langchain/core/prompts';
 import { createTools } from "./tools.ts";
 import type { ModeTool } from "./tools.ts";
 import { MessageBus } from "./message-bus.ts";
@@ -15,9 +14,17 @@ import { estimateTotalTokens } from "./context/context-manager.ts";
 import { AgentMode, ThinkingStatus } from "./types.ts";
 import type { ModelConfig, AgentModeValue } from "./types.ts";
 import type { CommandAction } from "./commands.ts";
+import {
+  AGENT_DEFAULT_DEBUG_MODE,
+  AGENT_DEFAULT_MODE,
+  AGENT_DURATION_UPDATE_INTERVAL_MS,
+  AGENT_MAX_ITERATIONS,
+  AGENT_STATUS_TEXT,
+  AGENT_WELCOME_MESSAGE,
+} from "./config/agent-config.ts";
 import { SessionManager } from "./session/session-manager.ts";
 import { McpConfigManager, McpManager } from "./mcp/index.ts";
-import { loadSystemTemplate, buildSystemPrompt, formatDuration } from "./agent-helpers.ts";
+import { loadSystemTemplate, buildSystemPrompt } from "./agent-helpers.ts";
 import { createBoundModel, checkAndSummarize } from "./agent-model.ts";
 import { streamModelResponse } from "./agent-stream.ts";
 import { executeToolCalls, normalizeResponse, handleApiError } from "./agent-tools.ts";
@@ -31,9 +38,6 @@ import {
   restoreSession as restoreSessionFn,
   newSession as newSessionFn,
 } from "./agent-session.ts";
-
-/** 欢迎消息文本 */
-const WELCOME_MESSAGE = `您好老板！\n\n我是一个会写代码的《牛码》；\n\n有什么可以为您效劳的？😊`;
 
 /**
  * Agent 核心类 - 管理对话、工具调用和子系统
@@ -69,13 +73,13 @@ export class Agent {
   /** 合并后的工具列表（内置 + MCP） */
   tools: ModeTool[];
   /** 当前工作模式 */
-  mode: AgentModeValue = AgentMode.BUILD;
+  mode: AgentModeValue = AGENT_DEFAULT_MODE;
   /** 模型变更事件的取消订阅函数 */
   private unsubModelChange: () => void;
   /** 中断控制器 */
   private abortController: AbortController | null = null;
   /** 调试模式开关 */
-  debugMode = false;
+  debugMode = AGENT_DEFAULT_DEBUG_MODE;
 
   constructor() {
     this.systemTemplate = loadSystemTemplate();
@@ -83,7 +87,7 @@ export class Agent {
     this.builtinTools = createTools(this.confirmBus, this.processManager, this.todoBus);
     this.tools = [...this.builtinTools];
     this.unsubModelChange = this.config.onModelChange(() => { this.currentModel = null; });
-    this.messageBus.ai(WELCOME_MESSAGE);
+    this.messageBus.ai(AGENT_WELCOME_MESSAGE);
   }
 
   /** 获取或创建绑定工具的模型实例 */
@@ -128,7 +132,7 @@ export class Agent {
 
   /** 重新连接 MCP 服务器并刷新工具（供 UI 调用） */
   async reconnectMcp(): Promise<void> {
-    this.messageBus.setThinkingStatus(ThinkingStatus.THINKING, "正在重连 MCP 服务器...");
+    this.messageBus.setThinkingStatus(ThinkingStatus.THINKING, AGENT_STATUS_TEXT.RECONNECTING_MCP);
     await this.mcpManager.reconnect();
     this.refreshTools();
     this.messageBus.setThinkingStatus(ThinkingStatus.IDLE);
@@ -143,7 +147,7 @@ export class Agent {
   }
 
   /** 执行一次对话，支持多轮工具调用 */
-  async run(query: string, fileContext = "", maxIterations = 30): Promise<string> {
+  async run(query: string, fileContext = "", maxIterations = AGENT_MAX_ITERATIONS): Promise<string> {
     const startTime = Date.now();
     const startTokens = estimateTotalTokens(this.chatMessages);
     this.abortController = new AbortController();
@@ -155,7 +159,7 @@ export class Agent {
       if (elapsed >= 0) {
         this.messageBus.setLastAITotalDuration(elapsed);
       }
-    }, 100);
+    }, AGENT_DURATION_UPDATE_INTERVAL_MS);
 
     let messageContent = query;
     if (fileContext) {
@@ -169,10 +173,10 @@ export class Agent {
       this.todoBus.setCurrentMessageId(aiMessage.id);
 
       for (let i = 0; i < maxIterations; i++) {
-        if (this.abortController.signal.aborted) { this.messageBus.ai("\n⚠️ 已中断"); break; }
+        if (this.abortController.signal.aborted) { this.messageBus.ai(AGENT_STATUS_TEXT.ABORTED); break; }
 
         const iterationStartTime = Date.now();
-        this.messageBus.setThinkingStatus(ThinkingStatus.THINKING, "玩命思考中...🐂🐎");
+        this.messageBus.setThinkingStatus(ThinkingStatus.THINKING, AGENT_STATUS_TEXT.THINKING);
 
         let response: any;
         try {
@@ -180,7 +184,7 @@ export class Agent {
             this.messageBus, this.debugMode, this.getModel(), this.chatMessages, this.abortController.signal
           );
         } catch (error) {
-          if (this.abortController.signal.aborted) { this.messageBus.ai("\n⚠️ 已中断"); break; }
+          if (this.abortController.signal.aborted) { this.messageBus.ai(AGENT_STATUS_TEXT.ABORTED); break; }
           this.messageBus.setThinkingStatus(ThinkingStatus.IDLE);
           handleApiError(this.config, error);
         }
@@ -191,8 +195,8 @@ export class Agent {
 
         await executeToolCalls(this, response, iterationStartTime);
         if (i > 0) await checkAndSummarize(this);
-        if (this.abortController.signal.aborted) { this.messageBus.ai("\n⚠️ 已中断"); break; }
-        this.messageBus.setThinkingStatus(ThinkingStatus.WAITING, "等待 AI 响应...");
+        if (this.abortController.signal.aborted) { this.messageBus.ai(AGENT_STATUS_TEXT.ABORTED); break; }
+        this.messageBus.setThinkingStatus(ThinkingStatus.WAITING, AGENT_STATUS_TEXT.WAITING_AI);
       }
 
       this.messageBus.setThinkingStatus(ThinkingStatus.IDLE);

@@ -1,9 +1,8 @@
 import { EventEmitter } from "events";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import { homedir } from "os";
-import { join } from "path";
 import type { ConfigPort, ModelConfig } from "./types.ts";
-import { BUILTIN_MODELS } from "./builtin-models.ts";
+import { BUILTIN_MODELS } from "./config/model-config.ts";
+import { APP_CONFIG_FILE, NIUMA_CONFIG_DIR } from "./config/storage-config.ts";
 
 export type { ModelConfig } from "./types.ts";
 
@@ -34,8 +33,8 @@ export class ConfigManager extends EventEmitter implements ConfigPort {
 
   constructor() {
     super();
-    this.configDir = join(homedir(), ".niuma");
-    this.configPath = join(this.configDir, "config.json");
+    this.configDir = NIUMA_CONFIG_DIR;
+    this.configPath = APP_CONFIG_FILE;
 
     if (!existsSync(this.configDir)) {
       mkdirSync(this.configDir, { recursive: true });

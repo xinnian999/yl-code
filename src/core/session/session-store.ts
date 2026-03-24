@@ -1,20 +1,14 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync } from "fs";
-import { homedir } from "os";
 import { join } from "path";
 import type { StoredMessage } from "@langchain/core/messages";
 import type { Message, UserMessage, AIMessage } from "../message-bus.ts";
 import type { MessageBlock } from "../types.ts";
-
-// ============ 常量 ============
-
-/** 会话存储目录 */
-const SESSIONS_DIR = join(homedir(), ".niuma", "sessions");
-/** 索引文件路径 */
-const INDEX_FILE = join(SESSIONS_DIR, "index.json");
-/** 最大会话数量 */
-const MAX_SESSIONS = 50;
-/** 标题最大长度 */
-const MAX_TITLE_LENGTH = 30;
+import {
+  MAX_SESSIONS,
+  MAX_SESSION_TITLE_LENGTH,
+  SESSION_INDEX_FILE,
+  SESSIONS_DIR,
+} from "../config/storage-config.ts";
 
 // ============ 类型定义 ============
 
@@ -59,8 +53,8 @@ export function ensureSessionsDir(): void {
 export function loadSessionIndex(): SessionIndex {
   try {
     ensureSessionsDir();
-    if (existsSync(INDEX_FILE)) {
-      const data = readFileSync(INDEX_FILE, "utf-8");
+    if (existsSync(SESSION_INDEX_FILE)) {
+      const data = readFileSync(SESSION_INDEX_FILE, "utf-8");
       const parsed = JSON.parse(data);
       if (parsed && Array.isArray(parsed.sessions)) {
         return parsed as SessionIndex;
@@ -84,7 +78,7 @@ export function saveSessionIndex(index: SessionIndex): void {
       deleteSessionFile(removed.id);
     }
   }
-  writeFileSync(INDEX_FILE, JSON.stringify(index, null, 2), "utf-8");
+  writeFileSync(SESSION_INDEX_FILE, JSON.stringify(index, null, 2), "utf-8");
 }
 
 // ============ 会话数据操作 ============
@@ -138,8 +132,8 @@ export function generateSessionId(): string {
 export function generateTitle(firstUserMessage: string): string {
   if (!firstUserMessage) return "新对话";
   const cleaned = firstUserMessage.replace(/\n/g, " ").trim();
-  if (cleaned.length <= MAX_TITLE_LENGTH) return cleaned;
-  return cleaned.slice(0, MAX_TITLE_LENGTH) + "...";
+  if (cleaned.length <= MAX_SESSION_TITLE_LENGTH) return cleaned;
+  return cleaned.slice(0, MAX_SESSION_TITLE_LENGTH) + "...";
 }
 
 /** 将 UI 消息列表序列化为可持久化格式 */

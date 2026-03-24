@@ -4,8 +4,7 @@
  */
 import { EventEmitter } from "events";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import { homedir } from "os";
-import { join } from "path";
+import { MCP_CONFIG_FILE, NIUMA_CONFIG_DIR } from "../config/storage-config.ts";
 
 // ============ 类型定义 ============
 
@@ -77,11 +76,10 @@ export class McpConfigManager extends EventEmitter {
 
   constructor() {
     super();
-    const configDir = join(homedir(), ".niuma");
-    this.configPath = join(configDir, "mcp.json");
+    this.configPath = MCP_CONFIG_FILE;
 
-    if (!existsSync(configDir)) {
-      mkdirSync(configDir, { recursive: true });
+    if (!existsSync(NIUMA_CONFIG_DIR)) {
+      mkdirSync(NIUMA_CONFIG_DIR, { recursive: true });
     }
 
     this.config = this.loadConfig();
