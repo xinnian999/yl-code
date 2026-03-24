@@ -97,6 +97,10 @@ export interface CommandContext {
   debugMode: boolean;
   /** 设置调试模式 */
   setDebugMode: (value: boolean) => void;
+  /** 流式输出开关 */
+  streamEnabled: boolean;
+  /** 设置流式输出开关 */
+  setStreamEnabled: (value: boolean) => void;
   /** 消息总线 */
   messageBus: MessageBus;
 }
@@ -118,6 +122,13 @@ export function executeCommand(command: string, ctx: CommandContext): CommandAct
       ctx.setDebugMode(!ctx.debugMode);
       ctx.messageBus.createAIMessage();
       ctx.messageBus.ai(!ctx.debugMode ? "🐛 调试模式已开启" : "🐛 调试模式已关闭");
+      return { action: "none" };
+    case "stream":
+      ctx.setStreamEnabled(!ctx.streamEnabled);
+      ctx.messageBus.createAIMessage();
+      ctx.messageBus.ai(
+        !ctx.streamEnabled ? "🌊 流式输出已开启" : "🌊 流式输出已关闭"
+      );
       return { action: "none" };
     case "help":
       ctx.messageBus.createAIMessage();

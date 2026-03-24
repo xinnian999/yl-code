@@ -5,6 +5,7 @@ export const COMMANDS: Array<{ value: string; description: string }> = [
   { value: "model", description: "切换 AI 模型" },
   { value: "mcp", description: "管理 MCP 服务器" },
   { value: "debug", description: "开关调试模式" },
+  { value: "stream", description: "开关流式输出" },
   { value: "clear", description: "清空对话历史" },
   { value: "help", description: "显示帮助信息" },
   { value: "exit", description: "退出程序" },
@@ -18,6 +19,7 @@ export const COMMAND_HELP_TEXT = `📖 可用命令：
 /model   - 切换 AI 模型
 /mcp     - 管理 MCP 服务器
 /debug   - 开关调试模式（实时查看流式 chunk）
+/stream  - 开关流式输出
 /clear   - 清空对话历史
 /help    - 显示帮助信息
 /exit    - 退出程序

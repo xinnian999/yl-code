@@ -139,3 +139,54 @@ export async function streamModelResponse(
 
   return response;
 }
+
+/** 非流式调用模型，并在结束后一次性写入 UI */
+export async function invokeModelResponse(
+  messageBus: MessageBus,
+  debugMode: boolean,
+  model: ReturnType<ChatOpenAI["bindTools"]>,
+  chatMessages: BaseMessage[],
+  signal: AbortSignal
+): Promise<any> {
+  const response = await model.invoke(chatMessages, { signal });
+  const content =
+    typeof response.content === "string"
+      ? response.content
+      : JSON.stringify(response.content);
+
+  if (content.trim()) {
+    // 非流式模式下，拿到完整文本就应立即结束“思考中”状态，
+    // 否则 UI 会在内容已展示时仍然显示 spinner。
+    messageBus.setThinkingStatus(ThinkingStatus.IDLE);
+    const blockIndex = messageBus.createTextBlock(content);
+    if (debugMode) {
+      const debugObj = {
+        chunks: 1,
+        status: "done",
+        mode: "non_stream",
+        ...extractResponseMeta(response),
+      };
+      messageBus.setDebugOnBlock(blockIndex, JSON.stringify(debugObj, null, 2));
+    }
+    messageBus.clearStreamingBlock();
+    return response;
+  }
+
+  if (debugMode) {
+    messageBus.ai("");
+    messageBus.appendDebugToLastBlock(
+      JSON.stringify(
+        {
+          chunks: 1,
+          status: "done",
+          mode: "non_stream",
+          ...extractResponseMeta(response),
+        },
+        null,
+        2
+      )
+    );
+  }
+
+  return response;
+}

@@ -17,6 +17,7 @@ import type { CommandAction } from "./commands.ts";
 import {
   AGENT_DEFAULT_DEBUG_MODE,
   AGENT_DEFAULT_MODE,
+  AGENT_DEFAULT_STREAM_ENABLED,
   AGENT_DURATION_UPDATE_INTERVAL_MS,
   AGENT_MAX_ITERATIONS,
   AGENT_STATUS_TEXT,
@@ -26,7 +27,7 @@ import { SessionManager } from "./session/session-manager.ts";
 import { McpConfigManager, McpManager } from "./mcp/index.ts";
 import { loadSystemTemplate, buildSystemPrompt } from "./agent-helpers.ts";
 import { createBoundModel, checkAndSummarize } from "./agent-model.ts";
-import { streamModelResponse } from "./agent-stream.ts";
+import { invokeModelResponse, streamModelResponse } from "./agent-stream.ts";
 import { executeToolCalls, normalizeResponse, handleApiError } from "./agent-tools.ts";
 import {
   buildFileContext,
@@ -80,6 +81,8 @@ export class Agent {
   private abortController: AbortController | null = null;
   /** 调试模式开关 */
   debugMode = AGENT_DEFAULT_DEBUG_MODE;
+  /** 流式输出开关 */
+  streamEnabled = AGENT_DEFAULT_STREAM_ENABLED;
 
   constructor() {
     this.systemTemplate = loadSystemTemplate();
@@ -100,6 +103,9 @@ export class Agent {
 
   /** 获取调试模式状态 */
   isDebugMode(): boolean { return this.debugMode; }
+
+  /** 获取流式输出状态 */
+  isStreamEnabled(): boolean { return this.streamEnabled; }
 
   /** 中断当前正在进行的 AI 请求 */
   abort(): void { this.abortController?.abort(); }
@@ -180,9 +186,21 @@ export class Agent {
 
         let response: any;
         try {
-          response = await streamModelResponse(
-            this.messageBus, this.debugMode, this.getModel(), this.chatMessages, this.abortController.signal
-          );
+          response = this.streamEnabled
+            ? await streamModelResponse(
+                this.messageBus,
+                this.debugMode,
+                this.getModel(),
+                this.chatMessages,
+                this.abortController.signal
+              )
+            : await invokeModelResponse(
+                this.messageBus,
+                this.debugMode,
+                this.getModel(),
+                this.chatMessages,
+                this.abortController.signal
+              );
         } catch (error) {
           if (this.abortController.signal.aborted) { this.messageBus.ai(AGENT_STATUS_TEXT.ABORTED); break; }
           this.messageBus.setThinkingStatus(ThinkingStatus.IDLE);
@@ -231,6 +249,8 @@ export class Agent {
       newSession: () => this.newSession(),
       debugMode: this.debugMode,
       setDebugMode: (v) => { this.debugMode = v; },
+      streamEnabled: this.streamEnabled,
+      setStreamEnabled: (v) => { this.streamEnabled = v; },
       messageBus: this.messageBus,
     });
   }

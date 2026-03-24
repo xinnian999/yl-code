@@ -10,6 +10,9 @@ export const AGENT_DEFAULT_MODE: AgentModeValue = AgentMode.BUILD;
 /** Agent 默认调试开关 */
 export const AGENT_DEFAULT_DEBUG_MODE = false;
 
+/** Agent 默认是否开启流式输出 */
+export const AGENT_DEFAULT_STREAM_ENABLED = false;
+
 /** 单轮对话最大工具循环次数 */
 export const AGENT_MAX_ITERATIONS = 30;
 
