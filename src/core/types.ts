@@ -78,6 +78,7 @@ export type MessageBlock =
 export const AgentMode = {
   ASK: "ask",
   BUILD: "build",
+  PLAN: "plan",
 } as const;
 
 /** Agent 模式值类型 */
@@ -94,6 +95,7 @@ export interface AgentModeConfig {
 export const AGENT_MODES: AgentModeConfig[] = [
   { value: "ask",   label: "Ask",   description: "问答模式" },
   { value: "build", label: "Build", description: "构建模式" },
+  { value: "plan",  label: "Plan",  description: "计划模式" },
 ];
 
 // ============ 模型配置 ============
@@ -110,11 +112,45 @@ export interface ModelConfig {
 
 // ============ 进程信息 ============
 
-export interface ProcessInfo {
+/** 后台进程状态 */
+export type BackgroundProcessStatus = "running" | "exited";
+
+/** 后台进程快照 */
+export interface BackgroundProcessSnapshot {
+  /** 进程 ID */
   pid: number;
+  /** 原始命令 */
   command: string;
+  /** 工作目录 */
   workingDirectory: string;
+  /** 运行状态 */
+  status: BackgroundProcessStatus;
+  /** 退出码 */
+  exitCode: number | null;
+  /** 最近日志输出 */
+  output: string;
+  /** 启动时间戳 */
+  startedAt: number;
+}
+
+/** 后台进程信息 */
+export interface ProcessInfo {
+  /** 进程 ID */
+  pid: number;
+  /** 原始命令 */
+  command: string;
+  /** 工作目录 */
+  workingDirectory: string;
+  /** 子进程实例 */
   process: ChildProcess;
+  /** 运行状态 */
+  status: BackgroundProcessStatus;
+  /** 退出码 */
+  exitCode: number | null;
+  /** 最近日志输出 */
+  output: string;
+  /** 启动时间戳 */
+  startedAt: number;
 }
 
 // ============ 端口接口 ============
@@ -163,7 +199,10 @@ export interface ConfigPort {
  * 进程端口 - core 通过此接口注册后台进程
  */
 export interface ProcessPort {
+  /** 注册后台进程 */
   registerBackgroundProcess(info: ProcessInfo): void;
+  /** 获取后台进程快照列表 */
+  getBackgroundProcesses(): BackgroundProcessSnapshot[];
 }
 
 // ============ 上下文管理 ============

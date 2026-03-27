@@ -127,6 +127,8 @@ export function getToolDescription(toolName: string, args: ToolArgs): string {
       return `修改代码: ${fileTarget}`;
     case "execute_command":
       return `执行命令: ${commandTarget}`;
+    case "read_background_logs":
+      return "查看后台日志";
     case "list_directory":
       return `查看目录: ${dirTarget}`;
     case "todo_write":
@@ -149,11 +151,26 @@ export function getModeInstructions(mode: AgentModeValue): string {
     case AgentMode.ASK:
       return [
         "当前是 **问答模式（Ask）**。",
-        "你只能使用 `read_file`、`list_directory` 和 `todo_write` 工具来阅读代码、回答问题、跟踪任务。",
-        "**严禁调用 `write_file` 或 `execute_command`**，即使用户要求也不行，请告知用户切换到 Build 模式。",
+        "你只能使用 `read_file` 和 `list_directory` 工具来阅读代码、回答问题。",
+        "禁止调用 `write_file`、`write_file_patch`、`execute_command`、`todo_write` 和所有 MCP 工具。",
+        "如果用户要求修改代码、执行命令或落地实现，请明确告知用户切换到 Build 模式。",
       ].join("\n");
     case AgentMode.BUILD:
       return "当前是 **构建模式（Build）**，你可以使用所有工具来完成编码任务。";
+    case AgentMode.PLAN:
+      return [
+        "当前是 **计划模式（Plan）**。",
+        "你只能使用 `read_file` 和 `list_directory` 工具进行只读探索，禁止调用 `write_file`、`write_file_patch`、`execute_command`、`todo_write` 和所有 MCP 工具。",
+        "你的目标是先通过阅读代码消除可发现的不确定性，再判断是否还需要向用户提问。",
+        "如果信息不足，请继续读代码；只有在无法通过代码确定、且会影响方案的关键问题上，才向用户提问。",
+        "当你需要向用户提问时，不要输出普通问题文本，必须只输出一个 `<plan_question>` 块，块内是 JSON 对象，格式为 {\"title\":\"...\",\"question\":\"...\",\"options\":[{\"label\":\"...\",\"description\":\"...\"}]}。",
+        "`plan_question` 和 `<proposed_plan>` 都是输出标签，不是工具名，绝对不要把它们作为工具调用。",
+        "问题选项只需要提供固定候选项，系统会自动追加最后一个“自定义输入”选项，因此不要自己重复输出自定义选项。",
+        "禁止直接落地执行、修改文件、运行命令或给出已经开始实现的结果。",
+        "只有当信息齐备时，最终回复必须只输出一个 `<proposed_plan>` Markdown 块，不要在块前后添加额外说明。",
+        "该块内必须包含：标题、概要、关键改动或实现改动、测试计划、前提假设。",
+        "计划里的章节标题必须使用中文，不要出现 Summary、Key Changes、Implementation Changes、Test Plan、Assumptions 等英文标题。",
+      ].join("\n");
     default:
       return "";
   }
@@ -164,6 +181,7 @@ export function buildSystemPrompt(template: string, mode: AgentModeValue): strin
   return template
     .replace("{workingDirectory}", process.cwd())
     .replace("{workingMode}", mode)
+    .replace("{modeInstructions}", getModeInstructions(mode))
     .replace("{os}", platform())
     .replace("{currentTime}", new Date().toLocaleString());
 }

@@ -13,11 +13,20 @@ export const AGENT_DEFAULT_DEBUG_MODE = false;
 /** Agent 默认是否开启流式输出 */
 export const AGENT_DEFAULT_STREAM_ENABLED = false;
 
-/** 单轮对话最大工具循环次数 */
-export const AGENT_MAX_ITERATIONS = 30;
+/** 单轮对话最大工具循环次数，null 表示默认不限制 */
+export const AGENT_MAX_ITERATIONS: number | null = null;
 
 /** 任务耗时刷新间隔（毫秒） */
 export const AGENT_DURATION_UPDATE_INTERVAL_MS = 100;
+
+/** 模型请求最大尝试次数（包含首次请求） */
+export const AGENT_API_MAX_ATTEMPTS = 3;
+
+/** 模型请求初始重试等待时间（毫秒） */
+export const AGENT_API_RETRY_BASE_DELAY_MS = 1200;
+
+/** 模型请求最大重试等待时间（毫秒） */
+export const AGENT_API_RETRY_MAX_DELAY_MS = 5000;
 
 /** Agent 运行时状态文案 */
 export const AGENT_STATUS_TEXT = {

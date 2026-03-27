@@ -6,10 +6,12 @@ import ModelSelector from "./components/ModelSelector.tsx";
 import HistorySelector, { NEW_SESSION_ID } from "./components/HistorySelector.tsx";
 import McpManagerView from "./components/McpManager.tsx";
 import FooterBar from "./components/FooterBar.tsx";
+import PlanInteraction from "./components/PlanInteraction.tsx";
 import { useMessages } from "./hooks/useMessages.ts";
 import { useDiffConfirm } from "./hooks/useDiffConfirm.ts";
+import { usePlanInteraction } from "./hooks/usePlanInteraction.ts";
 import { useContextUsage } from "./hooks/useContextUsage.ts";
-import { AgentMode, AGENT_MODES } from "@/core/types.ts";
+import { AGENT_MODES } from "@/core/types.ts";
 import type { ModelConfig, AgentModeValue } from "@/core/types.ts";
 import type { Agent } from "@/core/agent.ts";
 
@@ -24,16 +26,29 @@ const App: React.FC<AppProps> = ({ agent }) => {
   const { messages, thinkingStatus, streamingBlockIndex } = useMessages(agent);
   const { usage: contextUsage, isSummarizing } = useContextUsage(agent);
   const { showDiffConfirm, pendingChange, diffEditorOpened, handleDiffConfirm } = useDiffConfirm(agent);
+  const {
+    showPlanInteraction,
+    pendingPlanInteraction,
+    handlePlanQuestionResolve,
+    handlePlanPreviewResolve,
+  } = usePlanInteraction(agent);
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSelectingModel, setIsSelectingModel] = useState(false);
   const [isSelectingHistory, setIsSelectingHistory] = useState(false);
   const [isManagingMcp, setIsManagingMcp] = useState(false);
-  const [currentMode, setCurrentMode] = useState<AgentModeValue>(AgentMode.BUILD);
+  const [currentMode, setCurrentMode] = useState<AgentModeValue>(() => agent.getMode());
   const [debugMode, setDebugMode] = useState(false);
 
   // 启动时自动连接 MCP 服务器
   useEffect(() => { agent.init(); }, [agent]);
+
+  // 同步 core 内部触发的模式变更（例如计划确认后自动进入 Build）
+  useEffect(() => {
+    return agent.onModeChange((mode) => {
+      setCurrentMode(mode);
+    });
+  }, [agent]);
 
   /** 退出应用 */
   const handleExit = useCallback(() => {
@@ -100,7 +115,11 @@ const App: React.FC<AppProps> = ({ agent }) => {
     setIsSelectingHistory(false);
   }, [agent]);
 
-  const hasOverlay = showDiffConfirm || isSelectingModel || isSelectingHistory || isManagingMcp;
+  const hasOverlay = showDiffConfirm
+    || showPlanInteraction
+    || isSelectingModel
+    || isSelectingHistory
+    || isManagingMcp;
 
   return (
     <Box flexDirection="column" height="100%" paddingY={1}>
@@ -122,8 +141,17 @@ const App: React.FC<AppProps> = ({ agent }) => {
             diffEditorOpened={diffEditorOpened}
             onDiffConfirm={handleDiffConfirm}
           />
+          {showPlanInteraction && pendingPlanInteraction && (
+            <Box paddingX={1} marginBottom={1}>
+              <PlanInteraction
+                interaction={pendingPlanInteraction}
+                onResolveQuestion={handlePlanQuestionResolve}
+                onResolvePreview={handlePlanPreviewResolve}
+              />
+            </Box>
+          )}
           <InputArea
-            isProcessing={isProcessing || showDiffConfirm}
+            isProcessing={isProcessing || showDiffConfirm || showPlanInteraction}
             onSubmit={handleSubmit}
             onAbort={handleAbort}
             onModeSwitch={handleModeSwitch}

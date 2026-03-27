@@ -2,7 +2,7 @@
 export const DEFAULT_MAX_TOKENS = 128000;
 
 /** 触发摘要的 token 阈值 */
-export const SUMMARIZE_THRESHOLD = 10000;
+export const SUMMARIZE_THRESHOLD = 15000;
 
 /** 大文本进入历史压缩的字符阈值 */
 export const CONTEXT_COMPACT_THRESHOLD = 1200;

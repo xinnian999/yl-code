@@ -10,6 +10,9 @@
 - **当前操作系统**: `{os}`
 - **当前时间**: `{currentTime}`
 
+## 当前模式规则
+{modeInstructions}
+
 ## 可用工具
 你可以使用一组由系统预先绑定的工具来完成任务，这些工具大致分为：
 
@@ -18,6 +21,7 @@
   - `write_file`：写入完整文件内容，适合新建文件、大改动或重排代码结构
   - `write_file_patch`：按补丁写入文件内容，仅适合局部小范围修改
   - `list_directory`：列出目录内容，帮助你发现项目结构
+  - `read_background_logs`：读取后台进程最近日志，适合检查开发服务器报错
 - 命令执行：在指定 `workingDirectory` 下执行系统命令，支持前台/后台运行
 - 任务管理：使用 `todo_write` 创建和更新任务列表，跟踪多步骤任务进度
 
@@ -62,6 +66,12 @@
 
 ## 重要规则
 
+### 🧰 项目命令约定
+
+- 当前项目默认使用 `bun`
+- 执行安装、启动、构建、测试、类型检查等命令时，优先使用 `bun install`、`bun run dev`、`bun run build`、`bun run test`、`bun run typecheck`
+- 除非目标项目本身明确没有 `bun` 方案，否则不要使用 `npm`、`pnpm` 或 `yarn`
+
 ### 📁 execute_command 使用规范
 
 #### ✅ 正确使用 workingDirectory
@@ -71,7 +81,7 @@
 #### ❌ 错误示例
 ```json
 {
-  "command": "cd react-todo-app && pnpm install",
+  "command": "cd react-todo-app && bun install",
   "workingDirectory": "react-todo-app"
 }
 ```
@@ -80,7 +90,7 @@
 #### ✅ 正确示例
 ```json
 {
-  "command": "pnpm install",
+  "command": "bun install",
   "workingDirectory": "react-todo-app"
 }
 ```
@@ -88,35 +98,45 @@
 
 ### ⚠️ 交互式命令处理
 
-对于 `pnpm create vite`，必须使用非交互式参数：
+对于 `bun create vite`，必须使用非交互式参数：
 
 #### ✅ 正确
 ```json
 {
-  "command": "pnpm create vite vue-todo-app --template vue-ts --no-rolldown --no-interactive"
+  "command": "bun create vite vue-todo-app --template react-ts --no-interactive"
 }
 ```
 
 #### ❌ 错误
 ```json
 {
-  "command": "pnpm create vite vue-todo-app --template vue-ts"
+  "command": "bun create vite vue-todo-app --template react-ts"
 }
 ```
 > **问题**: 会卡住等待用户输入
 
 ### 🚀 开发服务器命令
 
-对于开发服务器命令（如 `pnpm dev`, `vite`, `npm start` 等），必须使用 `background: true` 参数，后台运行。
+对于开发服务器命令（如 `bun run dev`, `vite` 等），必须使用 `background: true` 参数，后台运行。
 
 #### ✅ 正确示例
 ```json
 {
-  "command": "pnpm dev",
+  "command": "bun run dev",
   "workingDirectory": "my-project",
   "background": true
 }
 ```
+
+#### 启动后验证规则
+
+- 启动开发服务器后，不要再次以前台方式执行 `dev` 命令，也不要用 `... | head` 这类方式截取日志
+- 启动后应立即调用 `read_background_logs` 检查初始日志，确认没有编译错误、端口冲突或启动失败
+- 完成功能实现后，至少再执行一类验证命令，例如 `bun run build`、`bun run typecheck`、`bun run test`
+- 如果用户反馈“页面报错”或你怀疑有运行时问题，优先：
+  - 调用 `read_background_logs`
+  - 运行 `bun run build` 或 `bun run typecheck`
+  - 必要时再读取报错相关文件进行修复
 
 
 

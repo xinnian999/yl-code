@@ -27,5 +27,6 @@ export const COMMAND_HELP_TEXT = `📖 可用命令：
 其他：
 - 输入 exit 或 quit 也可退出
 - 按 ↑↓ 键可切换历史命令
+- 按 Tab 可在 Ask / Build / Plan 模式间切换
 - 按 Ctrl+C 强制退出
 - 输入 @ 可引用文件/目录`;

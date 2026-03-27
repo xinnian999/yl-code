@@ -9,18 +9,22 @@ export class ProcessManager implements ProcessPort {
   /** 是否正在执行清理 */
   private isCleaning = false;
 
-  /** 注册后台进程，并监听退出事件自动移除 */
+  /** 注册后台进程，保留其状态和日志供后续排查 */
   registerBackgroundProcess(processInfo: ProcessInfo): void {
     this.backgroundProcesses.push(processInfo);
+  }
 
-    processInfo.process.on("exit", () => {
-      const index = this.backgroundProcesses.findIndex(
-        (p) => p.pid === processInfo.pid
-      );
-      if (index !== -1) {
-        this.backgroundProcesses.splice(index, 1);
-      }
-    });
+  /** 获取后台进程快照列表 */
+  getBackgroundProcesses() {
+    return this.backgroundProcesses.map((processInfo) => ({
+      pid: processInfo.pid,
+      command: processInfo.command,
+      workingDirectory: processInfo.workingDirectory,
+      status: processInfo.status,
+      exitCode: processInfo.exitCode,
+      output: processInfo.output,
+      startedAt: processInfo.startedAt,
+    }));
   }
 
   /** 终止单个进程（先 SIGTERM，超时后 SIGKILL） */
@@ -60,18 +64,20 @@ export class ProcessManager implements ProcessPort {
 
   /** 清理所有后台进程（先 SIGTERM，超时后 SIGKILL） */
   async cleanupAll(): Promise<void> {
-    if (this.backgroundProcesses.length === 0) return;
+    const runningProcesses = this.backgroundProcesses.filter(
+      (processInfo) => processInfo.status === "running"
+    );
+    if (runningProcesses.length === 0) return;
 
     console.log(
-      `\n🧹 正在清理 ${this.backgroundProcesses.length} 个后台进程...`
+      `\n🧹 正在清理 ${runningProcesses.length} 个后台进程...`
     );
 
-    const cleanupPromises = this.backgroundProcesses.map(
+    const cleanupPromises = runningProcesses.map(
       ({ pid, command, process: child }) => this.terminateProcess(pid, command, child)
     );
 
     await Promise.all(cleanupPromises);
-    this.backgroundProcesses.length = 0;
   }
 
   /** 执行清理并退出进程 */

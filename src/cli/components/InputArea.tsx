@@ -105,6 +105,8 @@ const InputArea: React.FC<InputAreaProps> = ({
     if (key.tab && !showCommandSuggestions && !showFileSuggestions && !hasOverlay) {
       onModeSwitch();
     }
+  }, {
+    isActive: !hasOverlay,
   });
 
   /** 处理输入内容变化 */

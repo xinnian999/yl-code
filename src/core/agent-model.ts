@@ -31,7 +31,7 @@ export function createBoundModel(
     apiKey: modelConfig.apiKey,
     temperature: 0,
     timeout: 300000,
-    maxRetries: 2,
+    maxRetries: 0,
     configuration: { baseURL: modelConfig.baseUrl },
   });
   const filteredTools = getToolsForMode(tools, mode);

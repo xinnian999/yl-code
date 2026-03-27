@@ -12,6 +12,7 @@ import type { SessionManager } from "./session/session-manager.ts";
 import type { ConfirmBus } from "./confirm-bus.ts";
 import type { TodoBus } from "./todo-bus.ts";
 import type { ContextBus } from "./context/context-bus.ts";
+import type { PlanBus } from "./plan/plan-bus.ts";
 import { HELP_TEXT, type CommandAction } from "./commands.ts";
 import { buildSystemPrompt } from "./agent-helpers.ts";
 import { estimateTotalTokens } from "./context/context-manager.ts";
@@ -149,6 +150,7 @@ export interface SessionContext {
   chatMessages: BaseMessage[];
   readonly messageBus: MessageBus;
   readonly confirmBus: ConfirmBus;
+  readonly planBus: PlanBus;
   readonly todoBus: TodoBus;
   readonly contextBus: ContextBus;
   readonly sessionManager: SessionManager;
@@ -177,6 +179,7 @@ export function restoreSession(ctx: SessionContext, sessionId: string): boolean 
   ctx.contextBus.updateUsage(estimateTotalTokens(ctx.chatMessages));
   ctx.messageBus.restoreMessages(data.uiMessages);
   ctx.confirmBus.resetSession();
+  ctx.planBus.resetSession();
   return true;
 }
 
@@ -187,6 +190,7 @@ export function newSession(ctx: SessionContext): void {
   ctx.clearMemory();
   ctx.messageBus.clearMessages();
   ctx.confirmBus.resetSession();
+  ctx.planBus.resetSession();
   ctx.todoBus.clearTodos();
   ctx.contextBus.reset();
   ctx.messageBus.createAIMessage();

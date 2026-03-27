@@ -2,11 +2,14 @@ import { tool } from "@langchain/core/tools";
 import type { StructuredToolInterface } from "@langchain/core/tools";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { spawn } from "node:child_process";
 import { applyPatch, type StructuredPatch } from "diff";
 import { z } from "zod";
 import { AgentMode } from "./types.ts";
 import type { ConfirmPort, ProcessPort, TodoPort, TodoItem, AgentModeValue } from "./types.ts";
+import {
+  executeShellCommand,
+  formatBackgroundProcessLogs,
+} from "./command-executor.ts";
 import {
   sanitizeDisplayText,
   toDisplayCommand,
@@ -113,6 +116,30 @@ function applyPatchWithFallback(originalContent: string, patchText: string): str
   } catch {
     return false;
   }
+}
+
+/** 选择需要查看的后台进程 */
+function pickBackgroundProcess(
+  processes: ReturnType<ProcessPort["getBackgroundProcesses"]>,
+  pid?: number,
+  command?: string
+) {
+  if (typeof pid === "number") {
+    return processes.find((processInfo) => processInfo.pid === pid) || null;
+  }
+
+  if (command && command.trim()) {
+    const normalized = command.trim().toLowerCase();
+    const matched = processes.filter((processInfo) =>
+      processInfo.command.toLowerCase().includes(normalized)
+    );
+    return matched.at(-1) || null;
+  }
+
+  const runningProcess = [...processes]
+    .reverse()
+    .find((processInfo) => processInfo.status === "running");
+  return runningProcess || processes.at(-1) || null;
 }
 
 /**
@@ -241,75 +268,27 @@ export function createTools(confirm: ConfirmPort, processPort: ProcessPort, todo
       command,
       workingDirectory,
       background = false,
+      timeoutMs,
     }: {
       command: string;
       workingDirectory?: string;
       background?: boolean;
+      timeoutMs?: number;
     }): Promise<string> => {
       const cwd = workingDirectory || process.cwd();
-      const displayCommand = toDisplayCommand(command);
-      const displayWorkingDirectory = workingDirectory
-        ? toDisplayPath(workingDirectory)
-        : undefined;
 
       const result = await confirm.requestCommandConfirm(command, workingDirectory, background);
 
       if (result === "reject") {
-        return `用户拒绝执行命令: ${displayCommand}，请根据情况调整方案或询问用户意见`;
+        return `用户拒绝执行命令: ${toDisplayCommand(command)}，请根据情况调整方案或询问用户意见`;
       }
 
-      return new Promise((resolve) => {
-        const [cmd, ...args] = command.split(" ");
-
-        if (background) {
-          const child = spawn(cmd, args, {
-            cwd,
-            stdio: "ignore",
-            shell: true,
-          });
-
-          processPort.registerBackgroundProcess({
-            pid: child.pid!,
-            command,
-            workingDirectory: cwd,
-            process: child,
-          });
-
-          const cwdInfo = workingDirectory
-            ? `\n\n重要提示：命令在目录 "${displayWorkingDirectory}" 中后台运行。`
-            : "";
-          resolve(
-            `命令已在后台启动: ${displayCommand}${cwdInfo}\n提示：开发服务器正在运行，你可以继续对话。`
-          );
-          return;
-        }
-
-        const child = spawn(cmd, args, {
-          cwd,
-          stdio: "inherit",
-          shell: true,
-        });
-
-        let errorMsg = "";
-
-        child.on("error", (error) => {
-          errorMsg = error.message;
-        });
-
-        child.on("close", (code) => {
-          if (code === 0) {
-            const cwdInfo = workingDirectory
-              ? `\n\n重要提示：命令在目录 "${displayWorkingDirectory}" 中执行成功。如果需要在这个项目目录中继续执行命令，请使用 workingDirectory: "${displayWorkingDirectory}" 参数，不要使用 cd 命令。`
-              : "";
-            resolve(`命令执行成功: ${displayCommand}${cwdInfo}`);
-          } else {
-            resolve(
-              `命令执行失败，退出码: ${code}${
-                errorMsg ? "\n错误: " + sanitizeDisplayText(errorMsg, cwd) : ""
-              }`
-            );
-          }
-        });
+      return executeShellCommand({
+        command,
+        workingDirectory: cwd,
+        background,
+        timeoutMs,
+        processPort,
       });
     },
     {
@@ -319,6 +298,40 @@ export function createTools(confirm: ConfirmPort, processPort: ProcessPort, todo
         command: z.string().describe("要执行的命令"),
         workingDirectory: z.string().optional().describe("工作目录（推荐指定）"),
         background: z.boolean().optional().describe("是否在后台运行"),
+        timeoutMs: z.number().int().positive().optional().describe("前台命令超时时间（毫秒）"),
+      }),
+    }
+  );
+
+  const readBackgroundLogsTool = tool(
+    async ({
+      pid,
+      command,
+      maxChars = 4000,
+    }: {
+      pid?: number;
+      command?: string;
+      maxChars?: number;
+    }): Promise<string> => {
+      const processes = processPort.getBackgroundProcesses();
+      if (processes.length === 0) {
+        return "当前没有后台进程。";
+      }
+
+      const targetProcess = pickBackgroundProcess(processes, pid, command);
+      if (!targetProcess) {
+        return "未找到匹配的后台进程。";
+      }
+
+      return formatBackgroundProcessLogs(targetProcess, maxChars);
+    },
+    {
+      name: "read_background_logs",
+      description: "读取后台进程的最近日志。适合在启动开发服务器后检查是否有编译报错或运行时错误。",
+      schema: z.object({
+        pid: z.number().int().optional().describe("后台进程 PID，可选"),
+        command: z.string().optional().describe("命令关键字，可选"),
+        maxChars: z.number().int().positive().optional().describe("返回日志的最大字符数"),
       }),
     }
   );
@@ -374,11 +387,12 @@ export function createTools(confirm: ConfirmPort, processPort: ProcessPort, todo
   );
 
   return [
-    { tool: readFileTool,       modes: [AgentMode.ASK, AgentMode.BUILD] },
-    { tool: listDirectoryTool,  modes: [AgentMode.ASK, AgentMode.BUILD] },
+    { tool: readFileTool,       modes: [AgentMode.ASK, AgentMode.BUILD, AgentMode.PLAN] },
+    { tool: listDirectoryTool,  modes: [AgentMode.ASK, AgentMode.BUILD, AgentMode.PLAN] },
     { tool: writeFileTool,      modes: [AgentMode.BUILD] },
     { tool: writeFilePatchTool, modes: [AgentMode.BUILD] },
     { tool: executeCommandTool, modes: [AgentMode.BUILD] },
+    { tool: readBackgroundLogsTool, modes: [AgentMode.BUILD] },
     { tool: todoWriteTool,      modes: [AgentMode.BUILD] },
   ];
 }

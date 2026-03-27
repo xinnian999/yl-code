@@ -12,6 +12,13 @@ import {
   getToolDescription,
 } from "./agent-helpers.ts";
 
+/** 为流式错误附加可见输出标记 */
+function markStreamError(error: unknown, hasVisibleOutput: boolean): Error {
+  const streamError = error instanceof Error ? error : new Error(String(error));
+  (streamError as Error & { hasVisibleOutput?: boolean }).hasVisibleOutput = hasVisibleOutput;
+  return streamError;
+}
+
 /** 从响应中提取调试元数据 */
 function extractResponseMeta(response: any): Record<string, unknown> {
   const meta: Record<string, unknown> = {};
@@ -59,66 +66,71 @@ export async function streamModelResponse(
   let lastFlushTime = 0;
   const FLUSH_INTERVAL_MS = 120;
 
-  for await (const chunk of stream) {
-    response = response ? concat(response, chunk) : chunk;
+  try {
+    for await (const chunk of stream) {
+      response = response ? concat(response, chunk) : chunk;
 
-    // 累积文本内容，按时间间隔批量刷新到 UI，减少终端重绘次数
-    if (chunk.content) {
-      const text = typeof chunk.content === "string" ? chunk.content : String(chunk.content);
-      if (text) {
-        if (streamBlockIndex === -1) {
-          messageBus.setThinkingStatus(ThinkingStatus.IDLE);
-          streamBlockIndex = messageBus.createTextBlock(text);
-          messageBus.setStreamingBlock(streamBlockIndex);
-          lastFlushTime = Date.now();
-        } else {
-          pendingText += text;
-          const now = Date.now();
-          if (now - lastFlushTime >= FLUSH_INTERVAL_MS) {
-            messageBus.appendToBlock(streamBlockIndex, pendingText);
-            pendingText = "";
-            lastFlushTime = now;
+      // 累积文本内容，按时间间隔批量刷新到 UI，减少终端重绘次数
+      if (chunk.content) {
+        const text = typeof chunk.content === "string" ? chunk.content : String(chunk.content);
+        if (text) {
+          if (streamBlockIndex === -1) {
+            messageBus.setThinkingStatus(ThinkingStatus.IDLE);
+            streamBlockIndex = messageBus.createTextBlock(text);
+            messageBus.setStreamingBlock(streamBlockIndex);
+            lastFlushTime = Date.now();
+          } else {
+            pendingText += text;
+            const now = Date.now();
+            if (now - lastFlushTime >= FLUSH_INTERVAL_MS) {
+              messageBus.appendToBlock(streamBlockIndex, pendingText);
+              pendingText = "";
+              lastFlushTime = now;
+            }
           }
         }
       }
-    }
 
-    if (debugMode) {
-      chunkIndex++;
-      const now = Date.now();
-      if (streamBlockIndex !== -1 && response && now - lastFlushTime >= FLUSH_INTERVAL_MS) {
-        const debugObj = {
-          chunks: chunkIndex,
-          status: "streaming",
-          ...extractResponseMeta(response),
-        };
-        messageBus.setDebugOnBlock(
-          streamBlockIndex,
-          JSON.stringify(debugObj, null, 2)
-        );
-      }
-    }
-
-    const chunkAny = chunk as any;
-    if (chunkAny.tool_call_chunks?.length > 0) {
-      const toolName = getToolNameFromChunk(chunkAny.tool_call_chunks);
-      const toolArgs = getToolArgsPreview(chunkAny.tool_call_chunks);
-
-      if (toolName && toolName !== currentToolName) {
-        currentToolName = toolName;
-        messageBus.setThinkingStatus(ThinkingStatus.TOOL_CALLING, `正在调用工具: ${toolName}`);
+      if (debugMode) {
+        chunkIndex++;
+        const now = Date.now();
+        if (streamBlockIndex !== -1 && response && now - lastFlushTime >= FLUSH_INTERVAL_MS) {
+          const debugObj = {
+            chunks: chunkIndex,
+            status: "streaming",
+            ...extractResponseMeta(response),
+          };
+          messageBus.setDebugOnBlock(
+            streamBlockIndex,
+            JSON.stringify(debugObj, null, 2)
+          );
+        }
       }
 
-      if (toolArgs && toolArgs !== currentToolArgs) {
-        currentToolArgs = toolArgs;
-        const toolDesc = getToolDescription(currentToolName!, {
-          filePath: toolArgs,
-          directoryPath: toolArgs,
-          command: toolArgs,
-        });
-        messageBus.setThinkingStatus(ThinkingStatus.TOOL_CALLING, toolDesc);
+      const chunkAny = chunk as any;
+      if (chunkAny.tool_call_chunks?.length > 0) {
+        const toolName = getToolNameFromChunk(chunkAny.tool_call_chunks);
+        const toolArgs = getToolArgsPreview(chunkAny.tool_call_chunks);
+
+        if (toolName && toolName !== currentToolName) {
+          currentToolName = toolName;
+          messageBus.setThinkingStatus(ThinkingStatus.TOOL_CALLING, `正在调用工具: ${toolName}`);
+        }
+
+        if (toolArgs && toolArgs !== currentToolArgs) {
+          currentToolArgs = toolArgs;
+          const toolDesc = getToolDescription(currentToolName!, {
+            filePath: toolArgs,
+            directoryPath: toolArgs,
+            command: toolArgs,
+          });
+          messageBus.setThinkingStatus(ThinkingStatus.TOOL_CALLING, toolDesc);
+        }
       }
     }
+  } catch (error) {
+    messageBus.clearStreamingBlock();
+    throw markStreamError(error, streamBlockIndex !== -1);
   }
 
   // 流式输出结束，刷新剩余文本并清除流式状态

@@ -4,7 +4,7 @@
 import { ToolMessage, AIMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
 import { getToolsForMode } from "./tools.ts";
-import { ThinkingStatus } from "./types.ts";
+import { AgentMode, ThinkingStatus } from "./types.ts";
 import type { ConfigManager } from "./config.ts";
 import type { AgentContext } from "./agent-helpers.ts";
 import {
@@ -77,6 +77,8 @@ function getMissingRequiredArgs(toolName: string, args: Record<string, unknown>)
       return getStringArg(args.command) ? [] : ["command"];
     case "list_directory":
       return getStringArg(args.directoryPath) ? [] : ["directoryPath"];
+    case "read_background_logs":
+      return [];
     case "todo_write":
       return Array.isArray(args.todos) ? [] : ["todos"];
     default:
@@ -93,7 +95,9 @@ function getToolArgsExample(toolName: string): string | null {
     case "write_file_patch":
       return '{"filePath":"src/index.ts","patch":"@@ ..."}';
     case "execute_command":
-      return '{"command":"npm test","workingDirectory":"project"}';
+      return '{"command":"bun run build","workingDirectory":"project"}';
+    case "read_background_logs":
+      return '{"command":"bun run dev","maxChars":4000}';
     case "list_directory":
       return '{"directoryPath":"src"}';
     case "todo_write":
@@ -174,6 +178,21 @@ export function handleApiError(config: ConfigManager, error: unknown): never {
   throw detailedError;
 }
 
+/** 根据当前模式生成工具不可用时的提示文案 */
+function buildModeUnavailableMessage(
+  mode: AgentContext["mode"],
+  toolName: string
+): string {
+  switch (mode) {
+    case AgentMode.ASK:
+      return `工具 "${toolName}" 在 Ask 模式下不可用。Ask 模式仅支持只读分析，请切换到 Build 模式执行修改或命令。`;
+    case AgentMode.PLAN:
+      return `工具 "${toolName}" 在 Plan 模式下不可用。Plan 模式仅支持只读探索与产出计划，请切换到 Build 模式执行修改或命令。`;
+    default:
+      return `工具 "${toolName}" 在当前模式下不可用，请切换到 Build 模式。`;
+  }
+}
+
 /** 执行响应中的工具调用列表 */
 export async function executeToolCalls(
   ctx: AgentContext,
@@ -194,7 +213,7 @@ export async function executeToolCalls(
     if (!foundTool) {
       const isKnownTool = ctx.tools.some((t) => t.tool.name === toolCall.name);
       const errorMsg = isKnownTool
-        ? `工具 "${toolCall.name}" 在当前模式下不可用，请切换到 Build 模式`
+        ? buildModeUnavailableMessage(ctx.mode, toolCall.name)
         : `工具 "${toolCall.name}" 未找到`;
 
       ctx.messageBus.tool(`调用工具: ${toolCall.name}`);

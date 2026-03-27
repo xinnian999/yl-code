@@ -76,6 +76,21 @@ function compactListDirectoryResult(content: string, directoryPath?: string): st
   ].join("\n");
 }
 
+function compactBackgroundLogsResult(content: string): string {
+  if (!content.includes("日志:\n")) return content;
+  if (content.length <= CONTEXT_COMPACT_THRESHOLD) return content;
+
+  const markerIndex = content.indexOf("日志:\n");
+  const head = content.slice(0, markerIndex + "日志:\n".length);
+  const logs = content.slice(markerIndex + "日志:\n".length);
+
+  return [
+    head + `[日志内容已压缩，原始长度 ${logs.length} 字符]`,
+    `预览: ${compactPreview(logs)}`,
+    "如需继续排查，请重新调用 read_background_logs。",
+  ].join("\n");
+}
+
 function compactHumanFileContext(content: string): string {
   const marker = "【用户引用的文件内容如下，请根据这些内容完成任务】";
   if (!content.includes(marker) || content.length <= CONTEXT_COMPACT_THRESHOLD) {
@@ -163,6 +178,9 @@ export function compactMessagesForContext(messages: BaseMessage[]): void {
           msg.content,
           typeof toolInfo.args.directoryPath === "string" ? toolInfo.args.directoryPath : undefined
         );
+        break;
+      case "read_background_logs":
+        (msg as any).content = compactBackgroundLogsResult(msg.content);
         break;
     }
   }
