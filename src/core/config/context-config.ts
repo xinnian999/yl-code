@@ -1,8 +1,22 @@
 /** 默认最大上下文 token 数 */
 export const DEFAULT_MAX_TOKENS = 128000;
 
+/** 触发摘要的上下文占比 */
+export const SUMMARIZE_THRESHOLD_RATIO = 0.25;
+
 /** 触发摘要的 token 阈值 */
-export const SUMMARIZE_THRESHOLD = 15000;
+export const SUMMARIZE_THRESHOLD = Math.round(
+  DEFAULT_MAX_TOKENS * SUMMARIZE_THRESHOLD_RATIO
+);
+
+/** 摘要时保留的最近消息窗口数 */
+export const CONTEXT_SUMMARY_KEEP_RECENT_MESSAGES = 12;
+
+/** 历史压缩时保护的最近消息窗口数 */
+export const CONTEXT_COMPACT_PROTECT_RECENT_MESSAGES = 10;
+
+/** 触发有效摘要所需的最小源消息 token 数 */
+export const MIN_SUMMARIZE_SOURCE_TOKENS = 1000;
 
 /** 大文本进入历史压缩的字符阈值 */
 export const CONTEXT_COMPACT_THRESHOLD = 1200;

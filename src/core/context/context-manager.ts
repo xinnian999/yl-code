@@ -8,14 +8,23 @@ import type { BaseMessage } from "@langchain/core/messages";
 import type { ChatOpenAI } from "@langchain/openai";
 import {
   DEFAULT_MAX_TOKENS,
+  CONTEXT_COMPACT_PROTECT_RECENT_MESSAGES,
   CONTEXT_COMPACT_PREVIEW_CHARS,
   CONTEXT_COMPACT_THRESHOLD,
+  CONTEXT_SUMMARY_KEEP_RECENT_MESSAGES,
+  MIN_SUMMARIZE_SOURCE_TOKENS,
   SUMMARIZE_PROMPT,
   SUMMARIZE_THRESHOLD,
 } from "../config/context-config.ts";
 import { toDisplayPath } from "../path-display.ts";
 
-export { DEFAULT_MAX_TOKENS, SUMMARIZE_THRESHOLD } from "../config/context-config.ts";
+export {
+  DEFAULT_MAX_TOKENS,
+  SUMMARIZE_THRESHOLD,
+  CONTEXT_SUMMARY_KEEP_RECENT_MESSAGES,
+  CONTEXT_COMPACT_PROTECT_RECENT_MESSAGES,
+  MIN_SUMMARIZE_SOURCE_TOKENS,
+} from "../config/context-config.ts";
 
 function compactPreview(text: string, maxChars = CONTEXT_COMPACT_PREVIEW_CHARS): string {
   const normalized = text.replace(/\s+/g, " ").trim();
@@ -111,14 +120,49 @@ function compactHumanFileContext(content: string): string {
   ].join("\n\n");
 }
 
+/** 计算最近需要保护的消息起始下标 */
+function getProtectedRecentStartIndex(messages: BaseMessage[]): number {
+  return Math.max(1, messages.length - CONTEXT_COMPACT_PROTECT_RECENT_MESSAGES);
+}
+
+/** 判断当前消息是否属于最近保护窗口 */
+function isProtectedRecentMessage(
+  messageIndex: number,
+  protectedStartIndex: number
+): boolean {
+  return messageIndex >= protectedStartIndex;
+}
+
+/** 将最近窗口起点回退到安全边界，避免从 ToolMessage 中间截断 */
+function getSafeRecentWindowStart(
+  messages: BaseMessage[],
+  initialStartIndex: number
+): number {
+  let safeStartIndex = initialStartIndex;
+
+  while (
+    safeStartIndex > 1
+    && messages[safeStartIndex] instanceof ToolMessage
+  ) {
+    safeStartIndex--;
+  }
+
+  return safeStartIndex;
+}
+
 /**
  * 压缩已经被模型消费过的历史消息，减少后续轮次的 prompt 体积。
  * 只保留必要的文件路径、结果摘要和少量预览，避免大段文件内容在后续轮次中重复携带。
  */
 export function compactMessagesForContext(messages: BaseMessage[]): void {
   const toolCallMap = new Map<string, { name: string; args: Record<string, unknown> }>();
+  const protectedStartIndex = getProtectedRecentStartIndex(messages);
 
-  for (const msg of messages) {
+  for (const [messageIndex, msg] of messages.entries()) {
+    if (isProtectedRecentMessage(messageIndex, protectedStartIndex)) {
+      continue;
+    }
+
     if (msg instanceof HumanMessage && typeof msg.content === "string") {
       (msg as any).content = compactHumanFileContext(msg.content);
       continue;
@@ -160,7 +204,11 @@ export function compactMessagesForContext(messages: BaseMessage[]): void {
     }
   }
 
-  for (const msg of messages) {
+  for (const [messageIndex, msg] of messages.entries()) {
+    if (isProtectedRecentMessage(messageIndex, protectedStartIndex)) {
+      continue;
+    }
+
     if (!(msg instanceof ToolMessage) || typeof msg.content !== "string") continue;
 
     const toolInfo = toolCallMap.get((msg as any).tool_call_id);
@@ -239,14 +287,13 @@ export interface SplitResult {
   systemMessage: SystemMessage;
   /** 需要摘要的中间消息 */
   toSummarize: BaseMessage[];
-  /** 保留的最近一轮对话（从最后一个 HumanMessage 起） */
+  /** 保留的最近用户意图与尾部消息窗口 */
   toKeep: BaseMessage[];
 }
 
 /**
  * 将消息列表分割为待摘要和保留两部分
- * 保留规则：SystemMessage（index 0）+ 最近一轮完整对话
- * 最近一轮 = 最后一个 HumanMessage 及其后的所有消息
+ * 保留规则：SystemMessage（index 0）+ 最后一个用户意图消息 + 最近尾部窗口
  */
 export function splitMessages(messages: BaseMessage[]): SplitResult | null {
   if (messages.length < 3) return null;
@@ -265,11 +312,29 @@ export function splitMessages(messages: BaseMessage[]): SplitResult | null {
   // 只有一轮对话或没有用户消息，不需要摘要
   if (lastHumanIndex <= 1) return null;
 
-  const toSummarize = messages.slice(1, lastHumanIndex);
-  const toKeep = messages.slice(lastHumanIndex);
+  const keepIndexes = new Set<number>([lastHumanIndex]);
+  const recentWindowStart = getSafeRecentWindowStart(
+    messages,
+    Math.max(
+      1,
+      messages.length - CONTEXT_SUMMARY_KEEP_RECENT_MESSAGES
+    )
+  );
+
+  for (let i = recentWindowStart; i < messages.length; i++) {
+    keepIndexes.add(i);
+  }
+
+  const toSummarize = messages.filter((_, index) => {
+    return index !== 0 && !keepIndexes.has(index);
+  });
+  const toKeep = messages.filter((_, index) => keepIndexes.has(index));
 
   // 待摘要部分太短则跳过
   if (toSummarize.length < 2) return null;
+  if (estimateTotalTokens(toSummarize) < MIN_SUMMARIZE_SOURCE_TOKENS) {
+    return null;
+  }
 
   return { systemMessage, toSummarize, toKeep };
 }

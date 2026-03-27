@@ -52,6 +52,7 @@ import {
   normalizeResponseToolCalls,
   handleApiError,
 } from "./agent-tools.ts";
+import { ExecutionStateManager } from "./execution/execution-state.ts";
 import {
   buildFileContext,
   addModel as addModelFn,
@@ -87,6 +88,8 @@ export class Agent {
   readonly mcpManager = new McpManager(this.mcpConfig);
   /** 后台进程管理器 */
   private processManager = new ProcessManager();
+  /** 长任务执行状态管理器 */
+  readonly executionState = new ExecutionStateManager();
 
   /** 对话消息历史 */
   chatMessages: BaseMessage[];
@@ -113,7 +116,7 @@ export class Agent {
 
   constructor() {
     this.systemTemplate = loadSystemTemplate();
-    this.chatMessages = [new SystemMessage(buildSystemPrompt(this.systemTemplate, this.mode))];
+    this.chatMessages = [new SystemMessage(this.buildCurrentSystemPrompt())];
     this.builtinTools = createTools(this.confirmBus, this.processManager, this.todoBus);
     this.tools = [...this.builtinTools];
     this.unsubModelChange = this.config.onModelChange(() => { this.currentModel = null; });
@@ -139,9 +142,29 @@ export class Agent {
 
   /** 清空对话历史，仅保留系统提示词 */
   clearMemory(): void {
+    this.executionState.reset();
     this.chatMessages.length = 0;
-    this.chatMessages.push(new SystemMessage(buildSystemPrompt(this.systemTemplate, this.mode)));
+    this.chatMessages.push(new SystemMessage(this.buildCurrentSystemPrompt()));
     this.contextBus.reset();
+  }
+
+  /** 构建当前系统提示词 */
+  private buildCurrentSystemPrompt(): string {
+    return buildSystemPrompt(
+      this.systemTemplate,
+      this.mode,
+      this.executionState.buildPromptText()
+    );
+  }
+
+  /** 刷新系统提示词，使动态执行状态进入下一轮模型请求 */
+  private refreshSystemPrompt(): void {
+    const systemPrompt = this.buildCurrentSystemPrompt();
+    if (this.chatMessages.length === 0) {
+      this.chatMessages.push(new SystemMessage(systemPrompt));
+      return;
+    }
+    this.chatMessages[0] = new SystemMessage(systemPrompt);
   }
 
   /** 异步初始化（启动时调用，静默连接 MCP 服务器） */
@@ -397,6 +420,8 @@ export class Agent {
     this.confirmBus.resetSkipConfirm();
     this.planBus.resetWaitTime();
     compactMessagesForContext(this.chatMessages);
+    this.executionState.recordUserTurn(query);
+    this.refreshSystemPrompt();
 
     const durationTimer = setInterval(() => {
       const wait = this.confirmBus.getCurrentWaitTime() + this.planBus.getCurrentWaitTime();
@@ -413,6 +438,7 @@ export class Agent {
 
     try {
       await checkAndSummarize(this);
+      this.refreshSystemPrompt();
       this.chatMessages.push(new HumanMessage(messageContent));
       this.beginAssistantTurn();
 
@@ -422,6 +448,7 @@ export class Agent {
         if (this.abortController.signal.aborted) { this.messageBus.ai(AGENT_STATUS_TEXT.ABORTED); break; }
 
         const iterationStartTime = Date.now();
+        this.refreshSystemPrompt();
         this.messageBus.setThinkingStatus(ThinkingStatus.THINKING, AGENT_STATUS_TEXT.THINKING);
 
         let response: any;
@@ -537,8 +564,7 @@ export class Agent {
     if (this.mode === mode) return;
     this.mode = mode;
     this.currentModel = null;
-    const systemPrompt = buildSystemPrompt(this.systemTemplate, this.mode);
-    if (this.chatMessages.length > 0) this.chatMessages[0] = new SystemMessage(systemPrompt);
+    this.refreshSystemPrompt();
     this.notifyModeChange();
   }
 
@@ -546,7 +572,13 @@ export class Agent {
   saveSession(): void { saveSessionFn(this); }
 
   /** 恢复指定会话 */
-  restoreSession(sessionId: string): boolean { return restoreSessionFn(this, sessionId); }
+  restoreSession(sessionId: string): boolean {
+    const restored = restoreSessionFn(this, sessionId);
+    if (!restored) return false;
+    this.executionState.reset();
+    this.refreshSystemPrompt();
+    return true;
+  }
 
   /** 开始新对话会话 */
   newSession(): void { newSessionFn(this); }

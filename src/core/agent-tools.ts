@@ -240,12 +240,14 @@ export async function executeToolCalls(
       const toolResult = await (foundTool as any).invoke(normalizedArgs);
       const waitTimeAdded = ctx.confirmBus.totalWaitTime - waitTimeBefore;
       const toolDuration = Date.now() - iterationStartTime - waitTimeAdded;
+      const toolResultText = String(toolResult);
 
       ctx.messageBus.tool(`${toolDesc} (耗时: ${formatDuration(toolDuration)})`);
+      ctx.executionState.recordToolResult(toolCall.name, normalizedArgs, toolResultText);
 
       // debug 模式：将工具调用详情附加到 tool block
       if (ctx.debugMode) {
-        const resultStr = String(toolResult);
+        const resultStr = toolResultText;
         const preview = resultStr.length > 500 ? resultStr.slice(0, 500) + "...(截断)" : resultStr;
         ctx.messageBus.appendDebugToLastBlock(JSON.stringify({
           tool: toolCall.name,
@@ -262,7 +264,7 @@ export async function executeToolCalls(
       }
 
       ctx.chatMessages.push(
-        new ToolMessage({ content: toolResult as string, tool_call_id: toolCall.id })
+        new ToolMessage({ content: toolResultText, tool_call_id: toolCall.id })
       );
     } catch (error) {
       const toolDuration = Date.now() - iterationStartTime;
@@ -270,6 +272,11 @@ export async function executeToolCalls(
       const errMsg = err?.message || String(error);
       ctx.messageBus.tool(`${toolDesc} (耗时: ${formatDuration(toolDuration)})`);
       ctx.messageBus.error(`   ↳ 失败: ${errMsg}`);
+      ctx.executionState.recordToolResult(
+        toolCall.name,
+        normalizedArgs,
+        `工具执行失败: ${errMsg}`
+      );
       ctx.chatMessages.push(
         new ToolMessage({ content: `工具执行失败: ${errMsg}`, tool_call_id: toolCall.id })
       );

@@ -10,6 +10,7 @@ import type { TodoBus } from "./todo-bus.ts";
 import type { ContextBus } from "./context/context-bus.ts";
 import type { ConfigManager } from "./config.ts";
 import type { ModeTool } from "./tools.ts";
+import type { ExecutionStateManager } from "./execution/execution-state.ts";
 import { platform } from "os";
 import { toDisplayCommand, toDisplayPath } from "./path-display.ts";
 
@@ -35,6 +36,8 @@ export interface AgentContext {
   mode: AgentModeValue;
   /** 带模式标签的工具列表 */
   tools: ModeTool[];
+  /** 长任务执行状态 */
+  readonly executionState: ExecutionStateManager;
 }
 
 // ============ 辅助类型 ============
@@ -156,7 +159,14 @@ export function getModeInstructions(mode: AgentModeValue): string {
         "如果用户要求修改代码、执行命令或落地实现，请明确告知用户切换到 Build 模式。",
       ].join("\n");
     case AgentMode.BUILD:
-      return "当前是 **构建模式（Build）**，你可以使用所有工具来完成编码任务。";
+      return [
+        "当前是 **构建模式（Build）**，你可以使用所有工具来完成编码任务。",
+        "面对从零实现的大任务时，默认按“脚手架初始化 -> 基础类型与状态 -> 单模块或一组强相关文件 -> 联调验证”推进。",
+        "一次优先只处理一个模块或一组强相关文件，不要在同一轮里无证据地大面积重写多个无关页面。",
+        "完成脚手架后，应尽快运行 `bun run build`；每完成一个模块或一组强相关文件后，也应优先再跑一次 `bun run build`。",
+        "如果最近一次验证失败，先读取报错涉及的文件，再定点修改；没有新的报错证据前，不要扩散到无关文件。",
+        "如果同一批错误已经连续失败多次，继续调用工具前，先用简短文本总结根因和下一步修改点。",
+      ].join("\n");
     case AgentMode.PLAN:
       return [
         "当前是 **计划模式（Plan）**。",
@@ -177,11 +187,16 @@ export function getModeInstructions(mode: AgentModeValue): string {
 }
 
 /** 根据模板和模式构建完整系统提示词 */
-export function buildSystemPrompt(template: string, mode: AgentModeValue): string {
+export function buildSystemPrompt(
+  template: string,
+  mode: AgentModeValue,
+  executionStateText = "暂无额外执行状态。"
+): string {
   return template
     .replace("{workingDirectory}", process.cwd())
     .replace("{workingMode}", mode)
     .replace("{modeInstructions}", getModeInstructions(mode))
+    .replace("{executionState}", executionStateText)
     .replace("{os}", platform())
     .replace("{currentTime}", new Date().toLocaleString());
 }

@@ -1,6 +1,6 @@
 import { EventEmitter } from "events";
 import type { ContextPort, ContextUsage } from "../types.ts";
-import { SUMMARIZE_THRESHOLD } from "../config/context-config.ts";
+import { DEFAULT_MAX_TOKENS } from "../config/context-config.ts";
 
 // ============ 事件类型 ============
 
@@ -26,7 +26,7 @@ export class ContextBus extends EventEmitter implements ContextPort {
   /** 最大 token 数（可配置） */
   private maxTokens: number;
 
-  constructor(maxTokens: number = SUMMARIZE_THRESHOLD) {
+  constructor(maxTokens: number = DEFAULT_MAX_TOKENS) {
     super();
     this.maxTokens = maxTokens;
   }
