@@ -10,7 +10,10 @@ import { ConfigManager } from "./config.ts";
 import { ProcessManager } from "./process-manager.ts";
 import { TodoBus } from "./todo-bus.ts";
 import { ContextBus } from "./context/context-bus.ts";
-import { estimateTotalTokens } from "./context/context-manager.ts";
+import {
+  estimateTotalTokens,
+  compactMessagesForContext,
+} from "./context/context-manager.ts";
 import { AgentMode, ThinkingStatus } from "./types.ts";
 import type { ModelConfig, AgentModeValue } from "./types.ts";
 import type { CommandAction } from "./commands.ts";
@@ -28,7 +31,12 @@ import { McpConfigManager, McpManager } from "./mcp/index.ts";
 import { loadSystemTemplate, buildSystemPrompt } from "./agent-helpers.ts";
 import { createBoundModel, checkAndSummarize } from "./agent-model.ts";
 import { invokeModelResponse, streamModelResponse } from "./agent-stream.ts";
-import { executeToolCalls, normalizeResponse, handleApiError } from "./agent-tools.ts";
+import {
+  executeToolCalls,
+  normalizeResponse,
+  normalizeResponseToolCalls,
+  handleApiError,
+} from "./agent-tools.ts";
 import {
   buildFileContext,
   addModel as addModelFn,
@@ -158,6 +166,7 @@ export class Agent {
     const startTokens = estimateTotalTokens(this.chatMessages);
     this.abortController = new AbortController();
     this.confirmBus.resetSkipConfirm();
+    compactMessagesForContext(this.chatMessages);
 
     const durationTimer = setInterval(() => {
       const wait = this.confirmBus.getCurrentWaitTime();
@@ -207,6 +216,8 @@ export class Agent {
           handleApiError(this.config, error);
         }
 
+        compactMessagesForContext(this.chatMessages);
+        normalizeResponseToolCalls(response);
         this.chatMessages.push(normalizeResponse(response));
 
         if (!response.tool_calls || response.tool_calls.length === 0) break;
@@ -220,6 +231,7 @@ export class Agent {
       this.messageBus.setThinkingStatus(ThinkingStatus.IDLE);
       if (!this.abortController?.signal.aborted) this.todoBus.completeAll();
       this.reportStats(startTime, startTokens);
+      compactMessagesForContext(this.chatMessages);
 
       const lastMessage = this.chatMessages[this.chatMessages.length - 1];
       return typeof lastMessage.content === "string" ? lastMessage.content : "";

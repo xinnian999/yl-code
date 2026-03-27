@@ -7,6 +7,11 @@ import { applyPatch, type StructuredPatch } from "diff";
 import { z } from "zod";
 import { AgentMode } from "./types.ts";
 import type { ConfirmPort, ProcessPort, TodoPort, TodoItem, AgentModeValue } from "./types.ts";
+import {
+  sanitizeDisplayText,
+  toDisplayCommand,
+  toDisplayPath,
+} from "./path-display.ts";
 
 // ============ 类型定义 ============
 
@@ -118,12 +123,13 @@ export function createTools(confirm: ConfirmPort, processPort: ProcessPort, todo
   const readFileTool = tool(
     async ({ filePath }: { filePath: string }): Promise<string> => {
       const resolvedPath = path.resolve(filePath);
+      const displayPath = toDisplayPath(resolvedPath);
       try {
         const content = await fs.readFile(resolvedPath, "utf-8");
         return `文件内容:\n${content}`;
       } catch (error) {
         const err = error as Error;
-        return `读取文件失败: ${err.message}`;
+        return `读取文件失败: ${sanitizeDisplayText(err.message, resolvedPath) || displayPath}`;
       }
     },
     {
@@ -138,6 +144,7 @@ export function createTools(confirm: ConfirmPort, processPort: ProcessPort, todo
   const writeFileTool = tool(
     async ({ filePath, content }: { filePath: string; content: string }): Promise<string> => {
       const resolvedPath = path.resolve(filePath);
+      const displayPath = toDisplayPath(resolvedPath);
       try {
         let originalContent = "";
         try {
@@ -147,13 +154,13 @@ export function createTools(confirm: ConfirmPort, processPort: ProcessPort, todo
         }
 
         if (originalContent === content) {
-          return `文件内容未变化，无需写入: ${resolvedPath}`;
+          return `文件内容未变化，无需写入: ${displayPath}`;
         }
 
         const result = await confirm.requestConfirm(resolvedPath, originalContent, content);
 
         if (result === "reject") {
-          return `用户拒绝了对 ${resolvedPath} 的修改，请根据情况调整方案或询问用户意见`;
+          return `用户拒绝了对 ${displayPath} 的修改，请根据情况调整方案或询问用户意见`;
         }
 
         const dir = path.dirname(resolvedPath);
@@ -162,11 +169,11 @@ export function createTools(confirm: ConfirmPort, processPort: ProcessPort, todo
 
         const isNewFile = originalContent === "";
         return isNewFile
-          ? `文件创建成功: ${resolvedPath}`
-          : `文件写入成功: ${resolvedPath}`;
+          ? `文件创建成功: ${displayPath}`
+          : `文件写入成功: ${displayPath}`;
       } catch (error) {
         const err = error as Error;
-        return `写入文件失败: ${err.message}`;
+        return `写入文件失败: ${sanitizeDisplayText(err.message, resolvedPath) || displayPath}`;
       }
     },
     {
@@ -182,6 +189,7 @@ export function createTools(confirm: ConfirmPort, processPort: ProcessPort, todo
   const writeFilePatchTool = tool(
     async ({ filePath, patch }: { filePath: string; patch: string }): Promise<string> => {
       const resolvedPath = path.resolve(filePath);
+      const displayPath = toDisplayPath(resolvedPath);
       try {
         let originalContent = "";
         try {
@@ -192,17 +200,17 @@ export function createTools(confirm: ConfirmPort, processPort: ProcessPort, todo
 
         const patchedContent = applyPatchWithFallback(originalContent, patch);
         if (patchedContent === false) {
-          return `补丁应用失败: ${resolvedPath}`;
+          return `补丁应用失败: ${displayPath}`;
         }
 
         if (patchedContent === originalContent) {
-          return `文件内容未变化，无需写入: ${resolvedPath}`;
+          return `文件内容未变化，无需写入: ${displayPath}`;
         }
 
         const result = await confirm.requestConfirm(resolvedPath, originalContent, patchedContent);
 
         if (result === "reject") {
-          return `用户拒绝了对 ${resolvedPath} 的修改，请根据情况调整方案或询问用户意见`;
+          return `用户拒绝了对 ${displayPath} 的修改，请根据情况调整方案或询问用户意见`;
         }
 
         const dir = path.dirname(resolvedPath);
@@ -211,11 +219,11 @@ export function createTools(confirm: ConfirmPort, processPort: ProcessPort, todo
 
         const isNewFile = originalContent === "";
         return isNewFile
-          ? `文件创建成功: ${resolvedPath}`
-          : `文件写入成功: ${resolvedPath}`;
+          ? `文件创建成功: ${displayPath}`
+          : `文件写入成功: ${displayPath}`;
       } catch (error) {
         const err = error as Error;
-        return `写入文件失败: ${err.message}`;
+        return `写入文件失败: ${sanitizeDisplayText(err.message, resolvedPath) || displayPath}`;
       }
     },
     {
@@ -239,11 +247,15 @@ export function createTools(confirm: ConfirmPort, processPort: ProcessPort, todo
       background?: boolean;
     }): Promise<string> => {
       const cwd = workingDirectory || process.cwd();
+      const displayCommand = toDisplayCommand(command);
+      const displayWorkingDirectory = workingDirectory
+        ? toDisplayPath(workingDirectory)
+        : undefined;
 
       const result = await confirm.requestCommandConfirm(command, workingDirectory, background);
 
       if (result === "reject") {
-        return `用户拒绝执行命令: ${command}，请根据情况调整方案或询问用户意见`;
+        return `用户拒绝执行命令: ${displayCommand}，请根据情况调整方案或询问用户意见`;
       }
 
       return new Promise((resolve) => {
@@ -264,10 +276,10 @@ export function createTools(confirm: ConfirmPort, processPort: ProcessPort, todo
           });
 
           const cwdInfo = workingDirectory
-            ? `\n\n重要提示：命令在目录 "${workingDirectory}" 中后台运行。`
+            ? `\n\n重要提示：命令在目录 "${displayWorkingDirectory}" 中后台运行。`
             : "";
           resolve(
-            `命令已在后台启动: ${command}${cwdInfo}\n提示：开发服务器正在运行，你可以继续对话。`
+            `命令已在后台启动: ${displayCommand}${cwdInfo}\n提示：开发服务器正在运行，你可以继续对话。`
           );
           return;
         }
@@ -287,13 +299,13 @@ export function createTools(confirm: ConfirmPort, processPort: ProcessPort, todo
         child.on("close", (code) => {
           if (code === 0) {
             const cwdInfo = workingDirectory
-              ? `\n\n重要提示：命令在目录 "${workingDirectory}" 中执行成功。如果需要在这个项目目录中继续执行命令，请使用 workingDirectory: "${workingDirectory}" 参数，不要使用 cd 命令。`
+              ? `\n\n重要提示：命令在目录 "${displayWorkingDirectory}" 中执行成功。如果需要在这个项目目录中继续执行命令，请使用 workingDirectory: "${displayWorkingDirectory}" 参数，不要使用 cd 命令。`
               : "";
-            resolve(`命令执行成功: ${command}${cwdInfo}`);
+            resolve(`命令执行成功: ${displayCommand}${cwdInfo}`);
           } else {
             resolve(
               `命令执行失败，退出码: ${code}${
-                errorMsg ? "\n错误: " + errorMsg : ""
+                errorMsg ? "\n错误: " + sanitizeDisplayText(errorMsg, cwd) : ""
               }`
             );
           }
@@ -313,12 +325,13 @@ export function createTools(confirm: ConfirmPort, processPort: ProcessPort, todo
 
   const listDirectoryTool = tool(
     async ({ directoryPath }: { directoryPath: string }): Promise<string> => {
+      const resolvedPath = path.resolve(directoryPath);
       try {
-        const files = await fs.readdir(directoryPath);
+        const files = await fs.readdir(resolvedPath);
         return `目录内容:\n${files.map((f) => `- ${f}`).join("\n")}`;
       } catch (error) {
         const err = error as Error;
-        return `列出目录失败: ${err.message}`;
+        return `列出目录失败: ${sanitizeDisplayText(err.message, resolvedPath)}`;
       }
     },
     {

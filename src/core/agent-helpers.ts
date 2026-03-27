@@ -11,6 +11,7 @@ import type { ContextBus } from "./context/context-bus.ts";
 import type { ConfigManager } from "./config.ts";
 import type { ModeTool } from "./tools.ts";
 import { platform } from "os";
+import { toDisplayCommand, toDisplayPath } from "./path-display.ts";
 
 // ============ Agent 上下文接口 ============
 
@@ -56,6 +57,9 @@ export interface ToolArgs {
   filePath?: string;
   directoryPath?: string;
   command?: string;
+  file?: string;
+  path?: string;
+  directory?: string;
 }
 
 // ============ 纯辅助函数 ============
@@ -75,8 +79,14 @@ export function getToolArgsPreview(toolCallChunks: ToolCallChunk[]): string | nu
   try {
     const filePathMatch = argsStr.match(/"filePath"\s*:\s*"([^"]+)"/);
     if (filePathMatch) return filePathMatch[1];
+    const fileMatch = argsStr.match(/"file"\s*:\s*"([^"]+)"/);
+    if (fileMatch) return fileMatch[1];
+    const pathMatch = argsStr.match(/"path"\s*:\s*"([^"]+)"/);
+    if (pathMatch) return pathMatch[1];
     const dirPathMatch = argsStr.match(/"directoryPath"\s*:\s*"([^"]+)"/);
     if (dirPathMatch) return dirPathMatch[1];
+    const dirMatch = argsStr.match(/"directory"\s*:\s*"([^"]+)"/);
+    if (dirMatch) return dirMatch[1];
     const commandMatch = argsStr.match(/"command"\s*:\s*"([^"]+)"/);
     if (commandMatch) return commandMatch[1];
   } catch {
@@ -102,17 +112,23 @@ export function formatTotalDuration(ms: number): string {
 
 /** 根据工具名称和参数生成中文描述 */
 export function getToolDescription(toolName: string, args: ToolArgs): string {
+  const rawFileTarget = args.filePath || args.file || args.path;
+  const rawDirTarget = args.directoryPath || args.directory || args.path;
+  const fileTarget = rawFileTarget ? toDisplayPath(rawFileTarget) : "未提供路径";
+  const dirTarget = rawDirTarget ? toDisplayPath(rawDirTarget) : "未提供目录";
+  const commandTarget = args.command ? toDisplayCommand(args.command) : "未提供命令";
+
   switch (toolName) {
     case "read_file":
-      return `阅读代码: ${args.filePath}`;
+      return `阅读代码: ${fileTarget}`;
     case "write_file":
-      return `写入代码: ${args.filePath}`;
+      return `写入代码: ${fileTarget}`;
     case "write_file_patch":
-      return `修改代码: ${args.filePath}`;
+      return `修改代码: ${fileTarget}`;
     case "execute_command":
-      return `执行命令: ${args.command}`;
+      return `执行命令: ${commandTarget}`;
     case "list_directory":
-      return `查看目录: ${args.directoryPath}`;
+      return `查看目录: ${dirTarget}`;
     case "todo_write":
       return "更新任务列表";
     default:

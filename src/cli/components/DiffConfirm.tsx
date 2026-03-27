@@ -4,6 +4,7 @@ import type { PendingChange } from "@/core/confirm-bus.ts";
 import type { ConfirmResult } from "@/core/types.ts";
 import { generateCompactDiff, type DiffLine } from "@/core/diff-generator.ts";
 import { getEditorName, type EditorType } from "@/core/editor-detector.ts";
+import { toDisplayCommand, toDisplayPath } from "@/core/path-display.ts";
 
 /** 文件变更确认组件属性 */
 interface DiffConfirmProps {
@@ -101,7 +102,7 @@ const FileDiffConfirm: React.FC<DiffConfirmProps> = ({
 
       <Box marginBottom={1}>
         <Text>
-          文件: <Text color="cyan">{change.filePath}</Text>
+          文件: <Text color="cyan">{change.filePath ? toDisplayPath(change.filePath) : ""}</Text>
           {isNewFile && <Text color="green"> (新文件)</Text>}
         </Text>
       </Box>
@@ -204,11 +205,11 @@ const CommandConfirm: React.FC<Omit<DiffConfirmProps, "editorOpened">> = ({
 
       <Box marginBottom={1} flexDirection="column">
         <Text>
-          命令: <Text color="cyan">{change.command}</Text>
+          命令: <Text color="cyan">{change.command ? toDisplayCommand(change.command) : ""}</Text>
         </Text>
         {change.workingDirectory && (
           <Text>
-            目录: <Text color="gray">{change.workingDirectory}</Text>
+            目录: <Text color="gray">{toDisplayPath(change.workingDirectory)}</Text>
           </Text>
         )}
         {change.background && (

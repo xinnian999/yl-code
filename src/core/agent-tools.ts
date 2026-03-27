@@ -14,6 +14,125 @@ import {
   type ToolArgs,
 } from "./agent-helpers.ts";
 
+function getStringArg(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value : undefined;
+}
+
+function normalizeToolArgs(
+  toolName: string,
+  rawArgs: unknown
+): { args: Record<string, unknown>; repaired: boolean } {
+  const args =
+    rawArgs && typeof rawArgs === "object"
+      ? { ...(rawArgs as Record<string, unknown>) }
+      : {};
+  let repaired = false;
+
+  const setAlias = (targetKey: string, ...candidates: string[]) => {
+    if (getStringArg(args[targetKey])) return;
+    for (const key of candidates) {
+      const value = getStringArg(args[key]);
+      if (value) {
+        args[targetKey] = value;
+        repaired = true;
+        return;
+      }
+    }
+  };
+
+  switch (toolName) {
+    case "read_file":
+    case "write_file":
+    case "write_file_patch":
+      setAlias("filePath", "file", "path");
+      break;
+    case "list_directory":
+      setAlias("directoryPath", "directory", "dir", "path", "filePath");
+      break;
+    case "execute_command":
+      setAlias("workingDirectory", "cwd");
+      break;
+  }
+
+  return { args, repaired };
+}
+
+function getMissingRequiredArgs(toolName: string, args: Record<string, unknown>): string[] {
+  switch (toolName) {
+    case "read_file":
+      return getStringArg(args.filePath) ? [] : ["filePath"];
+    case "write_file": {
+      const missing: string[] = [];
+      if (!getStringArg(args.filePath)) missing.push("filePath");
+      if (typeof args.content !== "string") missing.push("content");
+      return missing;
+    }
+    case "write_file_patch": {
+      const missing: string[] = [];
+      if (!getStringArg(args.filePath)) missing.push("filePath");
+      if (typeof args.patch !== "string") missing.push("patch");
+      return missing;
+    }
+    case "execute_command":
+      return getStringArg(args.command) ? [] : ["command"];
+    case "list_directory":
+      return getStringArg(args.directoryPath) ? [] : ["directoryPath"];
+    case "todo_write":
+      return Array.isArray(args.todos) ? [] : ["todos"];
+    default:
+      return [];
+  }
+}
+
+function getToolArgsExample(toolName: string): string | null {
+  switch (toolName) {
+    case "read_file":
+      return '{"filePath":"src/index.ts"}';
+    case "write_file":
+      return '{"filePath":"src/index.ts","content":"..."}';
+    case "write_file_patch":
+      return '{"filePath":"src/index.ts","patch":"@@ ..."}';
+    case "execute_command":
+      return '{"command":"npm test","workingDirectory":"project"}';
+    case "list_directory":
+      return '{"directoryPath":"src"}';
+    case "todo_write":
+      return '{"todos":[{"content":"完成任务","status":"in_progress"}]}';
+    default:
+      return null;
+  }
+}
+
+function buildToolArgsError(toolName: string, missingFields: string[]): string {
+  const fieldsText = missingFields.join(", ");
+  const example = getToolArgsExample(toolName);
+  return example
+    ? `工具参数错误: ${toolName} 缺少必填字段 ${fieldsText}。请严格按 schema 重试，例如 ${example}`
+    : `工具参数错误: ${toolName} 缺少必填字段 ${fieldsText}。请严格按 schema 重试。`;
+}
+
+export function normalizeResponseToolCalls(response: any): void {
+  if (!response?.tool_calls || response.tool_calls.length === 0) return;
+
+  response.tool_calls = response.tool_calls.map((toolCall: ToolCall, index: number) => {
+    const { args } = normalizeToolArgs(toolCall.name, toolCall.args);
+
+    const rawToolCall = response.additional_kwargs?.tool_calls?.[index];
+    if (rawToolCall?.function && typeof rawToolCall.function.arguments === "string") {
+      try {
+        const parsedArgs = JSON.parse(rawToolCall.function.arguments);
+        rawToolCall.function.arguments = JSON.stringify(
+          normalizeToolArgs(toolCall.name, parsedArgs).args
+        );
+      } catch {
+        // 保留原始参数文本，避免影响调试信息
+      }
+    }
+
+    return { ...toolCall, args };
+  });
+}
+
 /** 标准化响应，确保空内容时有占位文本 */
 export function normalizeResponse(response: any): BaseMessage {
   const hasEmptyContent =
@@ -64,8 +183,11 @@ export async function executeToolCalls(
   const allowedTools = getToolsForMode(ctx.tools, ctx.mode);
 
   for (const toolCall of response.tool_calls as ToolCall[]) {
+    const { args: normalizedArgs, repaired } = normalizeToolArgs(toolCall.name, toolCall.args);
+    toolCall.args = normalizedArgs;
+
     const foundTool = allowedTools.find((t) => t.name === toolCall.name);
-    const toolDesc = getToolDescription(toolCall.name, toolCall.args as ToolArgs);
+    const toolDesc = getToolDescription(toolCall.name, normalizedArgs as ToolArgs);
 
     ctx.messageBus.setThinkingStatus(ThinkingStatus.TOOL_CALLING, `执行中: ${toolDesc}`);
 
@@ -83,9 +205,20 @@ export async function executeToolCalls(
       continue;
     }
 
+    const missingFields = getMissingRequiredArgs(toolCall.name, normalizedArgs);
+    if (missingFields.length > 0) {
+      const errMsg = buildToolArgsError(toolCall.name, missingFields);
+      ctx.messageBus.tool(`${toolDesc} (参数不完整)`);
+      ctx.messageBus.warning(`   ↳ ${errMsg}`);
+      ctx.chatMessages.push(
+        new ToolMessage({ content: errMsg, tool_call_id: toolCall.id })
+      );
+      continue;
+    }
+
     try {
       const waitTimeBefore = ctx.confirmBus.totalWaitTime;
-      const toolResult = await (foundTool as any).invoke(toolCall.args);
+      const toolResult = await (foundTool as any).invoke(normalizedArgs);
       const waitTimeAdded = ctx.confirmBus.totalWaitTime - waitTimeBefore;
       const toolDuration = Date.now() - iterationStartTime - waitTimeAdded;
 
@@ -98,7 +231,8 @@ export async function executeToolCalls(
         ctx.messageBus.appendDebugToLastBlock(JSON.stringify({
           tool: toolCall.name,
           id: toolCall.id,
-          args: toolCall.args,
+          args: normalizedArgs,
+          normalized: repaired,
           result: `(${resultStr.length}字符) ${preview}`,
         }, null, 2));
       }
