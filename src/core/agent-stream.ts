@@ -133,13 +133,11 @@ export async function streamModelResponse(
     throw markStreamError(error, streamBlockIndex !== -1);
   }
 
-  // 流式输出结束，刷新剩余文本并清除流式状态
+  // 流式输出结束，先刷新剩余文本与最终调试信息，再清除流式状态
   if (streamBlockIndex !== -1 && pendingText) {
     messageBus.appendToBlock(streamBlockIndex, pendingText);
   }
-  messageBus.clearStreamingBlock();
 
-  // debug 模式：流结束时写入最终元数据快照
   if (debugMode && streamBlockIndex !== -1) {
     const debugObj = {
       chunks: chunkIndex,
@@ -148,6 +146,8 @@ export async function streamModelResponse(
     };
     messageBus.setDebugOnBlock(streamBlockIndex, JSON.stringify(debugObj, null, 2));
   }
+
+  messageBus.clearStreamingBlock();
 
   return response;
 }
