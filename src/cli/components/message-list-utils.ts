@@ -5,6 +5,12 @@ import type { AIMessage, Message } from "@/core/message-bus.ts";
 import type { ThinkingState } from "@/core/types.ts";
 import type { MessageListRenderItem } from "./MessageListRenderTypes.ts";
 
+/** 空闲态思考状态，供历史统计行复用 */
+const IDLE_THINKING_STATE: ThinkingState = {
+  status: ThinkingStatus.IDLE,
+  detail: "",
+};
+
 /** 判断工具块是否表示任务列表更新 */
 function isTaskUpdateToolBlock(content: string): boolean {
   return content.trimStart().startsWith("更新任务列表");
@@ -38,6 +44,37 @@ export function getLastAIMessage(messages: Message[]): AIMessage | null {
   return null;
 }
 
+/** 判断指定 AI 消息是否需要显示统计信息 */
+function shouldRenderStatsForMessage(
+  message: AIMessage,
+  isLastAIMessage: boolean,
+  isProcessing: boolean,
+  hasActiveThinking: boolean,
+  showDiffConfirm: boolean
+): boolean {
+  if (typeof message.totalDurationMs === "number") {
+    return true;
+  }
+
+  if (!isLastAIMessage) {
+    return false;
+  }
+
+  return isProcessing || hasActiveThinking || showDiffConfirm;
+}
+
+/** 为统计行生成对应的思考状态 */
+function getStatsThinkingState(
+  isLastAIMessage: boolean,
+  thinkingStatus: ThinkingState
+): ThinkingState {
+  if (isLastAIMessage) {
+    return thinkingStatus;
+  }
+
+  return IDLE_THINKING_STATE;
+}
+
 /** 构建用于 UI 的扁平渲染项列表 */
 export function buildRenderItems(options: BuildRenderItemsOptions): MessageListRenderItem[] {
   const {
@@ -53,8 +90,6 @@ export function buildRenderItems(options: BuildRenderItemsOptions): MessageListR
   const lastAIMessage = getLastAIMessage(messages);
   const hasActiveThinking = isThinkingActive(thinkingStatus);
   const shouldPauseThinkingStatus = Boolean(showDiffConfirm && pendingChange);
-  const shouldShowStats = isProcessing || typeof lastAIMessage?.totalDurationMs === "number";
-
   for (const message of messages) {
     if (message.type === MessageType.USER) {
       renderItems.push({
@@ -102,11 +137,7 @@ export function buildRenderItems(options: BuildRenderItemsOptions): MessageListR
       });
     }
 
-    if (!isLastAIMessage) {
-      continue;
-    }
-
-    if (showDiffConfirm && pendingChange) {
+    if (isLastAIMessage && showDiffConfirm && pendingChange) {
       renderItems.push({
         id: `${aiMessage.id}:diff`,
         kind: "ai_diff",
@@ -116,15 +147,21 @@ export function buildRenderItems(options: BuildRenderItemsOptions): MessageListR
       });
     }
 
-    if (shouldShowStats) {
+    if (shouldRenderStatsForMessage(
+      aiMessage,
+      isLastAIMessage,
+      isProcessing,
+      hasActiveThinking,
+      showDiffConfirm,
+    )) {
       renderItems.push({
         id: `${aiMessage.id}:stats`,
         kind: "ai_stats",
         message: aiMessage,
-        thinkingStatus,
-        isRunning: isProcessing,
-        isPaused: shouldPauseThinkingStatus,
-        isDynamic: isProcessing || hasActiveThinking || showDiffConfirm,
+        thinkingStatus: getStatsThinkingState(isLastAIMessage, thinkingStatus),
+        isRunning: isLastAIMessage && isProcessing,
+        isPaused: isLastAIMessage && shouldPauseThinkingStatus,
+        isDynamic: isLastAIMessage && (isProcessing || hasActiveThinking || showDiffConfirm),
       });
     }
   }
