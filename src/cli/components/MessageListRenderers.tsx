@@ -4,86 +4,93 @@ import Markdown from "ink-markdown-es";
 import type { ConfirmResult, MessageBlock } from "@/core/types.ts";
 import { formatTotalDuration } from "@/core/agent-helpers.ts";
 import DiffConfirm from "./DiffConfirm.tsx";
+import { AssistantSection, DebugInfo, UserBubble } from "./MessageItemChrome.tsx";
 import StatusBar from "./StatusBar.tsx";
 import TodoList from "./TodoList.tsx";
 import type { MessageListRenderItem } from "./MessageListRenderTypes.ts";
 
-/** AI 卡片外框属性 */
-interface AIFrameProps {
-  children: React.ReactNode;
-}
-
-/** AI 卡片外框组件 */
-const AIFrame: React.FC<AIFrameProps> = ({ children }) => {
-  return (
-    <Box
-      flexDirection="column"
-      marginBottom={1}
-      marginLeft={1}
-      borderStyle="bold"
-      borderColor="green"
-      borderLeft={true}
-      borderTop={false}
-      borderBottom={false}
-      borderRight={false}
-      padding={1}
-    >
-      {children}
-    </Box>
-  );
-};
-
-/** 用户消息组件属性 */
-interface UserMessageProps {
-  content: string;
-}
-
-/** 用户消息组件 */
-const UserMessage: React.FC<UserMessageProps> = ({ content }) => {
-  return (
-    <Box
-      flexDirection="column"
-      marginBottom={1}
-      marginLeft={1}
-      borderStyle="bold"
-      borderColor="cyan"
-      borderLeft={true}
-      borderTop={false}
-      borderBottom={false}
-      borderRight={false}
-      padding={1}
-    >
-      <Text color="cyan">{content}</Text>
-    </Box>
-  );
-};
-
-/** 调试信息组件属性 */
-interface DebugInfoProps {
-  debug: string;
-}
-
-/** 调试信息组件 */
-const DebugInfo: React.FC<DebugInfoProps> = ({ debug }) => {
-  return (
-    <Box
-      marginTop={0}
-      marginBottom={1}
-      paddingX={1}
-      borderStyle="single"
-      borderColor="magenta"
-      flexDirection="column"
-    >
-      <Text color="magenta" bold>{"🐛 DEBUG"}</Text>
-      <Text color="magenta" dimColor>{debug}</Text>
-    </Box>
-  );
-};
+/** AI 消息块前缀 */
+const AI_BLOCK_PREFIX = "•";
 
 /** AI 内容块组件属性 */
 interface BlockContentProps {
+  /** 消息块数据 */
   block: MessageBlock;
+  /** 是否处于流式输出中 */
   isStreaming: boolean;
+}
+
+/** 带前缀的 AI 行容器属性 */
+interface AIBlockRowProps {
+  /** 行内容 */
+  children: React.ReactNode;
+  /** 前缀颜色 */
+  prefixColor?: string;
+}
+
+/** 带前缀的 AI 行容器 */
+const AIBlockRow: React.FC<AIBlockRowProps> = ({ children, prefixColor = "gray" }) => {
+  return (
+    <Box width="100%" marginBottom={1}>
+      <Box width={2} justifyContent="flex-start">
+        <Text color={prefixColor}>{AI_BLOCK_PREFIX}</Text>
+      </Box>
+      <Box flexDirection="column" flexGrow={1}>
+        {children}
+      </Box>
+    </Box>
+  );
+};
+
+/** 工具消息块 */
+function renderToolBlock(block: Extract<MessageBlock, { type: "tool" }>): React.ReactNode {
+  return (
+    <>
+      <AIBlockRow prefixColor="gray">
+        <Text color="gray">{block.content.trimEnd()}</Text>
+      </AIBlockRow>
+      {block.debug && <DebugInfo debug={block.debug} />}
+    </>
+  );
+}
+
+/** 错误消息块 */
+function renderErrorBlock(block: Extract<MessageBlock, { type: "error" }>): React.ReactNode {
+  return (
+    <>
+      <AIBlockRow prefixColor="red">
+        <Text color="red">{block.content.trimEnd()}</Text>
+      </AIBlockRow>
+      {block.debug && <DebugInfo debug={block.debug} />}
+    </>
+  );
+}
+
+/** 警告消息块 */
+function renderWarningBlock(block: Extract<MessageBlock, { type: "warning" }>): React.ReactNode {
+  return (
+    <>
+      <AIBlockRow prefixColor="yellow">
+        <Text color="yellow">{block.content.trimEnd()}</Text>
+      </AIBlockRow>
+      {block.debug && <DebugInfo debug={block.debug} />}
+    </>
+  );
+}
+
+/** 文本消息块 */
+function renderTextBlock(
+  block: Extract<MessageBlock, { type: "text" }>,
+  isStreaming: boolean
+): React.ReactNode {
+  return (
+    <>
+      <AIBlockRow>
+        {isStreaming ? <Text>{block.content}</Text> : <Markdown>{block.content}</Markdown>}
+      </AIBlockRow>
+      {block.debug && <DebugInfo debug={block.debug} />}
+    </>
+  );
 }
 
 /** AI 内容块组件 */
@@ -91,92 +98,112 @@ const BlockContent: React.FC<BlockContentProps> = ({ block, isStreaming }) => {
   if (block.type === "todo") {
     return (
       <>
-        <TodoList todos={block.todos} />
+        <AIBlockRow>
+          <TodoList todos={block.todos} />
+        </AIBlockRow>
         {block.debug && <DebugInfo debug={block.debug} />}
       </>
     );
   }
 
   if (block.type === "tool") {
-    return (
-      <>
-        <Box marginBottom={1}>
-          <Text color="gray">{"🔨 "}{block.content.trimEnd()}</Text>
-        </Box>
-        {block.debug && <DebugInfo debug={block.debug} />}
-      </>
-    );
+    return renderToolBlock(block);
   }
 
   if (block.type === "error") {
-    return (
-      <>
-        <Box marginBottom={1}>
-          <Text color="red">{"❌ "}{block.content.trimEnd()}</Text>
-        </Box>
-        {block.debug && <DebugInfo debug={block.debug} />}
-      </>
-    );
+    return renderErrorBlock(block);
   }
 
   if (block.type === "warning") {
-    return (
-      <>
-        <Box marginBottom={1}>
-          <Text color="yellow">{"⚠️  "}{block.content.trimEnd()}</Text>
-        </Box>
-        {block.debug && <DebugInfo debug={block.debug} />}
-      </>
-    );
+    return renderWarningBlock(block);
   }
 
+  return renderTextBlock(block, isStreaming);
+};
+
+/** 任务更新组合块 */
+function renderTaskUpdateBlock(
+  item: Extract<MessageListRenderItem, { kind: "ai_task_update" }>
+): React.ReactNode {
   return (
     <>
-      <Box marginBottom={1}>
-        {isStreaming ? <Text>{block.content}</Text> : <Markdown>{block.content}</Markdown>}
-      </Box>
-      {block.debug && <DebugInfo debug={block.debug} />}
+      <AIBlockRow prefixColor="gray">
+        <Text color="gray">{item.toolBlock.content.trimEnd()}</Text>
+        <TodoList todos={item.todoBlock.todos} />
+      </AIBlockRow>
+      {item.toolBlock.debug && <DebugInfo debug={item.toolBlock.debug} />}
+      {item.todoBlock.debug && <DebugInfo debug={item.todoBlock.debug} />}
     </>
   );
-};
+}
 
 /** 渲染项组件属性 */
 interface RenderItemProps {
+  /** 当前渲染项 */
   item: MessageListRenderItem;
+  /** diff 确认回调 */
   onDiffConfirm: (result: ConfirmResult) => void;
+}
+
+/** 构建统计文本 */
+function buildStatsText(item: Extract<MessageListRenderItem, { kind: "ai_stats" }>): string {
+  const durationText = typeof item.message.totalDurationMs === "number"
+    ? formatTotalDuration(item.message.totalDurationMs)
+    : "";
+  const tokensText = typeof item.message.totalTokensK === "number"
+    ? ` | 本轮消耗: ${item.message.totalTokensK.toFixed(1)}K tokens`
+    : "";
+
+  if (item.isPaused) {
+    return `🕒 等待用户确认`;
+  }
+
+  if (item.isRunning) {
+    return `🕒 任务计时中${durationText ? `: ${durationText}` : ""}`;
+  }
+
+  return `🕒 总耗时: ${durationText}${tokensText}`;
 }
 
 /** 单个扁平渲染项组件 */
 export const MessageListRenderItemView: React.FC<RenderItemProps> = ({ item, onDiffConfirm }) => {
   if (item.kind === "user") {
-    return <UserMessage content={item.message.content} />;
+    return <UserBubble content={item.message.content} />;
   }
 
   if (item.kind === "ai_block") {
     return (
-      <AIFrame>
+      <AssistantSection>
         <BlockContent block={item.block} isStreaming={item.isStreaming} />
-      </AIFrame>
+      </AssistantSection>
     );
+  }
+
+  if (item.kind === "ai_task_update") {
+    return <AssistantSection>{renderTaskUpdateBlock(item)}</AssistantSection>;
   }
 
   if (item.kind === "ai_status") {
     return (
-      <AIFrame>
-        <StatusBar thinkingStatus={item.thinkingStatus} />
-      </AIFrame>
+      <AssistantSection>
+        <AIBlockRow>
+          <StatusBar thinkingStatus={item.thinkingStatus} />
+        </AIBlockRow>
+      </AssistantSection>
     );
   }
 
   if (item.kind === "ai_diff") {
     return (
-      <AIFrame>
-        <DiffConfirm
-          change={item.pendingChange}
-          onConfirm={onDiffConfirm}
-          editorOpened={item.diffEditorOpened}
-        />
-      </AIFrame>
+      <AssistantSection>
+        <AIBlockRow>
+          <DiffConfirm
+            change={item.pendingChange}
+            onConfirm={onDiffConfirm}
+            editorOpened={item.diffEditorOpened}
+          />
+        </AIBlockRow>
+      </AssistantSection>
     );
   }
 
@@ -184,19 +211,11 @@ export const MessageListRenderItemView: React.FC<RenderItemProps> = ({ item, onD
     return null;
   }
 
-  const durationText = typeof item.message.totalDurationMs === "number"
-    ? formatTotalDuration(item.message.totalDurationMs)
-    : "";
-  const tokensText = typeof item.message.totalTokensK === "number"
-    ? ` | 本轮消耗: ${item.message.totalTokensK.toFixed(1)}K tokens`
-    : "";
-  const text = item.isRunning
-    ? `🕒 任务计时中${durationText ? `: ${durationText}` : ""}`
-    : `🕒 总耗时: ${durationText}${tokensText}`;
-
   return (
-    <AIFrame>
-      <Text color="gray">{text}</Text>
-    </AIFrame>
+    <AssistantSection>
+      <AIBlockRow>
+        <Text color="gray">{buildStatsText(item)}</Text>
+      </AIBlockRow>
+    </AssistantSection>
   );
 };

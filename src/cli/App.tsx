@@ -122,7 +122,9 @@ const App: React.FC<AppProps> = ({ agent }) => {
     || isManagingMcp;
 
   return (
-    <Box flexDirection="column" height="100%" paddingY={1}>
+    <Box
+      flexDirection="column"
+    >
       {isManagingMcp ? (
         <Box paddingX={1}><McpManagerView agent={agent} onClose={() => setIsManagingMcp(false)} /></Box>
       ) : isSelectingHistory ? (

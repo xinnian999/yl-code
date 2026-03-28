@@ -18,13 +18,11 @@ const StatusBar: React.FC<StatusBarProps> = ({ thinkingStatus }) => {
   const isActive = status !== ThinkingStatus.IDLE;
   const statusText = getStatusText(status, detail);
 
-  // 实时计时
   const [elapsed, setElapsed] = useState(0);
   const startTimeRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (isActive) {
-      // 开始计时
       startTimeRef.current = Date.now();
       setElapsed(0);
 
@@ -32,15 +30,14 @@ const StatusBar: React.FC<StatusBarProps> = ({ thinkingStatus }) => {
         if (startTimeRef.current) {
           setElapsed(Date.now() - startTimeRef.current);
         }
-      }, 100); // 每 100ms 更新一次
+      }, 100);
 
       return () => clearInterval(interval);
-    } else {
-      // 停止计时，重置
-      startTimeRef.current = null;
-      setElapsed(0);
     }
-  }, [isActive, status, detail]); // detail 变化时也重新计时（切换工具时）
+
+    startTimeRef.current = null;
+    setElapsed(0);
+  }, [isActive, status, detail]);
 
   return (
     <Box>
@@ -48,7 +45,6 @@ const StatusBar: React.FC<StatusBarProps> = ({ thinkingStatus }) => {
         {isActive && <><Spinner type="dots" /> </>}
         {statusText}
         {isActive && elapsed > 0 && <Text color="gray"> ({formatDuration(elapsed)})</Text>}
-        {/* {isActive && <Text color="gray" dimColor> - 按 Esc 中断</Text>} */}
       </Text>
     </Box>
   );

@@ -5,6 +5,11 @@ import type { AIMessage, Message } from "@/core/message-bus.ts";
 import type { ThinkingState } from "@/core/types.ts";
 import type { MessageListRenderItem } from "./MessageListRenderTypes.ts";
 
+/** 判断工具块是否表示任务列表更新 */
+function isTaskUpdateToolBlock(content: string): boolean {
+  return content.trimStart().startsWith("更新任务列表");
+}
+
 /** 扁平渲染项构建参数 */
 export interface BuildRenderItemsOptions {
   messages: Message[];
@@ -47,6 +52,8 @@ export function buildRenderItems(options: BuildRenderItemsOptions): MessageListR
   const renderItems: MessageListRenderItem[] = [];
   const lastAIMessage = getLastAIMessage(messages);
   const hasActiveThinking = isThinkingActive(thinkingStatus);
+  const shouldPauseThinkingStatus = Boolean(showDiffConfirm && pendingChange);
+  const shouldShowStats = isProcessing || typeof lastAIMessage?.totalDurationMs === "number";
 
   for (const message of messages) {
     if (message.type === MessageType.USER) {
@@ -62,8 +69,29 @@ export function buildRenderItems(options: BuildRenderItemsOptions): MessageListR
     const aiMessage = message as AIMessage;
     const isLastAIMessage = lastAIMessage?.id === aiMessage.id;
 
-    aiMessage.blocks.forEach((block, blockIndex) => {
+    for (let blockIndex = 0; blockIndex < aiMessage.blocks.length; blockIndex++) {
+      const block = aiMessage.blocks[blockIndex];
       const isStreaming = isLastAIMessage && streamingBlockIndex === blockIndex;
+
+      const nextBlock = aiMessage.blocks[blockIndex + 1];
+
+      if (
+        block.type === "tool" &&
+        nextBlock?.type === "todo" &&
+        isTaskUpdateToolBlock(block.content)
+      ) {
+        renderItems.push({
+          id: `${aiMessage.id}:task-update:${blockIndex}`,
+          kind: "ai_task_update",
+          message: aiMessage,
+          toolBlock: block,
+          todoBlock: nextBlock,
+          isDynamic: false,
+        });
+        blockIndex++;
+        continue;
+      }
+
       renderItems.push({
         id: `${aiMessage.id}:block:${blockIndex}`,
         kind: "ai_block",
@@ -72,13 +100,13 @@ export function buildRenderItems(options: BuildRenderItemsOptions): MessageListR
         isStreaming,
         isDynamic: isStreaming,
       });
-    });
+    }
 
     if (!isLastAIMessage) {
       continue;
     }
 
-    if (hasActiveThinking) {
+    if (hasActiveThinking && !shouldPauseThinkingStatus) {
       renderItems.push({
         id: `${aiMessage.id}:status`,
         kind: "ai_status",
@@ -97,12 +125,13 @@ export function buildRenderItems(options: BuildRenderItemsOptions): MessageListR
       });
     }
 
-    if (isProcessing || typeof aiMessage.totalDurationMs === "number") {
+    if (shouldShowStats) {
       renderItems.push({
         id: `${aiMessage.id}:stats`,
         kind: "ai_stats",
         message: aiMessage,
         isRunning: isProcessing,
+        isPaused: shouldPauseThinkingStatus,
         isDynamic: isProcessing || hasActiveThinking || showDiffConfirm,
       });
     }

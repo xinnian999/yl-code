@@ -3,6 +3,12 @@ import type { EditorType } from "@/core/editor-detector.ts";
 import type { AIMessage, UserMessage } from "@/core/message-bus.ts";
 import type { MessageBlock, ThinkingState } from "@/core/types.ts";
 
+/** 任务更新工具块 */
+export type TaskUpdateToolBlock = Extract<MessageBlock, { type: "tool" }>;
+
+/** 任务进度快照块 */
+export type TaskUpdateTodoBlock = Extract<MessageBlock, { type: "todo" }>;
+
 /** 用户消息渲染项 */
 export interface UserRenderItem {
   id: string;
@@ -18,6 +24,16 @@ export interface AIBlockRenderItem {
   message: AIMessage;
   block: MessageBlock;
   isStreaming: boolean;
+  isDynamic: boolean;
+}
+
+/** AI 任务更新组合渲染项 */
+export interface AITaskUpdateRenderItem {
+  id: string;
+  kind: "ai_task_update";
+  message: AIMessage;
+  toolBlock: TaskUpdateToolBlock;
+  todoBlock: TaskUpdateTodoBlock;
   isDynamic: boolean;
 }
 
@@ -44,6 +60,8 @@ export interface AIStatsRenderItem {
   kind: "ai_stats";
   message: AIMessage;
   isRunning: boolean;
+  /** 是否暂停显示 */
+  isPaused: boolean;
   isDynamic: boolean;
 }
 
@@ -51,6 +69,7 @@ export interface AIStatsRenderItem {
 export type MessageListRenderItem =
   | UserRenderItem
   | AIBlockRenderItem
+  | AITaskUpdateRenderItem
   | AIStatusRenderItem
   | AIDiffRenderItem
   | AIStatsRenderItem;

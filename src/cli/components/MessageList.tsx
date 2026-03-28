@@ -9,13 +9,21 @@ import { buildRenderItems, getDynamicTailCount } from "./message-list-utils.ts";
 
 /** 消息列表组件属性 */
 interface MessageListProps {
+  /** 全部消息 */
   messages: Message[];
+  /** 当前思考状态 */
   thinkingStatus: ThinkingState;
+  /** 当前流式块索引 */
   streamingBlockIndex: number;
+  /** 是否处理中 */
   isProcessing: boolean;
+  /** 是否展示 diff 确认 */
   showDiffConfirm: boolean;
+  /** 当前待确认变更 */
   pendingChange: PendingChange | null;
+  /** 已打开的编辑器类型 */
   diffEditorOpened: EditorType | null;
+  /** diff 确认回调 */
   onDiffConfirm: (result: ConfirmResult) => void;
 }
 
@@ -63,7 +71,7 @@ const MessageList = React.memo<MessageListProps>(({
   firstMessageIdRef.current = messages[0]?.id ?? "";
 
   return (
-    <Box flexDirection="column" flexGrow={1}>
+    <Box width="100%" flexDirection="column" flexGrow={1} alignItems="stretch">
       <Static items={staticItems}>
         {(item) => (
           <MessageListRenderItemView
