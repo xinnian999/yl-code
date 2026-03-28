@@ -25,6 +25,10 @@ interface MessageListProps {
   diffEditorOpened: EditorType | null;
   /** diff 确认回调 */
   onDiffConfirm: (result: ConfirmResult) => void;
+  /** 当前模型 ID，用于欢迎卡片 */
+  modelId: string;
+  /** 应用版本号，用于欢迎卡片 */
+  version: string;
 }
 
 /** 消息列表组件 */
@@ -37,6 +41,8 @@ const MessageList = React.memo<MessageListProps>(({
   pendingChange,
   diffEditorOpened,
   onDiffConfirm,
+  modelId,
+  version,
 }) => {
   const committedRef = useRef(0);
   const lastMessageCountRef = useRef(messages.length);
@@ -57,6 +63,8 @@ const MessageList = React.memo<MessageListProps>(({
     showDiffConfirm,
     pendingChange,
     diffEditorOpened,
+    modelId,
+    version,
   });
   const dynamicTailCount = getDynamicTailCount(renderItems);
   const safeCommitBoundary = Math.max(0, renderItems.length - dynamicTailCount);

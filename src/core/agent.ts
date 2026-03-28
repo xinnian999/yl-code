@@ -33,7 +33,6 @@ import {
   AGENT_DURATION_UPDATE_INTERVAL_MS,
   AGENT_MAX_ITERATIONS,
   AGENT_STATUS_TEXT,
-  AGENT_WELCOME_MESSAGE,
 } from "./config/agent-config.ts";
 import { SessionManager } from "./session/session-manager.ts";
 import { McpConfigManager, McpManager } from "./mcp/index.ts";
@@ -118,7 +117,6 @@ export class Agent {
     this.builtinTools = createTools(this.confirmBus, this.processManager, this.todoBus);
     this.tools = [...this.builtinTools];
     this.unsubModelChange = this.config.onModelChange(() => { this.currentModel = null; });
-    this.messageBus.ai(AGENT_WELCOME_MESSAGE);
   }
 
   /** 获取或创建绑定工具的模型实例 */

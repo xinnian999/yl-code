@@ -9,6 +9,15 @@ export type TaskUpdateToolBlock = Extract<MessageBlock, { type: "tool" }>;
 /** 任务进度快照块 */
 export type TaskUpdateTodoBlock = Extract<MessageBlock, { type: "todo" }>;
 
+/** 欢迎卡片渲染项 */
+export interface WelcomeRenderItem {
+  id: "welcome";
+  kind: "welcome";
+  modelId: string;
+  version: string;
+  isDynamic: false;
+}
+
 /** 用户消息渲染项 */
 export interface UserRenderItem {
   id: string;
@@ -60,6 +69,7 @@ export interface AIStatsRenderItem {
 
 /** 消息列表扁平渲染项 */
 export type MessageListRenderItem =
+  | WelcomeRenderItem
   | UserRenderItem
   | AIBlockRenderItem
   | AITaskUpdateRenderItem

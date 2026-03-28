@@ -144,6 +144,8 @@ const App: React.FC<AppProps> = ({ agent }) => {
             pendingChange={pendingChange}
             diffEditorOpened={diffEditorOpened}
             onDiffConfirm={handleDiffConfirm}
+            modelId={agent.getCurrentModelId()}
+            version="1.0.11"
           />
           {showPlanInteraction && pendingPlanInteraction && (
             <Box paddingX={1} marginBottom={1}>

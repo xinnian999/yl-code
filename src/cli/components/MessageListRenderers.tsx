@@ -8,6 +8,7 @@ import { AssistantSection, DebugInfo, UserBubble } from "./MessageItemChrome.tsx
 import PlanMessageBlock from "./PlanMessageBlock.tsx";
 import StatusBar from "./StatusBar.tsx";
 import TodoList from "./TodoList.tsx";
+import WelcomeCard from "./WelcomeCard.tsx";
 import type { MessageListRenderItem } from "./MessageListRenderTypes.ts";
 
 /** AI 消息块前缀 */
@@ -197,6 +198,10 @@ export const MessageListRenderItemView: React.FC<RenderItemProps> = ({
   item,
   onDiffConfirm,
 }) => {
+  if (item.kind === "welcome") {
+    return <WelcomeCard modelId={item.modelId} version={item.version} />;
+  }
+
   if (item.kind === "user") {
     return <UserBubble content={item.message.content} />;
   }

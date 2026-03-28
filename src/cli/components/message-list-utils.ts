@@ -25,6 +25,10 @@ export interface BuildRenderItemsOptions {
   showDiffConfirm: boolean;
   pendingChange: PendingChange | null;
   diffEditorOpened: EditorType | null;
+  /** 欢迎卡片：当前模型 ID */
+  modelId: string;
+  /** 欢迎卡片：应用版本号 */
+  version: string;
 }
 
 /** 判断当前是否存在活跃思考状态 */
@@ -85,8 +89,12 @@ export function buildRenderItems(options: BuildRenderItemsOptions): MessageListR
     showDiffConfirm,
     pendingChange,
     diffEditorOpened,
+    modelId,
+    version,
   } = options;
-  const renderItems: MessageListRenderItem[] = [];
+  const renderItems: MessageListRenderItem[] = [
+    { id: "welcome", kind: "welcome", modelId, version, isDynamic: false },
+  ];
   const lastAIMessage = getLastAIMessage(messages);
   const hasActiveThinking = isThinkingActive(thinkingStatus);
   const shouldPauseThinkingStatus = Boolean(showDiffConfirm && pendingChange);
