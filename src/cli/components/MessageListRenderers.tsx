@@ -145,13 +145,10 @@ interface RenderItemProps {
   onDiffConfirm: (result: ConfirmResult) => void;
 }
 
-/** 构建统计文本 */
-function buildStatsText(item: Extract<MessageListRenderItem, { kind: "ai_stats" }>): string {
+/** 构建计时状态文本 */
+function buildTimerText(item: Extract<MessageListRenderItem, { kind: "ai_stats" }>): string {
   const durationText = typeof item.message.totalDurationMs === "number"
     ? formatTotalDuration(item.message.totalDurationMs)
-    : "";
-  const tokensText = typeof item.message.totalTokensK === "number"
-    ? ` | 本轮消耗: ${item.message.totalTokensK.toFixed(1)}K tokens`
     : "";
 
   if (item.isPaused) {
@@ -162,7 +159,7 @@ function buildStatsText(item: Extract<MessageListRenderItem, { kind: "ai_stats" 
     return `🕒 任务计时中${durationText ? `: ${durationText}` : ""}`;
   }
 
-  return `🕒 总耗时: ${durationText}${tokensText}`;
+  return `🕒 总耗时: ${durationText}`;
 }
 
 /** 单个扁平渲染项组件 */
@@ -181,16 +178,6 @@ export const MessageListRenderItemView: React.FC<RenderItemProps> = ({ item, onD
 
   if (item.kind === "ai_task_update") {
     return <AssistantSection>{renderTaskUpdateBlock(item)}</AssistantSection>;
-  }
-
-  if (item.kind === "ai_status") {
-    return (
-      <AssistantSection>
-        <AIBlockRow>
-          <StatusBar thinkingStatus={item.thinkingStatus} />
-        </AIBlockRow>
-      </AssistantSection>
-    );
   }
 
   if (item.kind === "ai_diff") {
@@ -214,7 +201,11 @@ export const MessageListRenderItemView: React.FC<RenderItemProps> = ({ item, onD
   return (
     <AssistantSection>
       <AIBlockRow>
-        <Text color="gray">{buildStatsText(item)}</Text>
+        <StatusBar
+          thinkingStatus={item.thinkingStatus}
+          timerText={buildTimerText(item)}
+          hideThinking={item.isPaused}
+        />
       </AIBlockRow>
     </AssistantSection>
   );

@@ -29,7 +29,7 @@ export interface SessionIndex {
 /** UI 消息的可序列化形式（timestamp 为 ISO 字符串） */
 export type SerializedUIMessage =
   | { id: string; type: "user"; content: string; timestamp: string }
-  | { id: string; type: "ai"; blocks: MessageBlock[]; timestamp: string; totalDurationMs?: number; totalTokensK?: number };
+  | { id: string; type: "ai"; blocks: MessageBlock[]; timestamp: string; totalDurationMs?: number };
 
 /** 单个会话完整数据（持久化到 session_xxx.json） */
 export interface SessionData {
@@ -150,7 +150,6 @@ export function serializeUIMessages(messages: Message[]): SerializedUIMessage[] 
       blocks: [...aiMsg.blocks],
       timestamp: aiMsg.timestamp.toISOString(),
       totalDurationMs: aiMsg.totalDurationMs,
-      totalTokensK: aiMsg.totalTokensK,
     };
   });
 }
@@ -167,7 +166,6 @@ export function deserializeUIMessages(messages: SerializedUIMessage[]): Message[
       blocks: [...msg.blocks],
       timestamp: new Date(msg.timestamp),
       totalDurationMs: msg.totalDurationMs,
-      totalTokensK: msg.totalTokensK,
     };
   });
 }

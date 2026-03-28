@@ -37,14 +37,6 @@ export interface AITaskUpdateRenderItem {
   isDynamic: boolean;
 }
 
-/** AI 状态渲染项 */
-export interface AIStatusRenderItem {
-  id: string;
-  kind: "ai_status";
-  thinkingStatus: ThinkingState;
-  isDynamic: boolean;
-}
-
 /** AI 变更确认渲染项 */
 export interface AIDiffRenderItem {
   id: string;
@@ -59,6 +51,7 @@ export interface AIStatsRenderItem {
   id: string;
   kind: "ai_stats";
   message: AIMessage;
+  thinkingStatus: ThinkingState;
   isRunning: boolean;
   /** 是否暂停显示 */
   isPaused: boolean;
@@ -70,6 +63,5 @@ export type MessageListRenderItem =
   | UserRenderItem
   | AIBlockRenderItem
   | AITaskUpdateRenderItem
-  | AIStatusRenderItem
   | AIDiffRenderItem
   | AIStatsRenderItem;

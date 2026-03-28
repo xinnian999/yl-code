@@ -106,15 +106,6 @@ export function buildRenderItems(options: BuildRenderItemsOptions): MessageListR
       continue;
     }
 
-    if (hasActiveThinking && !shouldPauseThinkingStatus) {
-      renderItems.push({
-        id: `${aiMessage.id}:status`,
-        kind: "ai_status",
-        thinkingStatus,
-        isDynamic: true,
-      });
-    }
-
     if (showDiffConfirm && pendingChange) {
       renderItems.push({
         id: `${aiMessage.id}:diff`,
@@ -130,6 +121,7 @@ export function buildRenderItems(options: BuildRenderItemsOptions): MessageListR
         id: `${aiMessage.id}:stats`,
         kind: "ai_stats",
         message: aiMessage,
+        thinkingStatus,
         isRunning: isProcessing,
         isPaused: shouldPauseThinkingStatus,
         isDynamic: isProcessing || hasActiveThinking || showDiffConfirm,

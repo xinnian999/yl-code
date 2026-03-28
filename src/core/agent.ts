@@ -19,7 +19,6 @@ import {
   parsePlanInteractionFromToolCalls,
 } from "./plan/plan-parser.ts";
 import {
-  estimateTotalTokens,
   compactMessagesForContext,
 } from "./context/context-manager.ts";
 import { AgentMode, ThinkingStatus } from "./types.ts";
@@ -194,15 +193,13 @@ export class Agent {
     this.messageBus.setThinkingStatus(ThinkingStatus.IDLE);
   }
 
-  /** 输出本轮耗时和 token 统计 */
-  private reportStats(startTime: number, startTokens: number): void {
+  /** 输出本轮耗时统计 */
+  private reportStats(startTime: number): void {
     const totalDuration = Date.now()
       - startTime
       - this.confirmBus.totalWaitTime
       - this.planBus.totalWaitTime;
-    const usedTokens = estimateTotalTokens(this.chatMessages) - startTokens;
     this.messageBus.setLastAITotalDuration(totalDuration);
-    this.messageBus.setLastAITokenUsage(usedTokens / 1000);
   }
 
   /** 创建新的 AI 消息并绑定当前任务列表 */
@@ -415,7 +412,6 @@ export class Agent {
     maxIterations: number | null = AGENT_MAX_ITERATIONS
   ): Promise<string> {
     const startTime = Date.now();
-    const startTokens = estimateTotalTokens(this.chatMessages);
     this.abortController = new AbortController();
     this.confirmBus.resetSkipConfirm();
     this.planBus.resetWaitTime();
@@ -489,7 +485,7 @@ export class Agent {
 
       this.messageBus.setThinkingStatus(ThinkingStatus.IDLE);
       if (!this.abortController?.signal.aborted) this.todoBus.completeAll();
-      this.reportStats(startTime, startTokens);
+      this.reportStats(startTime);
       compactMessagesForContext(this.chatMessages);
 
       const lastMessage = this.chatMessages[this.chatMessages.length - 1];

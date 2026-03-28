@@ -1,51 +1,49 @@
-import React, { useState, useEffect, useRef } from "react";
+import React from "react";
 import { Box, Text } from "ink";
 import Spinner from "ink-spinner";
 import { ThinkingStatus, type ThinkingState } from "@/core/types.ts";
-import { formatDuration, getStatusText } from "@/core/agent-helpers.ts";
+import { getStatusText } from "@/core/agent-helpers.ts";
 
 /** 状态栏组件属性 */
 interface StatusBarProps {
+  /** 思考状态 */
   thinkingStatus: ThinkingState;
+  /** 计时状态文本 */
+  timerText: string;
+  /** 是否隐藏思考状态 */
+  hideThinking?: boolean;
+}
+
+/** 构建思考状态文本 */
+function getThinkingText(thinkingStatus: ThinkingState): string {
+  const { status, detail } = thinkingStatus || { status: ThinkingStatus.IDLE, detail: "" };
+  if (status === ThinkingStatus.IDLE) {
+    return "";
+  }
+
+  return getStatusText(status, detail);
 }
 
 /**
  * 状态栏组件
- * 显示思考状态（位于左下角）+ 实时计时
+ * 将思考状态与任务计时合并为同一行展示
  */
-const StatusBar: React.FC<StatusBarProps> = ({ thinkingStatus }) => {
-  const { status, detail } = thinkingStatus || { status: ThinkingStatus.IDLE, detail: "" };
-  const isActive = status !== ThinkingStatus.IDLE;
-  const statusText = getStatusText(status, detail);
+const StatusBar: React.FC<StatusBarProps> = ({ thinkingStatus, timerText, hideThinking = false }) => {
+  const thinkingText = getThinkingText(thinkingStatus);
+  const shouldShowThinking = !hideThinking && thinkingText.length > 0;
 
-  const [elapsed, setElapsed] = useState(0);
-  const startTimeRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (isActive) {
-      startTimeRef.current = Date.now();
-      setElapsed(0);
-
-      const interval = setInterval(() => {
-        if (startTimeRef.current) {
-          setElapsed(Date.now() - startTimeRef.current);
-        }
-      }, 100);
-
-      return () => clearInterval(interval);
-    }
-
-    startTimeRef.current = null;
-    setElapsed(0);
-  }, [isActive, status, detail]);
+  if (!shouldShowThinking) {
+    return (
+      <Box>
+        <Text color="gray">{timerText}</Text>
+      </Box>
+    );
+  }
 
   return (
     <Box>
-      <Text color="yellow">
-        {isActive && <><Spinner type="dots" /> </>}
-        {statusText}
-        {isActive && elapsed > 0 && <Text color="gray"> ({formatDuration(elapsed)})</Text>}
-      </Text>
+      <Text color="yellow"><Spinner type="dots" /> {thinkingText}</Text>
+      <Text color="gray"> ｜ {timerText}</Text>
     </Box>
   );
 };

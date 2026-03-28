@@ -31,7 +31,7 @@ export const AGENT_API_RETRY_MAX_DELAY_MS = 5000;
 /** Agent 运行时状态文案 */
 export const AGENT_STATUS_TEXT = {
   RECONNECTING_MCP: "正在重连 MCP 服务器...",
-  THINKING: "玩命思考中...🐂🐎",
+  THINKING: "玩命思考中",
   WAITING_AI: "等待 AI 响应...",
   ABORTED: "\n⚠️ 已中断",
 } as const;
