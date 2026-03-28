@@ -111,6 +111,14 @@ export class MessageBus extends EventEmitter implements MessagePort {
     this.emit("message:update", msg);
   }
 
+  /** 追加计划内容块 */
+  plan(title: string, content: string): void {
+    let msg = this.getLastAIMessage();
+    if (!msg) msg = this.createAIMessage();
+    msg.blocks.push({ type: "plan", title, content });
+    this.emit("message:update", msg);
+  }
+
   /** 创建一个文本块并返回块索引（用于后续流式追加） */
   createTextBlock(content: string = ""): number {
     let msg = this.getLastAIMessage();

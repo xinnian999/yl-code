@@ -92,7 +92,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
   /** 切换工作模式 */
   const handleModeSwitch = useCallback(() => {
     setCurrentMode((prev) => {
-      const currentIndex = AGENT_MODES.findIndex((m) => m.value === prev);
+      const currentIndex = AGENT_MODES.findIndex((modeItem) => modeItem.value === prev);
       const nextMode = AGENT_MODES[(currentIndex + 1) % AGENT_MODES.length].value;
       agent.setMode(nextMode);
       return nextMode;
@@ -115,6 +115,10 @@ const App: React.FC<AppProps> = ({ agent }) => {
     setIsSelectingHistory(false);
   }, [agent]);
 
+  /** 当前是否展示计划确认态 */
+  const isPlanPreviewVisible = showPlanInteraction
+    && pendingPlanInteraction?.type === "preview";
+
   const hasOverlay = showDiffConfirm
     || showPlanInteraction
     || isSelectingModel
@@ -122,9 +126,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
     || isManagingMcp;
 
   return (
-    <Box
-      flexDirection="column"
-    >
+    <Box flexDirection="column">
       {isManagingMcp ? (
         <Box paddingX={1}><McpManagerView agent={agent} onClose={() => setIsManagingMcp(false)} /></Box>
       ) : isSelectingHistory ? (
@@ -152,15 +154,24 @@ const App: React.FC<AppProps> = ({ agent }) => {
               />
             </Box>
           )}
-          <InputArea
-            isProcessing={isProcessing || showDiffConfirm || showPlanInteraction}
-            onSubmit={handleSubmit}
-            onAbort={handleAbort}
-            onModeSwitch={handleModeSwitch}
-            onCommand={handleCommand}
-            hasOverlay={hasOverlay}
-          />
-          <FooterBar mode={currentMode} debugMode={debugMode} contextUsage={contextUsage} isSummarizing={isSummarizing} />
+          {!isPlanPreviewVisible && (
+            <InputArea
+              isProcessing={isProcessing || showDiffConfirm || showPlanInteraction}
+              onSubmit={handleSubmit}
+              onAbort={handleAbort}
+              onModeSwitch={handleModeSwitch}
+              onCommand={handleCommand}
+              hasOverlay={hasOverlay}
+            />
+          )}
+          {!isPlanPreviewVisible && (
+            <FooterBar
+              mode={currentMode}
+              debugMode={debugMode}
+              contextUsage={contextUsage}
+              isSummarizing={isSummarizing}
+            />
+          )}
         </>
       )}
     </Box>

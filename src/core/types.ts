@@ -67,6 +67,7 @@ interface MessageBlockBase {
 /** 消息块类型 - AI 消息由多个块组成，按类型渲染 */
 export type MessageBlock =
   | (MessageBlockBase & { type: "text"; content: string })
+  | (MessageBlockBase & { type: "plan"; title: string; content: string })
   | (MessageBlockBase & { type: "tool"; content: string })
   | (MessageBlockBase & { type: "error"; content: string })
   | (MessageBlockBase & { type: "warning"; content: string })
@@ -161,6 +162,7 @@ export interface ProcessInfo {
 export interface MessagePort {
   createAIMessage(): void;
   ai(content: string): void;
+  plan(title: string, content: string): void;
   tool(content: string): void;
   error(content: string): void;
   setThinkingStatus(status: ThinkingStatusValue, detail?: string): void;

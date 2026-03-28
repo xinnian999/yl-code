@@ -13,7 +13,6 @@ import { ContextBus } from "./context/context-bus.ts";
 import { PlanBus } from "./plan/plan-bus.ts";
 import {
   buildPlanInteractionContent,
-  buildPlanPreviewSummary,
   buildPlanQuestionSummary,
   parsePlanInteraction,
   parsePlanInteractionFromToolCalls,
@@ -345,14 +344,10 @@ export class Agent {
     }
 
     const { title, planMarkdown } = parsedInteraction.data;
-    this.messageBus.ai(buildPlanPreviewSummary(title));
+    this.messageBus.plan(title, planMarkdown);
     this.appendPlanDebug(content);
 
     const result = await this.planBus.requestPlanPreview(title, planMarkdown);
-    if (result.action === "cancel") {
-      return "break";
-    }
-
     if (result.action === "execute") {
       this.messageBus.user("确认执行当前计划");
       this.chatMessages.push(
@@ -363,11 +358,7 @@ export class Agent {
       return "continue";
     }
 
-    this.continuePlanConversation(
-      `修改计划：${result.feedback}`,
-      `请根据以下意见修改计划，并只输出新的 <proposed_plan>：\n${result.feedback}`
-    );
-    return "continue";
+    return "break";
   }
 
   /** 处理计划模式下的模型文本响应 */

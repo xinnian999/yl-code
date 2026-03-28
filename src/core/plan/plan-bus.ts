@@ -58,8 +58,7 @@ export interface PlanQuestionAnswer {
 /** 计划预览的处理结果 */
 export type PlanPreviewResult =
   | { action: "execute" }
-  | { action: "revise"; feedback: string }
-  | { action: "cancel" };
+  | { action: "revise" };
 
 /** 计划交互的统一返回结果 */
 type PlanInteractionResult = PlanQuestionAnswer | PlanPreviewResult;

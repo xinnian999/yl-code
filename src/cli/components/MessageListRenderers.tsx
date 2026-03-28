@@ -5,6 +5,7 @@ import type { ConfirmResult, MessageBlock } from "@/core/types.ts";
 import { formatTotalDuration } from "@/core/agent-helpers.ts";
 import DiffConfirm from "./DiffConfirm.tsx";
 import { AssistantSection, DebugInfo, UserBubble } from "./MessageItemChrome.tsx";
+import PlanMessageBlock from "./PlanMessageBlock.tsx";
 import StatusBar from "./StatusBar.tsx";
 import TodoList from "./TodoList.tsx";
 import type { MessageListRenderItem } from "./MessageListRenderTypes.ts";
@@ -29,7 +30,10 @@ interface AIBlockRowProps {
 }
 
 /** 带前缀的 AI 行容器 */
-const AIBlockRow: React.FC<AIBlockRowProps> = ({ children, prefixColor = "gray" }) => {
+const AIBlockRow: React.FC<AIBlockRowProps> = ({
+  children,
+  prefixColor = "gray",
+}) => {
   return (
     <Box width="100%" marginBottom={1}>
       <Box width={2} justifyContent="flex-start">
@@ -43,7 +47,9 @@ const AIBlockRow: React.FC<AIBlockRowProps> = ({ children, prefixColor = "gray" 
 };
 
 /** 工具消息块 */
-function renderToolBlock(block: Extract<MessageBlock, { type: "tool" }>): React.ReactNode {
+function renderToolBlock(
+  block: Extract<MessageBlock, { type: "tool" }>
+): React.ReactNode {
   return (
     <>
       <AIBlockRow prefixColor="gray">
@@ -54,8 +60,24 @@ function renderToolBlock(block: Extract<MessageBlock, { type: "tool" }>): React.
   );
 }
 
+/** 计划消息块 */
+function renderPlanBlock(
+  block: Extract<MessageBlock, { type: "plan" }>
+): React.ReactNode {
+  return (
+    <>
+      <AIBlockRow prefixColor="cyan">
+        <PlanMessageBlock title={block.title} content={block.content} />
+      </AIBlockRow>
+      {block.debug && <DebugInfo debug={block.debug} />}
+    </>
+  );
+}
+
 /** 错误消息块 */
-function renderErrorBlock(block: Extract<MessageBlock, { type: "error" }>): React.ReactNode {
+function renderErrorBlock(
+  block: Extract<MessageBlock, { type: "error" }>
+): React.ReactNode {
   return (
     <>
       <AIBlockRow prefixColor="red">
@@ -67,7 +89,9 @@ function renderErrorBlock(block: Extract<MessageBlock, { type: "error" }>): Reac
 }
 
 /** 警告消息块 */
-function renderWarningBlock(block: Extract<MessageBlock, { type: "warning" }>): React.ReactNode {
+function renderWarningBlock(
+  block: Extract<MessageBlock, { type: "warning" }>
+): React.ReactNode {
   return (
     <>
       <AIBlockRow prefixColor="yellow">
@@ -104,6 +128,10 @@ const BlockContent: React.FC<BlockContentProps> = ({ block, isStreaming }) => {
         {block.debug && <DebugInfo debug={block.debug} />}
       </>
     );
+  }
+
+  if (block.type === "plan") {
+    return renderPlanBlock(block);
   }
 
   if (block.type === "tool") {
@@ -146,13 +174,15 @@ interface RenderItemProps {
 }
 
 /** 构建计时状态文本 */
-function buildTimerText(item: Extract<MessageListRenderItem, { kind: "ai_stats" }>): string {
+function buildTimerText(
+  item: Extract<MessageListRenderItem, { kind: "ai_stats" }>
+): string {
   const durationText = typeof item.message.totalDurationMs === "number"
     ? formatTotalDuration(item.message.totalDurationMs)
     : "";
 
   if (item.isPaused) {
-    return `🕒 等待用户确认`;
+    return "🕒 等待用户确认";
   }
 
   if (item.isRunning) {
@@ -163,7 +193,10 @@ function buildTimerText(item: Extract<MessageListRenderItem, { kind: "ai_stats" 
 }
 
 /** 单个扁平渲染项组件 */
-export const MessageListRenderItemView: React.FC<RenderItemProps> = ({ item, onDiffConfirm }) => {
+export const MessageListRenderItemView: React.FC<RenderItemProps> = ({
+  item,
+  onDiffConfirm,
+}) => {
   if (item.kind === "user") {
     return <UserBubble content={item.message.content} />;
   }
