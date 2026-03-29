@@ -10,8 +10,6 @@ interface StatusBarProps {
   thinkingStatus: ThinkingState;
   /** 计时状态文本 */
   timerText: string;
-  /** 是否隐藏思考状态 */
-  hideThinking?: boolean;
 }
 
 /** 构建思考状态文本 */
@@ -28,9 +26,9 @@ function getThinkingText(thinkingStatus: ThinkingState): string {
  * 状态栏组件
  * 将思考状态与任务计时合并为同一行展示
  */
-const StatusBar: React.FC<StatusBarProps> = ({ thinkingStatus, timerText, hideThinking = false }) => {
+const StatusBar: React.FC<StatusBarProps> = ({ thinkingStatus, timerText }) => {
   const thinkingText = getThinkingText(thinkingStatus);
-  const shouldShowThinking = !hideThinking && thinkingText.length > 0;
+  const shouldShowThinking = thinkingText.length > 0;
 
   if (!shouldShowThinking) {
     return (

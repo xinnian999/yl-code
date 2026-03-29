@@ -3,7 +3,8 @@ import { Box, Static } from "ink";
 import type { PendingChange } from "@/core/confirm-bus.ts";
 import type { EditorType } from "@/core/editor-detector.ts";
 import type { Message } from "@/core/message-bus.ts";
-import type { ConfirmResult, ThinkingState } from "@/core/types.ts";
+import type { ThinkingState } from "@/core/types.ts";
+import type { PendingPlanInteraction } from "@/core/plan/plan-bus.ts";
 import { MessageListRenderItemView } from "./MessageListRenderers.tsx";
 import { buildRenderItems, getDynamicTailCount } from "./message-list-utils.ts";
 
@@ -23,8 +24,8 @@ interface MessageListProps {
   pendingChange: PendingChange | null;
   /** 已打开的编辑器类型 */
   diffEditorOpened: EditorType | null;
-  /** diff 确认回调 */
-  onDiffConfirm: (result: ConfirmResult) => void;
+  /** 当前待处理的计划交互（用于渲染计划卡片） */
+  pendingPlanInteraction: PendingPlanInteraction | null;
   /** 当前模型 ID，用于欢迎卡片 */
   modelId: string;
   /** 应用版本号，用于欢迎卡片 */
@@ -40,7 +41,7 @@ const MessageList = React.memo<MessageListProps>(({
   showDiffConfirm,
   pendingChange,
   diffEditorOpened,
-  onDiffConfirm,
+  pendingPlanInteraction,
   modelId,
   version,
 }) => {
@@ -63,6 +64,7 @@ const MessageList = React.memo<MessageListProps>(({
     showDiffConfirm,
     pendingChange,
     diffEditorOpened,
+    pendingPlanInteraction,
     modelId,
     version,
   });
@@ -82,19 +84,11 @@ const MessageList = React.memo<MessageListProps>(({
     <Box width="100%" flexDirection="column" flexGrow={1} alignItems="stretch">
       <Static items={staticItems}>
         {(item) => (
-          <MessageListRenderItemView
-            key={item.id}
-            item={item}
-            onDiffConfirm={onDiffConfirm}
-          />
+          <MessageListRenderItemView key={item.id} item={item} />
         )}
       </Static>
       {activeItems.map((item) => (
-        <MessageListRenderItemView
-          key={item.id}
-          item={item}
-          onDiffConfirm={onDiffConfirm}
-        />
+        <MessageListRenderItemView key={item.id} item={item} />
       ))}
     </Box>
   );

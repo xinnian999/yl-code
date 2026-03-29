@@ -1,12 +1,11 @@
 import React, { useState, useCallback, useEffect } from "react";
 import { Box, useApp, useInput } from "ink";
 import MessageList from "./components/MessageList.tsx";
-import InputArea from "./components/InputArea.tsx";
+import BottomBar from "./components/BottomBar.tsx";
 import ModelSelector from "./components/ModelSelector.tsx";
 import HistorySelector, { NEW_SESSION_ID } from "./components/HistorySelector.tsx";
 import McpManagerView from "./components/McpManager.tsx";
-import FooterBar from "./components/FooterBar.tsx";
-import PlanInteraction from "./components/PlanInteraction.tsx";
+import ConfirmSelectArea from "./components/ConfirmSelectArea.tsx";
 import { useMessages } from "./hooks/useMessages.ts";
 import { useDiffConfirm } from "./hooks/useDiffConfirm.ts";
 import { usePlanInteraction } from "./hooks/usePlanInteraction.ts";
@@ -115,15 +114,10 @@ const App: React.FC<AppProps> = ({ agent }) => {
     setIsSelectingHistory(false);
   }, [agent]);
 
-  /** 当前是否展示计划确认态 */
-  const isPlanPreviewVisible = showPlanInteraction
-    && pendingPlanInteraction?.type === "preview";
+  /** 确认交互是否处于等待状态（隐藏输入框和底栏） */
+  const isConfirmPending = showDiffConfirm || showPlanInteraction;
 
-  const hasOverlay = showDiffConfirm
-    || showPlanInteraction
-    || isSelectingModel
-    || isSelectingHistory
-    || isManagingMcp;
+  const hasOverlay = isSelectingModel || isSelectingHistory || isManagingMcp;
 
   return (
     <Box flexDirection="column">
@@ -143,31 +137,29 @@ const App: React.FC<AppProps> = ({ agent }) => {
             showDiffConfirm={showDiffConfirm}
             pendingChange={pendingChange}
             diffEditorOpened={diffEditorOpened}
-            onDiffConfirm={handleDiffConfirm}
+            pendingPlanInteraction={pendingPlanInteraction}
             modelId={agent.getCurrentModelName()}
             version="1.0.11"
           />
-          {showPlanInteraction && pendingPlanInteraction && (
-            <Box paddingX={1} marginBottom={1}>
-              <PlanInteraction
-                interaction={pendingPlanInteraction}
-                onResolveQuestion={handlePlanQuestionResolve}
-                onResolvePreview={handlePlanPreviewResolve}
-              />
-            </Box>
+          {isConfirmPending && (
+            <ConfirmSelectArea
+              showDiffConfirm={showDiffConfirm}
+              pendingChange={pendingChange}
+              onDiffConfirm={handleDiffConfirm}
+              showPlanInteraction={showPlanInteraction}
+              pendingPlanInteraction={pendingPlanInteraction}
+              onPlanQuestionResolve={handlePlanQuestionResolve}
+              onPlanPreviewResolve={handlePlanPreviewResolve}
+            />
           )}
-          {!isPlanPreviewVisible && (
-            <InputArea
-              isProcessing={isProcessing || showDiffConfirm || showPlanInteraction}
+          {!isConfirmPending && (
+            <BottomBar
+              isProcessing={isProcessing}
               onSubmit={handleSubmit}
               onAbort={handleAbort}
               onModeSwitch={handleModeSwitch}
               onCommand={handleCommand}
               hasOverlay={hasOverlay}
-            />
-          )}
-          {!isPlanPreviewVisible && (
-            <FooterBar
               mode={currentMode}
               debugMode={debugMode}
               contextUsage={contextUsage}

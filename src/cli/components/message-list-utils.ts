@@ -3,6 +3,7 @@ import type { PendingChange } from "@/core/confirm-bus.ts";
 import type { EditorType } from "@/core/editor-detector.ts";
 import type { AIMessage, Message } from "@/core/message-bus.ts";
 import type { ThinkingState } from "@/core/types.ts";
+import type { PendingPlanInteraction } from "@/core/plan/plan-bus.ts";
 import type { MessageListRenderItem } from "./MessageListRenderTypes.ts";
 
 /** 空闲态思考状态，供历史统计行复用 */
@@ -25,6 +26,8 @@ export interface BuildRenderItemsOptions {
   showDiffConfirm: boolean;
   pendingChange: PendingChange | null;
   diffEditorOpened: EditorType | null;
+  /** 当前待处理的计划交互（用于渲染计划卡片） */
+  pendingPlanInteraction: PendingPlanInteraction | null;
   /** 欢迎卡片：当前模型 ID */
   modelId: string;
   /** 欢迎卡片：应用版本号 */
@@ -89,6 +92,7 @@ export function buildRenderItems(options: BuildRenderItemsOptions): MessageListR
     showDiffConfirm,
     pendingChange,
     diffEditorOpened,
+    pendingPlanInteraction,
     modelId,
     version,
   } = options;
@@ -151,7 +155,16 @@ export function buildRenderItems(options: BuildRenderItemsOptions): MessageListR
         kind: "ai_diff",
         pendingChange,
         diffEditorOpened,
-        isDynamic: true,
+        isDynamic: false,
+      });
+    }
+
+    if (isLastAIMessage && pendingPlanInteraction) {
+      renderItems.push({
+        id: `${aiMessage.id}:plan-card:${pendingPlanInteraction.type}`,
+        kind: "ai_plan_interaction",
+        interaction: pendingPlanInteraction,
+        isDynamic: false,
       });
     }
 

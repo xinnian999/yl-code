@@ -1,9 +1,10 @@
 import React from "react";
 import { Box, Text } from "ink";
 import Markdown from "ink-markdown-es";
-import type { ConfirmResult, MessageBlock } from "@/core/types.ts";
+import type { MessageBlock } from "@/core/types.ts";
 import { formatTotalDuration } from "@/core/agent-helpers.ts";
 import DiffConfirm from "./DiffConfirm.tsx";
+import PlanInteraction from "./PlanInteraction.tsx";
 import { AssistantSection, DebugInfo, UserBubble } from "./MessageItemChrome.tsx";
 import PlanMessageBlock from "./PlanMessageBlock.tsx";
 import StatusBar from "./StatusBar.tsx";
@@ -170,8 +171,6 @@ function renderTaskUpdateBlock(
 interface RenderItemProps {
   /** 当前渲染项 */
   item: MessageListRenderItem;
-  /** diff 确认回调 */
-  onDiffConfirm: (result: ConfirmResult) => void;
 }
 
 /** 构建计时状态文本 */
@@ -182,10 +181,6 @@ function buildTimerText(
     ? formatTotalDuration(item.message.totalDurationMs)
     : "";
 
-  if (item.isPaused) {
-    return "🕒 等待用户确认";
-  }
-
   if (item.isRunning) {
     return `🕒 任务计时中${durationText ? `: ${durationText}` : ""}`;
   }
@@ -194,10 +189,7 @@ function buildTimerText(
 }
 
 /** 单个扁平渲染项组件 */
-export const MessageListRenderItemView: React.FC<RenderItemProps> = ({
-  item,
-  onDiffConfirm,
-}) => {
+export const MessageListRenderItemView: React.FC<RenderItemProps> = ({ item }) => {
   if (item.kind === "welcome") {
     return <WelcomeCard modelId={item.modelId} version={item.version} />;
   }
@@ -222,14 +214,28 @@ export const MessageListRenderItemView: React.FC<RenderItemProps> = ({
     return (
       <AssistantSection>
         <AIBlockRow>
-          <DiffConfirm
-            change={item.pendingChange}
-            onConfirm={onDiffConfirm}
-            editorOpened={item.diffEditorOpened}
-          />
+          <DiffConfirm change={item.pendingChange} editorOpened={item.diffEditorOpened} />
         </AIBlockRow>
       </AssistantSection>
     );
+  }
+
+  if (item.kind === "ai_plan_interaction") {
+    return (
+      <AssistantSection>
+        <AIBlockRow>
+          <PlanInteraction interaction={item.interaction} />
+        </AIBlockRow>
+      </AssistantSection>
+    );
+  }
+
+  if (item.kind !== "ai_stats") {
+    return null;
+  }
+
+  if (item.isPaused) {
+    return null;
   }
 
   if (!item.isRunning && typeof item.message.totalDurationMs !== "number") {
@@ -242,7 +248,6 @@ export const MessageListRenderItemView: React.FC<RenderItemProps> = ({
         <StatusBar
           thinkingStatus={item.thinkingStatus}
           timerText={buildTimerText(item)}
-          hideThinking={item.isPaused}
         />
       </AIBlockRow>
     </AssistantSection>

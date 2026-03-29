@@ -1,46 +1,24 @@
 import React from "react";
 import PlanQuestionPrompt from "./PlanQuestionPrompt.tsx";
 import PlanPreviewConfirm from "./PlanPreviewConfirm.tsx";
-import type {
-  PendingPlanInteraction,
-  PlanPreviewResult,
-  PlanQuestionAnswer,
-} from "@/core/plan/plan-bus.ts";
+import type { PendingPlanInteraction } from "@/core/plan/plan-bus.ts";
 
-/** 计划交互组件属性 */
+/** 计划交互卡片组件属性 */
 interface PlanInteractionProps {
   /** 当前待处理的计划交互 */
   interaction: PendingPlanInteraction;
-  /** 处理计划问题回答 */
-  onResolveQuestion: (answer: PlanQuestionAnswer) => void;
-  /** 处理计划预览结果 */
-  onResolvePreview: (result: PlanPreviewResult) => void;
 }
 
 /**
- * 计划交互组件
- * 根据交互类型渲染计划问题或计划预览确认面板
+ * 计划交互卡片路由组件
+ * 根据交互类型渲染计划问题卡片或计划预览卡片（纯展示）
  */
-const PlanInteraction: React.FC<PlanInteractionProps> = ({
-  interaction,
-  onResolveQuestion,
-  onResolvePreview,
-}) => {
+const PlanInteraction: React.FC<PlanInteractionProps> = ({ interaction }) => {
   if (interaction.type === "question") {
-    return (
-      <PlanQuestionPrompt
-        interaction={interaction}
-        onResolve={onResolveQuestion}
-      />
-    );
+    return <PlanQuestionPrompt interaction={interaction} />;
   }
 
-  return (
-    <PlanPreviewConfirm
-      interaction={interaction}
-      onResolve={onResolvePreview}
-    />
-  );
+  return <PlanPreviewConfirm interaction={interaction} />;
 };
 
 export default PlanInteraction;

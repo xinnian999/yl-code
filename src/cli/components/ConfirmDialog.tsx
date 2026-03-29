@@ -1,5 +1,6 @@
-import React from "react";
-import { Box, Text, useInput } from "ink";
+import React, { useMemo } from "react";
+import { Box, Text } from "ink";
+import SelectInput from "ink-select-input";
 
 /** 确认对话框组件属性 */
 interface Props {
@@ -8,18 +9,28 @@ interface Props {
   onCancel: () => void;
 }
 
+/** 确认选项值类型 */
+type ConfirmValue = "confirm" | "cancel";
+
 /**
  * 确认对话框组件
- * 按 y 或 Enter 确认，按 n 或 Esc 取消
+ * 使用 SelectInput 提供可视化选择，消息文本以卡片形式静态展示
  */
 const ConfirmDialog: React.FC<Props> = ({ message, onConfirm, onCancel }) => {
-  useInput((input, key) => {
-    if (input.toLowerCase() === "y" || key.return) {
+  /** 选择项列表 */
+  const items = useMemo(() => [
+    { label: "确认", value: "confirm" as ConfirmValue },
+    { label: "取消", value: "cancel" as ConfirmValue },
+  ], []);
+
+  /** 处理选项选中 */
+  const handleSelect = (item: { value: ConfirmValue }) => {
+    if (item.value === "confirm") {
       onConfirm();
-    } else if (input.toLowerCase() === "n" || key.escape) {
+    } else {
       onCancel();
     }
-  });
+  };
 
   return (
     <Box flexDirection="column" paddingY={1}>
@@ -27,9 +38,7 @@ const ConfirmDialog: React.FC<Props> = ({ message, onConfirm, onCancel }) => {
         ⚠️ {message}
       </Text>
       <Box marginTop={1}>
-        <Text dimColor>
-          按 <Text color="green" bold>y</Text> 或 <Text color="green" bold>Enter</Text> 确认，按 <Text color="red" bold>n</Text> 或 <Text color="red" bold>Esc</Text> 取消
-        </Text>
+        <SelectInput items={items} onSelect={handleSelect} />
       </Box>
     </Box>
   );
