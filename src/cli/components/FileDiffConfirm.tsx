@@ -13,9 +13,6 @@ interface FileDiffConfirmProps {
   editorOpened?: EditorType | null;
 }
 
-/** 最多展示行数 */
-const VISIBLE_LINES = 20;
-
 /**
  * 渲染单行 diff
  */
@@ -48,8 +45,6 @@ const FileDiffConfirm: React.FC<FileDiffConfirmProps> = ({
   }, [change.originalContent, change.newContent]);
 
   const isNewFile = change.originalContent === "";
-  const visibleLines = diffResult.lines.slice(0, VISIBLE_LINES);
-  const hiddenCount = diffResult.lines.length - VISIBLE_LINES;
 
   return (
     <Box
@@ -95,12 +90,9 @@ const FileDiffConfirm: React.FC<FileDiffConfirmProps> = ({
           borderColor="gray"
           paddingX={1}
         >
-          {visibleLines.map((line, index) => (
+          {diffResult.lines.map((line: DiffLine, index: number) => (
             <DiffLineView key={index} line={line} />
           ))}
-          {hiddenCount > 0 && (
-            <Text dimColor>... 还有 {hiddenCount} 行未显示</Text>
-          )}
         </Box>
       )}
     </Box>

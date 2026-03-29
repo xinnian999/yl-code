@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Box } from "ink";
+import { Box, Text } from "ink";
 import SelectInput from "ink-select-input";
 import type { PendingChange } from "@/core/confirm-bus.ts";
 import type { ConfirmResult } from "@/core/types.ts";
@@ -63,7 +63,10 @@ const ConfirmSelectArea: React.FC<ConfirmSelectAreaProps> = ({
 
   if (showDiffConfirm && pendingChange) {
     return (
-      <Box paddingX={2} paddingY={1} backgroundColor={USER_SURFACE_BACKGROUND_COLOR} width="100%">
+      <Box paddingX={2} paddingY={1} backgroundColor={USER_SURFACE_BACKGROUND_COLOR} width="100%" flexDirection="column">
+        <Box marginBottom={1}>
+          <Text dimColor>同意此次操作吗？</Text>
+        </Box>
         <SelectInput
           items={diffItems}
           onSelect={(item) => onDiffConfirm(item.value)}
