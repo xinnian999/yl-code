@@ -136,11 +136,11 @@ const HistorySelector: React.FC<Props> = ({ agent, onSelect, onCancel }) => {
             ))}
           </ScrollList>
         ) : (
-          <Text color="gray">暂无历史对话</Text>
+          <Text dimColor>暂无历史对话</Text>
         )}
       </Box>
       <Box>
-        <Text color="gray">
+        <Text dimColor>
           <Text color="cyan">n</Text> 新建会话 |{" "}
           <Text color="cyan">d</Text> 删除
         </Text>

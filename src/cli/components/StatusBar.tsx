@@ -35,7 +35,7 @@ const StatusBar: React.FC<StatusBarProps> = ({ thinkingStatus, timerText, hideTh
   if (!shouldShowThinking) {
     return (
       <Box>
-        <Text color="gray">{timerText}</Text>
+        <Text dimColor>{timerText}</Text>
       </Box>
     );
   }
@@ -43,7 +43,7 @@ const StatusBar: React.FC<StatusBarProps> = ({ thinkingStatus, timerText, hideTh
   return (
     <Box>
       <Text color="yellow"><Spinner type="dots" /> {thinkingText}</Text>
-      <Text color="gray"> ｜ {timerText}</Text>
+      <Text dimColor> ｜ {timerText}</Text>
     </Box>
   );
 };

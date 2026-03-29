@@ -54,7 +54,7 @@ function renderToolBlock(
   return (
     <>
       <AIBlockRow prefixColor="gray">
-        <Text color="gray">{block.content.trimEnd()}</Text>
+        <Text dimColor>{block.content.trimEnd()}</Text>
       </AIBlockRow>
       {block.debug && <DebugInfo debug={block.debug} />}
     </>
@@ -157,7 +157,7 @@ function renderTaskUpdateBlock(
   return (
     <>
       <AIBlockRow prefixColor="gray">
-        <Text color="gray">{item.toolBlock.content.trimEnd()}</Text>
+        <Text dimColor>{item.toolBlock.content.trimEnd()}</Text>
         <TodoList todos={item.todoBlock.todos} />
       </AIBlockRow>
       {item.toolBlock.debug && <DebugInfo debug={item.toolBlock.debug} />}

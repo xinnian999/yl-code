@@ -1,5 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
+import BigText from "ink-big-text";
+import Gradient from "ink-gradient";
 import os from "os";
 
 /** WelcomeCard 组件属性 */
@@ -34,21 +36,27 @@ const WelcomeCard: React.FC<WelcomeCardProps> = ({ modelId, version }) => {
       marginTop={1}
       marginBottom={1}
     >
-      {/* 标题行 */}
-      <Text bold>{`>_ 牛码 (v${version})`}</Text>
+      {/* 大标题 */}
+      <Gradient name="rainbow">
+        <BigText text="YL CODE" font="block" />
+      </Gradient>
 
-      <Box height={1} />
+      {/* 副标题与版本 */}
+      <Box gap={1} marginTop={-1} marginBottom={1}>
+        <Text dimColor> YL CODE 编程助手</Text>
+        <Text dimColor>{`v${version}`}</Text>
+      </Box>
 
       {/* model 行 */}
       <Box gap={1}>
-        <Text color="gray">{"model:    "}</Text>
+        <Text dimColor>{"模型: "}</Text>
         <Text bold color="cyan">{modelId}</Text>
-        <Text color="gray">  /model to change</Text>
+        <Text dimColor>  /model 切换</Text>
       </Box>
 
       {/* directory 行 */}
       <Box gap={1}>
-        <Text color="gray">{"directory:"}</Text>
+        <Text dimColor>{"工作目录: "}</Text>
         <Text>{directory}</Text>
       </Box>
     </Box>

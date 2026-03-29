@@ -98,7 +98,7 @@ const McpManager: React.FC<Props> = ({ agent, onClose }) => {
         🔌 MCP 服务器管理 (↑↓ 移动, Esc 返回)
       </Text>
       {servers.length === 0 ? (
-        <Box marginY={1}><Text color="gray">暂无 MCP 服务器，按 o 编辑 JSON 配置</Text></Box>
+        <Box marginY={1}><Text dimColor>暂无 MCP 服务器，按 o 编辑 JSON 配置</Text></Box>
       ) : (
         <Box borderStyle="single" borderTop borderBottom borderLeft={false} borderRight={false}
           marginTop={1} marginBottom={1} height={LIST_HEIGHT}>
@@ -125,7 +125,7 @@ const McpManager: React.FC<Props> = ({ agent, onClose }) => {
         </Box>
       )}
       <Box>
-        <Text color="gray">
+        <Text dimColor>
           <Text color="cyan">t</Text> 启用/禁用 | <Text color="cyan">o</Text> 编辑JSON |{" "}
           <Text color="cyan">r</Text> 重连
         </Text>

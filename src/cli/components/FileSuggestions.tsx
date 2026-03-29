@@ -25,7 +25,7 @@ const FileSuggestions: React.FC<Props> = ({
   if (files.length === 0) {
     return (
       <Box marginBottom={1} paddingLeft={1}>
-        <Text color="gray">没有匹配的文件或目录</Text>
+        <Text dimColor>没有匹配的文件或目录</Text>
       </Box>
     );
   }
@@ -40,13 +40,13 @@ const FileSuggestions: React.FC<Props> = ({
   return (
     <Box flexDirection="column" marginBottom={1} paddingLeft={1}>
       <Box marginBottom={1}>
-        <Text color="gray">
+        <Text dimColor>
           📂 {filter ? `${process.cwd()}/${filter}` : process.cwd()}
         </Text>
       </Box>
 
       {startIndex > 0 && (
-        <Text color="gray" dimColor>
+        <Text dimColor>
           {"  "}↑ 还有 {startIndex} 项...
         </Text>
       )}
@@ -70,13 +70,13 @@ const FileSuggestions: React.FC<Props> = ({
       })}
 
       {startIndex + maxItems < files.length && (
-        <Text color="gray" dimColor>
+        <Text dimColor>
           {"  "}↓ 还有 {files.length - startIndex - maxItems} 项...
         </Text>
       )}
 
       <Box marginTop={1}>
-        <Text color="gray" dimColor>
+        <Text dimColor>
           ↑↓ 选择 | Enter 确认 | Esc 取消
         </Text>
       </Box>

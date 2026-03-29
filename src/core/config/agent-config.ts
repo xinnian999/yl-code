@@ -2,7 +2,7 @@ import { AgentMode } from "../types.ts";
 import type { AgentModeValue } from "../types.ts";
 
 /** Agent 默认欢迎消息 */
-export const AGENT_WELCOME_MESSAGE = `您好老板！\n\n我是一个会写代码的《牛码》；\n\n有什么可以为您效劳的？😊`;
+export const AGENT_WELCOME_MESSAGE = `您好老板！\n\n我是一个会写代码的《YL CODE》；\n\n有什么可以为您效劳的？😊`;
 
 /** Agent 默认工作模式 */
 export const AGENT_DEFAULT_MODE: AgentModeValue = AgentMode.BUILD;

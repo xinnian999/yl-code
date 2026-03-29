@@ -27,7 +27,7 @@ const ConfirmDialog: React.FC<Props> = ({ message, onConfirm, onCancel }) => {
         ⚠️ {message}
       </Text>
       <Box marginTop={1}>
-        <Text color="gray">
+        <Text dimColor>
           按 <Text color="green" bold>y</Text> 或 <Text color="green" bold>Enter</Text> 确认，按 <Text color="red" bold>n</Text> 或 <Text color="red" bold>Esc</Text> 取消
         </Text>
       </Box>

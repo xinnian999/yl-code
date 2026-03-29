@@ -126,7 +126,7 @@ const PlanQuestionPrompt: React.FC<PlanQuestionPromptProps> = ({
                 {option.label}
               </Text>
               {option.description && (
-                <Text color="gray">
+                <Text dimColor>
                   {isSelected ? "  " : "    "}
                   {option.description}
                 </Text>
@@ -144,7 +144,7 @@ const PlanQuestionPrompt: React.FC<PlanQuestionPromptProps> = ({
           borderColor="cyan"
           paddingX={1}
         >
-          <Text color="gray">请输入你的自定义回答，按 Enter 提交，Esc 返回选项列表</Text>
+          <Text dimColor>请输入你的自定义回答，按 Enter 提交，Esc 返回选项列表</Text>
           <TextInput
             value={customValue}
             onChange={setCustomValue}

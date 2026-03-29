@@ -83,7 +83,7 @@ const ModelForm: React.FC<Props> = ({ mode, initialValues, onSubmit, onCancel })
     <Box flexDirection="column">
       <Form {...formConfig} />
       <Box marginTop={2} justifyContent="flex-end">
-        <Text color="gray">
+        <Text dimColor>
           按 <Text color="cyan">q</Text> 返回模型选择
         </Text>
       </Box>

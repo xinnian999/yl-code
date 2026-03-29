@@ -29,12 +29,12 @@ const CommandSuggestions: React.FC<Props> = ({ selectedIndex, filter }) => {
         return (
           <Box key={cmd.value}>
             <Text
-              color={isSelected ? "cyan" : "gray"}
+              color={isSelected ? "cyan" : undefined}
+              dimColor={!isSelected}
               bold={isSelected}
             >
               {isSelected ? "❯ " : "  "}
-              <Text color={isSelected ? "cyan" : ""}>/{cmd.value}</Text>
-              <Text color="gray">{"  "}{cmd.description}</Text>
+              /{cmd.value}{"  "}{cmd.description}
             </Text>
           </Box>
         );

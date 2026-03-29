@@ -218,7 +218,7 @@ const ModelSelector: React.FC<Props> = ({ agent, onSelect, onCancel }) => {
         </ScrollList>
       </Box>
       <Box>
-        <Text color="gray">
+        <Text dimColor>
           <Text color="cyan">a</Text> 添加
           {!isBuiltinSelected && (
             <>

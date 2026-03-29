@@ -109,7 +109,7 @@ const FileDiffConfirm: React.FC<DiffConfirmProps> = ({
 
       {editorOpened && (
         <Box marginBottom={1}>
-          <Text color="gray">
+          <Text dimColor>
             已在 {getEditorName(editorOpened)} 中打开 diff 视图
           </Text>
         </Box>
@@ -119,7 +119,7 @@ const FileDiffConfirm: React.FC<DiffConfirmProps> = ({
         <Box marginBottom={1}>
           <Text color="green">+{diffResult.addedCount} </Text>
           <Text color="red">-{diffResult.removedCount} </Text>
-          <Text color="gray">({diffResult.unchangedCount} 行未变)</Text>
+          <Text dimColor>({diffResult.unchangedCount} 行未变)</Text>
         </Box>
       )}
 
@@ -132,7 +132,7 @@ const FileDiffConfirm: React.FC<DiffConfirmProps> = ({
           paddingX={1}
         >
           {canScroll && scrollOffset > 0 && (
-            <Text color="gray" dimColor>
+            <Text dimColor>
               ↑ 还有 {scrollOffset} 行
             </Text>
           )}
@@ -142,7 +142,7 @@ const FileDiffConfirm: React.FC<DiffConfirmProps> = ({
           ))}
 
           {canScroll && scrollOffset < maxScroll && (
-            <Text color="gray" dimColor>
+            <Text dimColor>
               ↓ 还有 {diffResult.lines.length - scrollOffset - VISIBLE_LINES} 行
             </Text>
           )}
@@ -209,7 +209,7 @@ const CommandConfirm: React.FC<Omit<DiffConfirmProps, "editorOpened">> = ({
         </Text>
         {change.workingDirectory && (
           <Text>
-            目录: <Text color="gray">{toDisplayPath(change.workingDirectory)}</Text>
+            目录: <Text dimColor>{toDisplayPath(change.workingDirectory)}</Text>
           </Text>
         )}
         {change.background && (

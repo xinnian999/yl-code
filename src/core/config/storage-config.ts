@@ -2,7 +2,7 @@ import { homedir } from "os";
 import { join } from "path";
 
 /** 全局配置目录 */
-export const NIUMA_CONFIG_DIR = join(homedir(), ".niuma");
+export const NIUMA_CONFIG_DIR = join(homedir(), ".yl");
 
 /** 主配置文件路径 */
 export const APP_CONFIG_FILE = join(NIUMA_CONFIG_DIR, "config.json");

@@ -32,8 +32,8 @@ const FooterBar: React.FC<Props> = ({ mode, debugMode, contextUsage, isSummarizi
       <Text bold color={color}>
         上下文({contextUsage.percentage}%)
       </Text>
-      {debugMode && <Text bold color="gray">🐛 Debug模式</Text>}
-      <Text bold color="gray">{config?.label}模式(Tab切换)</Text>
+      {debugMode && <Text bold dimColor>🐛 Debug模式</Text>}
+      <Text bold dimColor>{config?.label}模式(Tab切换)</Text>
     </Box>
   );
 };

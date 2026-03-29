@@ -538,6 +538,9 @@ export class Agent {
   /** 获取当前模型 ID */
   getCurrentModelId(): string { return this.config.getCurrentModelId(); }
 
+  /** 获取当前模型名称（用户自定义名称） */
+  getCurrentModelName(): string { return this.config.getCurrentModel().name; }
+
   /** 发送系统通知消息 */
   notify(message: string): void { this.messageBus.createAIMessage(); this.messageBus.ai(message); }
 

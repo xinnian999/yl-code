@@ -162,13 +162,13 @@ export function handleApiError(config: ConfigManager, error: unknown): never {
 
   const modelConfig = config.getCurrentModel();
   if (!modelConfig.apiKey) {
-    throw new Error("未配置模型 API Key，请检查 ~/.niuma/config.json");
+    throw new Error("未配置模型 API Key，请检查 ~/.yl/config.json");
   }
   if (!modelConfig.baseUrl) {
-    throw new Error("未配置模型 Base URL，请检查 ~/.niuma/config.json");
+    throw new Error("未配置模型 Base URL，请检查 ~/.yl/config.json");
   }
   if (!modelConfig.modelName) {
-    throw new Error("未配置模型名称，请检查 ~/.niuma/config.json");
+    throw new Error("未配置模型名称，请检查 ~/.yl/config.json");
   }
 
   const detailedError = new Error(

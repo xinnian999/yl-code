@@ -49,8 +49,8 @@ const PlanPreviewConfirm: React.FC<PlanPreviewConfirmProps> = ({
 
       <Box flexDirection="column" marginBottom={1}>
         <Text bold>已生成最终计划：{interaction.title}</Text>
-        <Text color="gray">完整计划已在上方消息区静态渲染。</Text>
-        <Text color="gray">确认执行会直接开始实现；选择修改计划后，会恢复输入框供你继续补充要求。</Text>
+        <Text dimColor>完整计划已在上方消息区静态渲染。</Text>
+        <Text dimColor>确认执行会直接开始实现；选择修改计划后，会恢复输入框供你继续补充要求。</Text>
       </Box>
 
       <Box flexDirection="column">
