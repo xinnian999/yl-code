@@ -26,8 +26,8 @@ const InputBox: React.FC<InputBoxProps> = ({ value, onChange, onSubmit, isDisabl
     <MessageRow>
       <Box width="100%" flexDirection="column" >
         <Box width="100%" paddingX={1} paddingY={1} backgroundColor={USER_SURFACE_BACKGROUND_COLOR}>
-          <Text color={USER_SURFACE_TEXT_COLOR}>
-            <Text color={USER_SURFACE_ACCENT_COLOR}>› </Text>
+          <Text dimColor >
+            <Text dimColor>› </Text>
           </Text>
           {isDisabled ? (
             <Text color={USER_SURFACE_TEXT_COLOR} dimColor>请等待响应...按 Esc 中断</Text>
@@ -37,7 +37,7 @@ const InputBox: React.FC<InputBoxProps> = ({ value, onChange, onSubmit, isDisabl
               value={value}
               onChange={onChange}
               onSubmit={onSubmit}
-              placeholder="输入您的问题..."
+              placeholder="输入您的指令..."
             />
           )}
         </Box>
