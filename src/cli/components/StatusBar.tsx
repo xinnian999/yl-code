@@ -12,14 +12,15 @@ interface StatusBarProps {
   timerText: string;
 }
 
-/** 构建思考状态文本 */
-function getThinkingText(thinkingStatus: ThinkingState): string {
-  const { status, detail } = thinkingStatus || { status: ThinkingStatus.IDLE, detail: "" };
-  if (status === ThinkingStatus.IDLE) {
+/** 构建运行中的统一状态栏文案 */
+function getRunningText(thinkingStatus: ThinkingState, timerText: string): string {
+  const { status } = thinkingStatus || { status: ThinkingStatus.IDLE, detail: "" };
+  const statusText = getStatusText(status);
+  if (!statusText) {
     return "";
   }
 
-  return getStatusText(status, detail);
+  return timerText ? `${statusText}(${timerText})` : statusText;
 }
 
 /**
@@ -27,10 +28,10 @@ function getThinkingText(thinkingStatus: ThinkingState): string {
  * 将思考状态与任务计时合并为同一行展示
  */
 const StatusBar: React.FC<StatusBarProps> = ({ thinkingStatus, timerText }) => {
-  const thinkingText = getThinkingText(thinkingStatus);
-  const shouldShowThinking = thinkingText.length > 0;
+  const runningText = getRunningText(thinkingStatus, timerText);
+  const shouldShowRunning = runningText.length > 0;
 
-  if (!shouldShowThinking) {
+  if (!shouldShowRunning) {
     return (
       <Box>
         <Text dimColor>{timerText}</Text>
@@ -40,8 +41,7 @@ const StatusBar: React.FC<StatusBarProps> = ({ thinkingStatus, timerText }) => {
 
   return (
     <Box>
-      <Text color="yellow"><Spinner type="dots" /> {thinkingText}</Text>
-      <Text dimColor> ｜ {timerText}</Text>
+      <Text color="yellow"><Spinner type="dots" /> {runningText}</Text>
     </Box>
   );
 };

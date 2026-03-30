@@ -65,7 +65,7 @@ const ConfirmSelectArea: React.FC<ConfirmSelectAreaProps> = ({
     return (
       <Box paddingX={2} paddingY={1} backgroundColor={USER_SURFACE_BACKGROUND_COLOR} width="100%" flexDirection="column">
         <Box marginBottom={1}>
-          <Text dimColor>同意此次操作吗？</Text>
+          <Text dimColor>同意上述操作吗？</Text>
         </Box>
         <SelectInput
           items={diffItems}

@@ -98,11 +98,13 @@ export function getToolArgsPreview(toolCallChunks: ToolCallChunk[]): string | nu
   return null;
 }
 
+/** 将毫秒格式化为短耗时文本 */
 export function formatDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   return `${(ms / 1000).toFixed(1)}s`;
 }
 
+/** 将毫秒格式化为面向用户展示的总耗时文本 */
 export function formatTotalDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
   const totalSeconds = Math.round(ms / 1000);
@@ -201,18 +203,11 @@ export function buildSystemPrompt(
     .replace("{currentTime}", new Date().toLocaleString());
 }
 
-/** 根据思考状态获取默认显示文本 */
-export function getStatusText(status: string, detail: string): string {
-  if (detail) return detail;
-
-  switch (status) {
-    case ThinkingStatus.THINKING:
-      return "玩命思考中...";
-    case ThinkingStatus.TOOL_CALLING:
-      return "正在执行工具...";
-    case ThinkingStatus.WAITING:
-      return "等待响应中...";
-    default:
-      return "";
+/** 根据思考状态获取统一的执行中文案 */
+export function getStatusText(status: string): string {
+  if (status === ThinkingStatus.IDLE) {
+    return "";
   }
+
+  return "任务执行中...";
 }

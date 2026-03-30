@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Text } from "ink";
 import Markdown from "ink-markdown-es";
 import type { MessageBlock } from "@/core/types.ts";
+import { ThinkingStatus } from "@/core/types.ts";
 import { formatTotalDuration } from "@/core/agent-helpers.ts";
 import DiffConfirm from "./DiffConfirm.tsx";
 import PlanInteraction from "./PlanInteraction.tsx";
@@ -177,15 +178,16 @@ interface RenderItemProps {
 function buildTimerText(
   item: Extract<MessageListRenderItem, { kind: "ai_stats" }>
 ): string {
+  const isActive = item.isRunning || item.thinkingStatus.status !== ThinkingStatus.IDLE;
   const durationText = typeof item.message.totalDurationMs === "number"
     ? formatTotalDuration(item.message.totalDurationMs)
-    : "";
+    : "0ms";
 
-  if (item.isRunning) {
-    return `🕒 任务计时中${durationText ? `: ${durationText}` : ""}`;
+  if (isActive) {
+    return durationText;
   }
 
-  return `🕒 总耗时: ${durationText}`;
+  return `总耗时: ${durationText}`;
 }
 
 /** 单个扁平渲染项组件 */
