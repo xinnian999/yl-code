@@ -101,10 +101,13 @@ const PlanQuestionSelect: React.FC<PlanQuestionSelectProps> = ({
     return (
       <Box
         flexDirection="column"
-        borderStyle="single"
-        borderColor="cyan"
         paddingX={1}
+        gap={1}
       >
+        <Box flexDirection="column">
+          <Text bold>{interaction.title}</Text>
+          <Text>{interaction.question}</Text>
+        </Box>
         <Text dimColor>请输入你的自定义回答，按 Enter 提交，Esc 返回选项列表</Text>
         <TextInput
           value={customValue}
@@ -117,11 +120,17 @@ const PlanQuestionSelect: React.FC<PlanQuestionSelectProps> = ({
   }
 
   return (
-    <SelectInput
-      items={items}
-      itemComponent={OptionItem}
-      onSelect={handleSelect}
-    />
+    <Box flexDirection="column" paddingX={1} gap={1}>
+      <Box flexDirection="column">
+        <Text bold>{interaction.title}</Text>
+        <Text>{interaction.question}</Text>
+      </Box>
+      <SelectInput
+        items={items}
+        itemComponent={OptionItem}
+        onSelect={handleSelect}
+      />
+    </Box>
   );
 };
 

@@ -98,12 +98,6 @@ export function getToolArgsPreview(toolCallChunks: ToolCallChunk[]): string | nu
   return null;
 }
 
-/** 将毫秒格式化为短耗时文本 */
-export function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  return `${(ms / 1000).toFixed(1)}s`;
-}
-
 /** 将毫秒格式化为面向用户展示的总耗时文本 */
 export function formatTotalDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;

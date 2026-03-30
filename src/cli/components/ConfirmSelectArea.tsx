@@ -77,7 +77,18 @@ const ConfirmSelectArea: React.FC<ConfirmSelectAreaProps> = ({
 
   if (showPlanInteraction && pendingPlanInteraction?.type === "preview") {
     return (
-      <Box paddingX={2} paddingY={1} backgroundColor={USER_SURFACE_BACKGROUND_COLOR} width="100%">
+      <Box
+        paddingX={2}
+        paddingY={1}
+        backgroundColor={USER_SURFACE_BACKGROUND_COLOR}
+        width="100%"
+        flexDirection="column"
+      >
+        <Box flexDirection="column" paddingX={1} marginBottom={1}>
+          <Text bold>{`已生成最终计划：${pendingPlanInteraction.title}`}</Text>
+          <Text dimColor>完整计划已在上方消息区静态渲染。</Text>
+          <Text dimColor>确认执行会直接开始实现；选择修改计划后，会恢复输入框供你继续补充要求。</Text>
+        </Box>
         <SelectInput
           items={planPreviewItems}
           onSelect={(item) => onPlanPreviewResolve({ action: item.value })}
@@ -88,7 +99,13 @@ const ConfirmSelectArea: React.FC<ConfirmSelectAreaProps> = ({
 
   if (showPlanInteraction && pendingPlanInteraction?.type === "question") {
     return (
-      <Box paddingX={2} paddingY={1} backgroundColor={USER_SURFACE_BACKGROUND_COLOR} width="100%">
+      <Box
+        paddingX={2}
+        paddingY={1}
+        backgroundColor={USER_SURFACE_BACKGROUND_COLOR}
+        width="100%"
+        flexDirection="column"
+      >
         <PlanQuestionSelect
           interaction={pendingPlanInteraction}
           onResolve={onPlanQuestionResolve}

@@ -8,11 +8,11 @@ import { AgentMode, ThinkingStatus } from "./types.ts";
 import type { ConfigManager } from "./config.ts";
 import type { AgentContext } from "./agent-helpers.ts";
 import {
-  formatDuration,
   getToolDescription,
   type ToolCall,
   type ToolArgs,
 } from "./agent-helpers.ts";
+import { isPlanInteractionToolName } from "./plan/plan-parser.ts";
 
 function getStringArg(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value : undefined;
@@ -115,6 +115,15 @@ function buildToolArgsError(toolName: string, missingFields: string[]): string {
     : `工具参数错误: ${toolName} 缺少必填字段 ${fieldsText}。请严格按 schema 重试。`;
 }
 
+/** 构建计划伪工具的纠正文案 */
+function buildPlanInteractionToolGuidance(toolName: string): string {
+  if (toolName === "plan_question") {
+    return "plan_question 是结构化输出标签，不是真实工具。请直接输出 <plan_question> JSON </plan_question>。";
+  }
+
+  return `${toolName} 是结构化输出标签，不是真实工具。请直接输出对应标签块。`;
+}
+
 export function normalizeResponseToolCalls(response: any): void {
   if (!response?.tool_calls || response.tool_calls.length === 0) return;
 
@@ -196,8 +205,7 @@ function buildModeUnavailableMessage(
 /** 执行响应中的工具调用列表 */
 export async function executeToolCalls(
   ctx: AgentContext,
-  response: any,
-  iterationStartTime: number
+  response: any
 ): Promise<void> {
   const allowedTools = getToolsForMode(ctx.tools, ctx.mode);
 
@@ -209,6 +217,16 @@ export async function executeToolCalls(
     const toolDesc = getToolDescription(toolCall.name, normalizedArgs as ToolArgs);
 
     ctx.messageBus.setThinkingStatus(ThinkingStatus.TOOL_CALLING, `执行中: ${toolDesc}`);
+
+    if (isPlanInteractionToolName(toolCall.name)) {
+      ctx.chatMessages.push(
+        new ToolMessage({
+          content: buildPlanInteractionToolGuidance(toolCall.name),
+          tool_call_id: toolCall.id,
+        })
+      );
+      continue;
+    }
 
     if (!foundTool) {
       const isKnownTool = ctx.tools.some((t) => t.tool.name === toolCall.name);
@@ -236,13 +254,10 @@ export async function executeToolCalls(
     }
 
     try {
-      const waitTimeBefore = ctx.confirmBus.totalWaitTime;
       const toolResult = await (foundTool as any).invoke(normalizedArgs);
-      const waitTimeAdded = ctx.confirmBus.totalWaitTime - waitTimeBefore;
-      const toolDuration = Date.now() - iterationStartTime - waitTimeAdded;
       const toolResultText = String(toolResult);
 
-      ctx.messageBus.tool(`${toolDesc} (耗时: ${formatDuration(toolDuration)})`);
+      ctx.messageBus.tool(toolDesc);
       ctx.executionState.recordToolResult(toolCall.name, normalizedArgs, toolResultText);
 
       // debug 模式：将工具调用详情附加到 tool block
@@ -267,10 +282,9 @@ export async function executeToolCalls(
         new ToolMessage({ content: toolResultText, tool_call_id: toolCall.id })
       );
     } catch (error) {
-      const toolDuration = Date.now() - iterationStartTime;
       const err = error as Error;
       const errMsg = err?.message || String(error);
-      ctx.messageBus.tool(`${toolDesc} (耗时: ${formatDuration(toolDuration)})`);
+      ctx.messageBus.tool(toolDesc);
       ctx.messageBus.error(`   ↳ 失败: ${errMsg}`);
       ctx.executionState.recordToolResult(
         toolCall.name,

@@ -16,6 +16,26 @@ export interface PlanInteractionToolCall {
   args?: unknown;
 }
 
+/** 原始函数调用中的 function 负载 */
+interface RawToolFunctionPayload {
+  /** 函数名称 */
+  name?: unknown;
+  /** 函数字符串参数 */
+  arguments?: unknown;
+}
+
+/** 原始工具调用结构 */
+interface RawPlanInteractionToolCall {
+  /** 顶层工具名称 */
+  name?: unknown;
+  /** 顶层参数对象 */
+  args?: unknown;
+  /** 顶层 arguments 字段 */
+  arguments?: unknown;
+  /** function 结构 */
+  function?: RawToolFunctionPayload;
+}
+
 /** 常见英文计划标题到中文标题的映射 */
 const PLAN_HEADING_REPLACEMENTS: Array<{
   pattern: RegExp;
@@ -36,6 +56,22 @@ const PLAN_QUESTION_TOOL_NAMES = new Set(["plan_question"]);
 
 /** 计划预览伪工具名集合 */
 const PLAN_PREVIEW_TOOL_NAMES = new Set(["plan_preview", "proposed_plan"]);
+
+/** 计划问题字段别名 */
+const PLAN_QUESTION_FIELD_KEYS = {
+  title: ["title", "name", "heading"],
+  question: ["question", "prompt", "content", "message", "text"],
+  options: ["options", "choices", "items", "answers", "suggestions"],
+} as const;
+
+/** 计划交互常见嵌套负载字段 */
+const PLAN_INTERACTION_NESTED_KEYS = [
+  "input",
+  "payload",
+  "data",
+  "arguments",
+  "params",
+] as const;
 
 /** 从文本中提取指定标签包裹的内容 */
 function extractTagContent(content: string, tag: string): string | null {
@@ -65,19 +101,78 @@ function parseJsonRecord(content: string): Record<string, unknown> | null {
   }
 }
 
+/** 从对象中按别名读取首个非空字符串字段 */
+function getFirstStringField(
+  raw: Record<string, unknown>,
+  keys: readonly string[]
+): string {
+  for (const key of keys) {
+    const value = raw[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return "";
+}
+
+/** 从对象中按别名读取首个数组字段 */
+function getFirstArrayField(
+  raw: Record<string, unknown>,
+  keys: readonly string[]
+): unknown[] {
+  for (const key of keys) {
+    const value = raw[key];
+    if (Array.isArray(value)) {
+      return value;
+    }
+  }
+  return [];
+}
+
+/** 展开计划交互中可能被嵌套包裹的负载对象 */
+function collectPayloadCandidates(
+  raw: Record<string, unknown>
+): Record<string, unknown>[] {
+  const candidates: Record<string, unknown>[] = [raw];
+
+  for (const key of PLAN_INTERACTION_NESTED_KEYS) {
+    const value = raw[key];
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      candidates.push(value as Record<string, unknown>);
+      continue;
+    }
+
+    if (typeof value === "string") {
+      const parsed = parseJsonRecord(value);
+      if (parsed) {
+        candidates.push(parsed);
+      }
+    }
+  }
+
+  return candidates;
+}
+
 /** 归一化单个计划问题选项 */
 function normalizeQuestionOption(raw: unknown): PlanQuestionOption | null {
+  if (typeof raw === "string" && raw.trim()) {
+    return {
+      label: raw.trim(),
+      description: "",
+    };
+  }
+
   if (!raw || typeof raw !== "object") return null;
 
-  const { label, description } = raw as Record<string, unknown>;
-  if (typeof label !== "string" || label.trim() === "") {
+  const option = raw as Record<string, unknown>;
+  const label = getFirstStringField(option, ["label", "title", "name", "value"]);
+  if (!label) {
     return null;
   }
 
   return {
-    label: label.trim(),
-    description:
-      typeof description === "string" ? description.trim() : "",
+    label,
+    description: getFirstStringField(option, ["description", "detail", "hint"]),
   };
 }
 
@@ -85,23 +180,33 @@ function normalizeQuestionOption(raw: unknown): PlanQuestionOption | null {
 function normalizePlanQuestionRequest(
   raw: Record<string, unknown>
 ): PlanQuestionRequest | null {
-  const title = typeof raw.title === "string" ? raw.title.trim() : "";
-  const question = typeof raw.question === "string" ? raw.question.trim() : "";
-  const options = Array.isArray(raw.options)
-    ? raw.options
-        .map(normalizeQuestionOption)
-        .filter((option): option is PlanQuestionOption => option !== null)
-    : [];
+  for (const candidate of collectPayloadCandidates(raw)) {
+    const title =
+      getFirstStringField(candidate, PLAN_QUESTION_FIELD_KEYS.title) ||
+      "计划问题确认";
+    const question = getFirstStringField(
+      candidate,
+      PLAN_QUESTION_FIELD_KEYS.question
+    );
+    const options = getFirstArrayField(
+      candidate,
+      PLAN_QUESTION_FIELD_KEYS.options
+    )
+      .map(normalizeQuestionOption)
+      .filter((option): option is PlanQuestionOption => option !== null);
 
-  if (!title || !question || options.length === 0) {
-    return null;
+    if (!question || options.length === 0) {
+      continue;
+    }
+
+    return {
+      title,
+      question,
+      options: options.slice(0, 5),
+    };
   }
 
-  return {
-    title,
-    question,
-    options: options.slice(0, 5),
-  };
+  return null;
 }
 
 /** 从 Markdown 中推断计划标题 */
@@ -137,11 +242,14 @@ function normalizePlanMarkdown(planMarkdown: string): string {
 function normalizePlanPreviewData(
   raw: unknown
 ): { title: string; planMarkdown: string } | null {
+  const parsedStringPayload =
+    typeof raw === "string" ? parseJsonRecord(raw) : null;
   const payload =
-    raw && typeof raw === "object" && !Array.isArray(raw)
+    parsedStringPayload ||
+    (raw && typeof raw === "object" && !Array.isArray(raw)
       ? (raw as Record<string, unknown>)
-      : null;
-  const rawPlanMarkdown = typeof raw === "string"
+      : null);
+  const rawPlanMarkdown = typeof raw === "string" && !parsedStringPayload
     ? raw
     : typeof payload?.planMarkdown === "string"
       ? payload.planMarkdown
@@ -199,6 +307,56 @@ export function parsePlanInteractionFromToolCalls(
   }
 
   return null;
+}
+
+/** 将原始工具调用结构归一化为计划交互可识别的格式 */
+function normalizeRawToolCall(
+  raw: unknown
+): PlanInteractionToolCall | null {
+  if (!raw || typeof raw !== "object") {
+    return null;
+  }
+
+  const toolCall = raw as RawPlanInteractionToolCall;
+  const functionPayload =
+    toolCall.function &&
+    typeof toolCall.function === "object" &&
+    !Array.isArray(toolCall.function)
+      ? toolCall.function
+      : null;
+  const name = typeof toolCall.name === "string"
+    ? toolCall.name
+    : typeof functionPayload?.name === "string"
+      ? functionPayload.name
+      : "";
+  if (!name) {
+    return null;
+  }
+
+  const args = typeof toolCall.arguments !== "undefined"
+    ? toolCall.arguments
+    : typeof functionPayload?.arguments !== "undefined"
+      ? functionPayload.arguments
+      : toolCall.args;
+  return { name, args };
+}
+
+/** 从原始工具调用数组中解析计划交互 */
+export function parsePlanInteractionFromRawToolCalls(
+  rawToolCalls: unknown
+): ParsedPlanInteraction | null {
+  if (!Array.isArray(rawToolCalls)) {
+    return null;
+  }
+
+  const toolCalls = rawToolCalls
+    .map(normalizeRawToolCall)
+    .filter((toolCall): toolCall is PlanInteractionToolCall => toolCall !== null);
+  if (toolCalls.length === 0) {
+    return null;
+  }
+
+  return parsePlanInteractionFromToolCalls(toolCalls);
 }
 
 /** 将计划交互重新编码为文本标签 */

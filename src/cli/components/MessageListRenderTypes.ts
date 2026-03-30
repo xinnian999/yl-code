@@ -2,7 +2,6 @@ import type { PendingChange } from "@/core/confirm-bus.ts";
 import type { EditorType } from "@/core/editor-detector.ts";
 import type { AIMessage, UserMessage } from "@/core/message-bus.ts";
 import type { MessageBlock, ThinkingState } from "@/core/types.ts";
-import type { PendingPlanInteraction } from "@/core/plan/plan-bus.ts";
 
 /** 任务更新工具块 */
 export type TaskUpdateToolBlock = Extract<MessageBlock, { type: "tool" }>;
@@ -56,14 +55,6 @@ export interface AIDiffRenderItem {
   isDynamic: false;
 }
 
-/** AI 计划交互卡片渲染项（纯展示，无交互，立即提交到 Static） */
-export interface AIPlanInteractionRenderItem {
-  id: string;
-  kind: "ai_plan_interaction";
-  interaction: PendingPlanInteraction;
-  isDynamic: false;
-}
-
 /** AI 统计渲染项 */
 export interface AIStatsRenderItem {
   id: string;
@@ -83,5 +74,4 @@ export type MessageListRenderItem =
   | AIBlockRenderItem
   | AITaskUpdateRenderItem
   | AIDiffRenderItem
-  | AIPlanInteractionRenderItem
   | AIStatsRenderItem;

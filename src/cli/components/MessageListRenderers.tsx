@@ -5,7 +5,6 @@ import type { MessageBlock } from "@/core/types.ts";
 import { ThinkingStatus } from "@/core/types.ts";
 import { formatTotalDuration } from "@/core/agent-helpers.ts";
 import DiffConfirm from "./DiffConfirm.tsx";
-import PlanInteraction from "./PlanInteraction.tsx";
 import { AssistantSection, DebugInfo, UserBubble } from "./MessageItemChrome.tsx";
 import PlanMessageBlock from "./PlanMessageBlock.tsx";
 import StatusBar from "./StatusBar.tsx";
@@ -217,16 +216,6 @@ export const MessageListRenderItemView: React.FC<RenderItemProps> = ({ item }) =
       <AssistantSection>
         <AIBlockRow>
           <DiffConfirm change={item.pendingChange} editorOpened={item.diffEditorOpened} />
-        </AIBlockRow>
-      </AssistantSection>
-    );
-  }
-
-  if (item.kind === "ai_plan_interaction") {
-    return (
-      <AssistantSection>
-        <AIBlockRow>
-          <PlanInteraction interaction={item.interaction} />
         </AIBlockRow>
       </AssistantSection>
     );

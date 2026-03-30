@@ -15,6 +15,7 @@ import {
   buildPlanInteractionContent,
   buildPlanQuestionSummary,
   parsePlanInteraction,
+  parsePlanInteractionFromRawToolCalls,
   parsePlanInteractionFromToolCalls,
 } from "./plan/plan-parser.ts";
 import {
@@ -303,11 +304,15 @@ export class Agent {
     const parsedFromToolCalls = parsePlanInteractionFromToolCalls(
       Array.isArray(response?.tool_calls) ? response.tool_calls : []
     );
-    if (!parsedFromToolCalls) {
+    const parsedFromRawToolCalls = parsePlanInteractionFromRawToolCalls(
+      response?.additional_kwargs?.tool_calls
+    );
+    const parsedInteraction = parsedFromToolCalls || parsedFromRawToolCalls;
+    if (!parsedInteraction) {
       return;
     }
 
-    const interactionContent = buildPlanInteractionContent(parsedFromToolCalls);
+    const interactionContent = buildPlanInteractionContent(parsedInteraction);
     response.content = content ? `${content}\n\n${interactionContent}` : interactionContent;
     this.clearResponseToolCalls(response);
   }
@@ -432,7 +437,6 @@ export class Agent {
         iterationCount++;
         if (this.abortController.signal.aborted) { this.messageBus.ai(AGENT_STATUS_TEXT.ABORTED); break; }
 
-        const iterationStartTime = Date.now();
         this.refreshSystemPrompt();
         this.messageBus.setThinkingStatus(ThinkingStatus.THINKING, AGENT_STATUS_TEXT.THINKING);
 
@@ -466,7 +470,7 @@ export class Agent {
 
         if (!response.tool_calls || response.tool_calls.length === 0) break;
 
-        await executeToolCalls(this, response, iterationStartTime);
+        await executeToolCalls(this, response);
         if (iterationCount > 1) await checkAndSummarize(this);
         if (this.abortController.signal.aborted) { this.messageBus.ai(AGENT_STATUS_TEXT.ABORTED); break; }
         this.messageBus.setThinkingStatus(ThinkingStatus.WAITING, AGENT_STATUS_TEXT.WAITING_AI);

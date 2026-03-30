@@ -57,7 +57,8 @@ function shouldRenderStatsForMessage(
   isLastAIMessage: boolean,
   isProcessing: boolean,
   hasActiveThinking: boolean,
-  showDiffConfirm: boolean
+  showDiffConfirm: boolean,
+  hasPendingPlanInteraction: boolean
 ): boolean {
   if (typeof message.totalDurationMs === "number") {
     return true;
@@ -67,7 +68,7 @@ function shouldRenderStatsForMessage(
     return false;
   }
 
-  return isProcessing || hasActiveThinking || showDiffConfirm;
+  return isProcessing || hasActiveThinking || showDiffConfirm || hasPendingPlanInteraction;
 }
 
 /** 为统计行生成对应的思考状态 */
@@ -101,7 +102,10 @@ export function buildRenderItems(options: BuildRenderItemsOptions): MessageListR
   ];
   const lastAIMessage = getLastAIMessage(messages);
   const hasActiveThinking = isThinkingActive(thinkingStatus);
-  const shouldPauseThinkingStatus = Boolean(showDiffConfirm && pendingChange);
+  const hasPendingPlanInteraction = Boolean(pendingPlanInteraction);
+  const shouldPauseStats = Boolean(
+    (showDiffConfirm && pendingChange) || hasPendingPlanInteraction
+  );
   for (const message of messages) {
     if (message.type === MessageType.USER) {
       renderItems.push({
@@ -159,21 +163,13 @@ export function buildRenderItems(options: BuildRenderItemsOptions): MessageListR
       });
     }
 
-    if (isLastAIMessage && pendingPlanInteraction) {
-      renderItems.push({
-        id: `${aiMessage.id}:plan-card:${pendingPlanInteraction.type}`,
-        kind: "ai_plan_interaction",
-        interaction: pendingPlanInteraction,
-        isDynamic: false,
-      });
-    }
-
     if (shouldRenderStatsForMessage(
       aiMessage,
       isLastAIMessage,
       isProcessing,
       hasActiveThinking,
       showDiffConfirm,
+      hasPendingPlanInteraction,
     )) {
       renderItems.push({
         id: `${aiMessage.id}:stats`,
@@ -181,8 +177,13 @@ export function buildRenderItems(options: BuildRenderItemsOptions): MessageListR
         message: aiMessage,
         thinkingStatus: getStatsThinkingState(isLastAIMessage, thinkingStatus),
         isRunning: isLastAIMessage && isProcessing,
-        isPaused: isLastAIMessage && shouldPauseThinkingStatus,
-        isDynamic: isLastAIMessage && (isProcessing || hasActiveThinking || showDiffConfirm),
+        isPaused: isLastAIMessage && shouldPauseStats,
+        isDynamic: isLastAIMessage && (
+          isProcessing ||
+          hasActiveThinking ||
+          showDiffConfirm ||
+          hasPendingPlanInteraction
+        ),
       });
     }
   }
