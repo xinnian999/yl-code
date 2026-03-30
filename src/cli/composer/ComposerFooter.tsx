@@ -39,7 +39,7 @@ const ComposerFooter: React.FC<ComposerFooterProps> = ({
   const color = getUsageColor(contextUsage.percentage);
 
   return (
-    <Box paddingX={1} justifyContent="flex-end" gap={2}>
+    <Box paddingX={2} justifyContent="flex-end" gap={2}>
       {isSummarizing ? (
         <Text bold color="cyan">
           压缩中...

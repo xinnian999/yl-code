@@ -37,30 +37,28 @@ const InputBox: React.FC<InputBoxProps> = ({
 }) => {
   return (
     <MessageRow>
-      <Box width="100%" flexDirection="column">
-        <Box
-          width="100%"
-          paddingX={1}
-          paddingY={1}
-          backgroundColor={USER_SURFACE_BACKGROUND_COLOR}
-        >
-          <Text dimColor>
-            <Text color={USER_SURFACE_ACCENT_COLOR}>› </Text>
+      <Box
+        width="100%"
+        paddingX={1}
+        paddingY={1}
+        backgroundColor={USER_SURFACE_BACKGROUND_COLOR}
+      >
+        <Text dimColor>
+          <Text color={USER_SURFACE_ACCENT_COLOR}>› </Text>
+        </Text>
+        {isDisabled ? (
+          <Text color={USER_SURFACE_TEXT_COLOR} dimColor>
+            请等待响应...按 Esc 中断
           </Text>
-          {isDisabled ? (
-            <Text color={USER_SURFACE_TEXT_COLOR} dimColor>
-              请等待响应...按 Esc 中断
-            </Text>
-          ) : (
-            <TextInput
-              key={inputKey}
-              value={value}
-              onChange={onChange}
-              onSubmit={onSubmit}
-              placeholder="输入您的指令..."
-            />
-          )}
-        </Box>
+        ) : (
+          <TextInput
+            key={inputKey}
+            value={value}
+            onChange={onChange}
+            onSubmit={onSubmit}
+            placeholder="请输入你的需求..."
+          />
+        )}
       </Box>
     </MessageRow>
   );

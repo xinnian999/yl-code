@@ -5,4 +5,4 @@ export const USER_SURFACE_BACKGROUND_COLOR = "#3a3a3c";
 export const USER_SURFACE_TEXT_COLOR = "whiteBright";
 
 /** 用户输入表面的强调色 */
-export const USER_SURFACE_ACCENT_COLOR = "gray";
+export const USER_SURFACE_ACCENT_COLOR = "";
