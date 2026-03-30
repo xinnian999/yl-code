@@ -1,4 +1,3 @@
-import "dotenv/config";
 import type { ChatOpenAI } from "@langchain/openai";
 import { SystemMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
