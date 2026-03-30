@@ -16,6 +16,7 @@
     "dev": "bun --watch src/cli/index.ts",
     "start": "bun src/cli/index.ts",
     "build": "bun run scripts/build.ts",
+    "test": "bun test",
     "prepublishOnly": "bun run build",
     "typecheck": "tsc --noEmit",
     "verify": "bun run build && node dist/index.js",

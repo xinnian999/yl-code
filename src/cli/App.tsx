@@ -1,18 +1,18 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Box, useApp, useInput } from "ink";
-import MessageList from "./components/MessageList.tsx";
-import BottomBar from "./components/BottomBar.tsx";
-import ModelSelector from "./components/ModelSelector.tsx";
-import HistorySelector, { NEW_SESSION_ID } from "./components/HistorySelector.tsx";
-import McpManagerView from "./components/McpManager.tsx";
-import ConfirmSelectArea from "./components/ConfirmSelectArea.tsx";
-import { useMessages } from "./hooks/useMessages.ts";
-import { useDiffConfirm } from "./hooks/useDiffConfirm.ts";
-import { usePlanInteraction } from "./hooks/usePlanInteraction.ts";
-import { useContextUsage } from "./hooks/useContextUsage.ts";
+import MessageList from "./chat/MessageList.tsx";
+import { useMessages } from "./chat/useMessages.ts";
+import ComposerPanel from "./composer/ComposerPanel.tsx";
+import { useContextUsage } from "./composer/useContextUsage.ts";
+import ConfirmBar from "./confirm/ConfirmBar.tsx";
+import { hasActiveConfirm } from "./confirm/active-confirm.ts";
+import { useActiveConfirm } from "./confirm/useActiveConfirm.ts";
+import { NEW_SESSION_ID } from "./panels/HistoryPanel.tsx";
+import OverlayContent from "./panels/OverlayContent.tsx";
+import { hasOverlayView, type OverlayView } from "./shared/view-state.ts";
 import { AGENT_MODES } from "@/core/types.ts";
 import type { ModelConfig, AgentModeValue } from "@/core/types.ts";
-import type { Agent } from "@/core/agent.ts";
+import type { Agent } from "@/core/agent/Agent.ts";
 
 /** 主应用组件属性 */
 export interface AppProps {
@@ -24,20 +24,21 @@ const App: React.FC<AppProps> = ({ agent }) => {
   const { exit } = useApp();
   const { messages, thinkingStatus, streamingBlockIndex } = useMessages(agent);
   const { usage: contextUsage, isSummarizing } = useContextUsage(agent);
-  const { showDiffConfirm, pendingChange, diffEditorOpened, handleDiffConfirm } = useDiffConfirm(agent);
   const {
-    showPlanInteraction,
+    activeConfirm,
     pendingPlanInteraction,
+    pendingChange,
     handlePlanQuestionResolve,
     handlePlanPreviewResolve,
-  } = usePlanInteraction(agent);
+    handleDiffConfirm,
+  } = useActiveConfirm(agent);
 
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isSelectingModel, setIsSelectingModel] = useState(false);
-  const [isSelectingHistory, setIsSelectingHistory] = useState(false);
-  const [isManagingMcp, setIsManagingMcp] = useState(false);
+  const [overlayView, setOverlayView] = useState<OverlayView>("none");
   const [currentMode, setCurrentMode] = useState<AgentModeValue>(() => agent.getMode());
-  const [debugMode, setDebugMode] = useState(false);
+  const [debugMode, setDebugMode] = useState(() => agent.isDebugMode());
+  const isConfirmPending = hasActiveConfirm(activeConfirm);
+  const hasOverlay = hasOverlayView(overlayView);
 
   // 启动时自动连接 MCP 服务器
   useEffect(() => { agent.init(); }, [agent]);
@@ -76,10 +77,18 @@ const App: React.FC<AppProps> = ({ agent }) => {
   const handleCommand = useCallback((commandValue: string) => {
     const result = agent.executeCommand(commandValue);
     setDebugMode(agent.isDebugMode());
-    if (result.action === "select_model") setIsSelectingModel(true);
-    if (result.action === "show_history") setIsSelectingHistory(true);
-    if (result.action === "manage_mcp") setIsManagingMcp(true);
-    if (result.action === "exit") setTimeout(() => handleExit(), 500);
+    if (result.action === "select_model") {
+      setOverlayView("model");
+    }
+    if (result.action === "show_history") {
+      setOverlayView("history");
+    }
+    if (result.action === "manage_mcp") {
+      setOverlayView("mcp");
+    }
+    if (result.action === "exit") {
+      setTimeout(() => handleExit(), 500);
+    }
   }, [agent, handleExit]);
 
   /** 中断 AI 输出 */
@@ -101,7 +110,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
   /** 选择模型 */
   const handleModelSelect = useCallback((model: ModelConfig) => {
     agent.switchModel(model);
-    setIsSelectingModel(false);
+    setOverlayView("none");
   }, [agent]);
 
   /** 选择历史会话 */
@@ -111,22 +120,24 @@ const App: React.FC<AppProps> = ({ agent }) => {
     } else {
       agent.restoreSession(sessionId);
     }
-    setIsSelectingHistory(false);
+    setOverlayView("none");
   }, [agent]);
 
-  /** 确认交互是否处于等待状态（隐藏输入框和底栏） */
-  const isConfirmPending = showDiffConfirm || showPlanInteraction;
-
-  const hasOverlay = isSelectingModel || isSelectingHistory || isManagingMcp;
+  /** 关闭当前覆盖面板 */
+  const closeOverlay = useCallback(() => {
+    setOverlayView("none");
+  }, []);
 
   return (
     <Box flexDirection="column">
-      {isManagingMcp ? (
-        <Box paddingX={1}><McpManagerView agent={agent} onClose={() => setIsManagingMcp(false)} /></Box>
-      ) : isSelectingHistory ? (
-        <Box paddingX={1}><HistorySelector agent={agent} onSelect={handleHistorySelect} onCancel={() => setIsSelectingHistory(false)} /></Box>
-      ) : isSelectingModel ? (
-        <Box paddingX={1}><ModelSelector agent={agent} onSelect={handleModelSelect} onCancel={() => setIsSelectingModel(false)} /></Box>
+      {hasOverlay ? (
+        <OverlayContent
+          overlayView={overlayView}
+          agent={agent}
+          onModelSelect={handleModelSelect}
+          onHistorySelect={handleHistorySelect}
+          onClose={closeOverlay}
+        />
       ) : (
         <>
           <MessageList
@@ -134,26 +145,24 @@ const App: React.FC<AppProps> = ({ agent }) => {
             thinkingStatus={thinkingStatus}
             streamingBlockIndex={streamingBlockIndex}
             isProcessing={isProcessing}
-            showDiffConfirm={showDiffConfirm}
             pendingChange={pendingChange}
-            diffEditorOpened={diffEditorOpened}
+            diffEditorOpened={
+              activeConfirm.kind === "diff" ? activeConfirm.diffEditorOpened : null
+            }
             pendingPlanInteraction={pendingPlanInteraction}
             modelId={agent.getCurrentModelName()}
             version="1.0.11"
           />
           {isConfirmPending && (
-            <ConfirmSelectArea
-              showDiffConfirm={showDiffConfirm}
-              pendingChange={pendingChange}
+            <ConfirmBar
+              activeConfirm={activeConfirm}
               onDiffConfirm={handleDiffConfirm}
-              showPlanInteraction={showPlanInteraction}
-              pendingPlanInteraction={pendingPlanInteraction}
               onPlanQuestionResolve={handlePlanQuestionResolve}
               onPlanPreviewResolve={handlePlanPreviewResolve}
             />
           )}
           {!isConfirmPending && (
-            <BottomBar
+            <ComposerPanel
               isProcessing={isProcessing}
               onSubmit={handleSubmit}
               onAbort={handleAbort}

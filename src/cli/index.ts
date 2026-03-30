@@ -2,7 +2,7 @@
 
 import React from "react";
 import { render } from "ink";
-import { Agent } from "@/core/agent.ts";
+import { Agent } from "@/core/agent/Agent.ts";
 import App from "./App.tsx";
 
 // 检查是否在 TTY 环境下运行
