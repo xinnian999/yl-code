@@ -7,7 +7,8 @@
     "yl": "./dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "fonts"
   ],
   "engines": {
     "node": ">=18.0.0"
