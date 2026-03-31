@@ -7,6 +7,7 @@ import {
   deriveComposerSuggestionState,
   getWrappedIndex,
 } from "./composer-state.ts";
+import type { HistoryNavigationResult } from "./useInputHistory.ts";
 
 /** 组合输入快捷键上下文 */
 export interface UseComposerShortcutsOptions {
@@ -40,14 +41,38 @@ export interface UseComposerShortcutsOptions {
   clearFileSuggestions: () => void;
   /** 执行命令 */
   executeCommand: (commandValue: string) => void;
+  /** 应用历史导航结果 */
+  applyHistoryNavigation: (result: HistoryNavigationResult) => void;
+  /** 当前是否正在浏览历史记录 */
+  isNavigatingHistory: boolean;
   /** 历史向上 */
-  navigateUp: (currentInput: string) => string | null;
+  navigateUp: (currentInput: string) => HistoryNavigationResult;
   /** 历史向下 */
-  navigateDown: () => string | null;
+  navigateDown: () => HistoryNavigationResult;
   /** 中断处理 */
   onAbort: () => void;
   /** 切换模式 */
   onModeSwitch: () => void;
+}
+
+/** 判断当前上下键是否应优先用于历史导航 */
+export function shouldHandleHistoryNavigation(
+  isProcessing: boolean,
+  isNavigatingHistory: boolean,
+  suggestionState: ComposerSuggestionState,
+): boolean {
+  if (isProcessing) {
+    return false;
+  }
+
+  if (isNavigatingHistory) {
+    return true;
+  }
+
+  return (
+    !suggestionState.showCommandSuggestions
+    && !suggestionState.showFileSuggestions
+  );
 }
 
 /** 组合输入区快捷键 hook */
@@ -70,6 +95,8 @@ export function useComposerShortcuts(
     bumpInputKey,
     clearFileSuggestions,
     executeCommand,
+    applyHistoryNavigation,
+    isNavigatingHistory,
     navigateUp,
     navigateDown,
     onAbort,
@@ -81,6 +108,24 @@ export function useComposerShortcuts(
       if (key.escape && isProcessing) {
         onAbort();
         return;
+      }
+
+      if (
+        shouldHandleHistoryNavigation(
+          isProcessing,
+          isNavigatingHistory,
+          suggestionState,
+        )
+      ) {
+        if (key.upArrow) {
+          applyHistoryNavigation(navigateUp(inputValue));
+          return;
+        }
+
+        if (key.downArrow) {
+          applyHistoryNavigation(navigateDown());
+          return;
+        }
       }
 
       if (suggestionState.showFileSuggestions) {
@@ -154,24 +199,6 @@ export function useComposerShortcuts(
           setInputValue("");
           setCommandSelectedIndex(0);
           setSuggestionState(deriveComposerSuggestionState(""));
-          return;
-        }
-      }
-
-      if (!isProcessing && !suggestionState.showCommandSuggestions) {
-        if (key.upArrow) {
-          const nextValue = navigateUp(inputValue);
-          if (nextValue !== null) {
-            setInputValue(nextValue);
-          }
-          return;
-        }
-
-        if (key.downArrow) {
-          const nextValue = navigateDown();
-          if (nextValue !== null) {
-            setInputValue(nextValue);
-          }
           return;
         }
       }

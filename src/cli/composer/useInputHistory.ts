@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { loadHistory, saveHistory } from "@/core/history.ts";
 
 /** 输入历史状态 */
@@ -114,56 +114,57 @@ export function resetHistoryNavigationState(
 
 /** 输入历史导航 hook */
 export function useInputHistory() {
-  const [state, setState] = useState<InputHistoryState>(() => {
-    return createInputHistoryState(loadHistory());
-  });
+  const initialState = createInputHistoryState(loadHistory());
+  const [state, setState] = useState<InputHistoryState>(initialState);
+  const stateRef = useRef<InputHistoryState>(initialState);
+
+  /** 同步更新历史状态和 ref，确保快捷键处理拿到最新结果 */
+  const commitState = useCallback((nextState: InputHistoryState) => {
+    stateRef.current = nextState;
+    setState(nextState);
+  }, []);
 
   /** 添加新命令到历史记录并持久化 */
   const pushHistory = useCallback((command: string) => {
-    setState((currentState) => {
-      const nextHistory = appendHistoryEntry(currentState.history, command);
-      if (nextHistory !== currentState.history) {
-        saveHistory(nextHistory);
-      }
+    const currentState = stateRef.current;
+    const nextHistory = appendHistoryEntry(currentState.history, command);
+    if (nextHistory !== currentState.history) {
+      saveHistory(nextHistory);
+    }
 
-      return {
-        history: nextHistory,
-        historyIndex: -1,
-        tempInput: "",
-      };
+    commitState({
+      history: nextHistory,
+      historyIndex: -1,
+      tempInput: "",
     });
-  }, []);
+  }, [commitState]);
 
   /** 向上浏览历史记录 */
-  const navigateUp = useCallback((currentInput: string): string | null => {
-    let nextValue: string | null = null;
-
-    setState((currentState) => {
-      const result = navigateHistoryUpState(currentState, currentInput);
-      nextValue = result.nextValue;
-      return result.nextState;
-    });
-
-    return nextValue;
-  }, []);
+  const navigateUp = useCallback((
+    currentInput: string,
+  ): HistoryNavigationResult => {
+    const result = navigateHistoryUpState(stateRef.current, currentInput);
+    commitState(result.nextState);
+    return result;
+  }, [commitState]);
 
   /** 向下浏览历史记录 */
-  const navigateDown = useCallback((): string | null => {
-    let nextValue: string | null = null;
-
-    setState((currentState) => {
-      const result = navigateHistoryDownState(currentState);
-      nextValue = result.nextValue;
-      return result.nextState;
-    });
-
-    return nextValue;
-  }, []);
+  const navigateDown = useCallback((): HistoryNavigationResult => {
+    const result = navigateHistoryDownState(stateRef.current);
+    commitState(result.nextState);
+    return result;
+  }, [commitState]);
 
   /** 重置历史导航索引 */
   const resetNavigation = useCallback(() => {
-    setState((currentState) => resetHistoryNavigationState(currentState));
-  }, []);
+    commitState(resetHistoryNavigationState(stateRef.current));
+  }, [commitState]);
 
-  return { pushHistory, navigateUp, navigateDown, resetNavigation };
+  return {
+    pushHistory,
+    navigateUp,
+    navigateDown,
+    resetNavigation,
+    isNavigatingHistory: state.historyIndex !== -1,
+  };
 }

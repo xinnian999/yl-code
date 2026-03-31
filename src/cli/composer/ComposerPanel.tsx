@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
 import { Box } from "ink";
 import { scanDirectory } from "@/core/file-scanner.ts";
 import type { AgentModeValue, ContextUsage } from "@/core/types.ts";
@@ -8,7 +8,10 @@ import {
   deriveComposerSuggestionState,
   getFilteredCommands,
 } from "./composer-state.ts";
-import { useInputHistory } from "./useInputHistory.ts";
+import {
+  useInputHistory,
+  type HistoryNavigationResult,
+} from "./useInputHistory.ts";
 import { useComposerShortcuts } from "./useComposerShortcuts.ts";
 
 /** 输入面板属性 */
@@ -55,7 +58,14 @@ const ComposerPanel: React.FC<ComposerPanelProps> = ({
   const [suggestionState, setSuggestionState] = useState(() => {
     return deriveComposerSuggestionState("");
   });
-  const { pushHistory, navigateUp, navigateDown, resetNavigation } =
+  const isApplyingHistoryNavigationRef = useRef(false);
+  const {
+    pushHistory,
+    navigateUp,
+    navigateDown,
+    resetNavigation,
+    isNavigatingHistory,
+  } =
     useInputHistory();
 
   /** 过滤后的命令建议 */
@@ -84,6 +94,28 @@ const ComposerPanel: React.FC<ComposerPanelProps> = ({
     [onCommand],
   );
 
+  /** 根据历史导航结果应用输入框状态，避免建议面板抢占上下键 */
+  const applyHistoryNavigation = useCallback(
+    (result: HistoryNavigationResult) => {
+      if (result.nextValue === null) {
+        return;
+      }
+
+      isApplyingHistoryNavigationRef.current = true;
+      setInputValue(result.nextValue);
+      setCommandSelectedIndex(0);
+      setFileSelectedIndex(0);
+
+      if (result.nextState.historyIndex !== -1) {
+        setSuggestionState(deriveComposerSuggestionState(""));
+        return;
+      }
+
+      setSuggestionState(deriveComposerSuggestionState(result.nextValue));
+    },
+    [],
+  );
+
   /** 处理输入变化 */
   const handleInputChange = useCallback(
     (value: string) => {
@@ -91,6 +123,11 @@ const ComposerPanel: React.FC<ComposerPanelProps> = ({
       setSuggestionState(deriveComposerSuggestionState(value));
       setCommandSelectedIndex(0);
       setFileSelectedIndex(0);
+      if (isApplyingHistoryNavigationRef.current) {
+        isApplyingHistoryNavigationRef.current = false;
+        return;
+      }
+
       resetNavigation();
     },
     [resetNavigation],
@@ -148,6 +185,8 @@ const ComposerPanel: React.FC<ComposerPanelProps> = ({
     },
     clearFileSuggestions,
     executeCommand,
+    applyHistoryNavigation,
+    isNavigatingHistory,
     navigateUp,
     navigateDown,
     onAbort,

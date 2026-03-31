@@ -31,4 +31,16 @@ describe("useInputHistory helpers", () => {
       -1,
     );
   });
+
+  test("继续向上浏览时会逐条向更早的历史推进", () => {
+    const initialState = createInputHistoryState(["第一条", "第二条", "第三条"]);
+    const firstUpResult = navigateHistoryUpState(initialState, "");
+    const secondUpResult = navigateHistoryUpState(firstUpResult.nextState, "");
+    const thirdUpResult = navigateHistoryUpState(secondUpResult.nextState, "");
+
+    expect(firstUpResult.nextValue).toBe("第三条");
+    expect(secondUpResult.nextValue).toBe("第二条");
+    expect(thirdUpResult.nextValue).toBe("第一条");
+    expect(thirdUpResult.nextState.historyIndex).toBe(0);
+  });
 });
