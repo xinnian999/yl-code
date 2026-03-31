@@ -11,6 +11,10 @@ import type { ConfigManager } from "../config/config-manager.ts";
 import type { ModeTool } from "../tooling/types.ts";
 import type { ExecutionStateManager } from "../execution/execution-state.ts";
 import { toDisplayCommand, toDisplayPath } from "../path-display.ts";
+import {
+  buildProjectRulesSection,
+  loadProjectRules,
+} from "./project-rules.ts";
 
 // ============ Agent 上下文接口 ============
 
@@ -182,12 +186,17 @@ export function getModeInstructions(mode: AgentModeValue): string {
 export function buildSystemPrompt(
   template: string,
   mode: AgentModeValue,
-  executionStateText = "暂无额外执行状态。"
+  executionStateText = "暂无额外执行状态。",
+  workingDirectory = process.cwd()
 ): string {
+  const projectRules = loadProjectRules(workingDirectory);
+  const projectRulesSection = buildProjectRulesSection(projectRules.content);
+
   return template
-    .replace("{workingDirectory}", process.cwd())
+    .replace("{workingDirectory}", workingDirectory)
     .replace("{workingMode}", mode)
     .replace("{modeInstructions}", getModeInstructions(mode))
+    .replace("{projectRulesSection}", projectRulesSection)
     .replace("{executionState}", executionStateText)
     .replace("{os}", platform())
     .replace("{currentTime}", new Date().toLocaleString());

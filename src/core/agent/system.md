@@ -13,6 +13,8 @@
 ## 当前模式规则
 {modeInstructions}
 
+{projectRulesSection}
+
 ## 当前执行状态
 {executionState}
 
