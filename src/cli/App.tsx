@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Box, useApp, useInput } from "ink";
+import { findNearestAgentsFile } from "@/core/agent/project-rules.ts";
 import MessageList from "./chat/MessageList.tsx";
 import { useMessages } from "./chat/useMessages.ts";
 import ComposerPanel from "./composer/ComposerPanel.tsx";
@@ -39,6 +40,10 @@ const App: React.FC<AppProps> = ({ agent }) => {
   const [debugMode, setDebugMode] = useState(() => agent.isDebugMode());
   const isConfirmPending = hasActiveConfirm(activeConfirm);
   const hasOverlay = hasOverlayView(overlayView);
+  const hasProjectRules = useMemo(
+    () => Boolean(findNearestAgentsFile(process.cwd())),
+    [],
+  );
 
   // 启动时自动连接 MCP 服务器
   useEffect(() => { agent.init(); }, [agent]);
@@ -152,6 +157,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
             pendingPlanInteraction={pendingPlanInteraction}
             modelId={agent.getCurrentModelName()}
             version="1.0.11"
+            hasProjectRules={hasProjectRules}
           />
           {isConfirmPending && (
             <ConfirmBar

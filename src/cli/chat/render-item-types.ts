@@ -78,6 +78,8 @@ export interface WelcomeRenderItem {
   modelId: string;
   /** 应用版本号 */
   version: string;
+  /** 是否存在项目规则文件 */
+  hasProjectRules: boolean;
   /** 是否为动态尾部 */
   isDynamic: false;
 }
@@ -123,4 +125,6 @@ export interface BuildRenderItemsOptions {
   modelId: string;
   /** 欢迎卡片版本号 */
   version: string;
+  /** 欢迎卡片是否显示项目规则 */
+  hasProjectRules: boolean;
 }

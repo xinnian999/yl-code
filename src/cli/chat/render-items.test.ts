@@ -51,6 +51,7 @@ describe("buildRenderItems", () => {
       pendingPlanInteraction: null,
       modelId: "test-model",
       version: "1.0.11",
+      hasProjectRules: true,
     });
 
     expect(items.map((item) => item.kind)).toEqual([
@@ -59,6 +60,9 @@ describe("buildRenderItems", () => {
       "ai_task_update",
       "ai_block",
     ]);
+    expect(items[0].kind === "welcome" ? items[0].hasProjectRules : false).toBe(
+      true,
+    );
   });
 
   test("存在待确认 diff 时会补出 diff 行和动态状态行", () => {
@@ -82,6 +86,7 @@ describe("buildRenderItems", () => {
       pendingPlanInteraction: null,
       modelId: "test-model",
       version: "1.0.11",
+      hasProjectRules: false,
     });
 
     expect(items.map((item) => item.kind)).toEqual([

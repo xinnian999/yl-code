@@ -17,7 +17,13 @@ export interface MessageItemViewProps {
 /** 单个扁平渲染项组件 */
 export const MessageItemView: React.FC<MessageItemViewProps> = ({ item }) => {
   if (item.kind === "welcome") {
-    return <WelcomeCard modelId={item.modelId} version={item.version} />;
+    return (
+      <WelcomeCard
+        modelId={item.modelId}
+        version={item.version}
+        hasProjectRules={item.hasProjectRules}
+      />
+    );
   }
 
   if (item.kind === "user") {

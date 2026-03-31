@@ -29,6 +29,8 @@ export interface MessageListProps {
   modelId: string;
   /** 应用版本号 */
   version: string;
+  /** 是否存在项目规则文件 */
+  hasProjectRules: boolean;
 }
 
 /** 消息列表组件 */
@@ -43,6 +45,7 @@ const MessageList = React.memo<MessageListProps>(
     pendingPlanInteraction,
     modelId,
     version,
+    hasProjectRules,
   }) => {
     const committedRef = useRef(0);
     const lastMessageCountRef = useRef(messages.length);
@@ -65,6 +68,7 @@ const MessageList = React.memo<MessageListProps>(
       pendingPlanInteraction,
       modelId,
       version,
+      hasProjectRules,
     } satisfies BuildRenderItemsOptions);
     const dynamicTailCount = getDynamicTailCount(renderItems);
     const safeCommitBoundary = Math.max(

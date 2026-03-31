@@ -98,6 +98,8 @@ export interface WelcomeCardProps {
   modelId: string;
   /** 应用版本号 */
   version: string;
+  /** 是否存在项目规则文件 */
+  hasProjectRules: boolean;
 }
 
 /** 将绝对路径中的 home 目录替换为 ~ */
@@ -110,6 +112,7 @@ function toTildePath(dir: string): string {
 export const WelcomeCard: React.FC<WelcomeCardProps> = ({
   modelId,
   version,
+  hasProjectRules,
 }) => {
   const directory = toTildePath(process.cwd());
 
@@ -143,6 +146,13 @@ export const WelcomeCard: React.FC<WelcomeCardProps> = ({
         <Text dimColor>工作目录:</Text>
         <Text>{directory}</Text>
       </Box>
+
+      {hasProjectRules ? (
+        <Box gap={1}>
+          <Text dimColor>项目规则:</Text>
+          <Text color="yellow">AGENTS.md</Text>
+        </Box>
+      ) : null}
 
       <Box gap={1} marginTop={1}>
         <Text dimColor>输入 /model 管理模型</Text>

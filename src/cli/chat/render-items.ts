@@ -85,9 +85,17 @@ export function buildRenderItems(
     pendingPlanInteraction,
     modelId,
     version,
+    hasProjectRules,
   } = options;
   const renderItems: MessageListRenderItem[] = [
-    { id: "welcome", kind: "welcome", modelId, version, isDynamic: false },
+    {
+      id: "welcome",
+      kind: "welcome",
+      modelId,
+      version,
+      hasProjectRules,
+      isDynamic: false,
+    },
   ];
   const lastAIMessage = getLastAIMessage(messages);
   const hasActiveThinking = isThinkingActive(thinkingStatus);
