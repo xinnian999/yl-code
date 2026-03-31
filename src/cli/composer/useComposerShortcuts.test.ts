@@ -7,8 +7,11 @@ describe("useComposerShortcuts", () => {
       shouldHandleHistoryNavigation(true, false, {
         showCommandSuggestions: false,
         showFileSuggestions: false,
+        showSkillSuggestions: false,
         fileFilter: "",
         atStartIndex: -1,
+        skillFilter: "",
+        skillStartIndex: -1,
       }),
     ).toBe(false);
 
@@ -16,8 +19,11 @@ describe("useComposerShortcuts", () => {
       shouldHandleHistoryNavigation(false, true, {
         showCommandSuggestions: true,
         showFileSuggestions: false,
+        showSkillSuggestions: false,
         fileFilter: "",
         atStartIndex: -1,
+        skillFilter: "",
+        skillStartIndex: -1,
       }),
     ).toBe(true);
 
@@ -25,8 +31,11 @@ describe("useComposerShortcuts", () => {
       shouldHandleHistoryNavigation(false, false, {
         showCommandSuggestions: true,
         showFileSuggestions: false,
+        showSkillSuggestions: false,
         fileFilter: "",
         atStartIndex: -1,
+        skillFilter: "",
+        skillStartIndex: -1,
       }),
     ).toBe(false);
   });

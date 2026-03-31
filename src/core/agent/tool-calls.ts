@@ -46,6 +46,23 @@ function normalizeToolArgs(
     case "write_file_patch":
       setAlias("filePath", "file", "path");
       break;
+    case "get_skills": {
+      if (Array.isArray(args.skillNames)) break;
+
+      const singleSkillName = getStringArg(args.skillName);
+      if (singleSkillName) {
+        args.skillNames = [singleSkillName];
+        repaired = true;
+        break;
+      }
+
+      const names = Array.isArray(args.names) ? args.names : args.skills;
+      if (Array.isArray(names)) {
+        args.skillNames = names.filter((item) => typeof item === "string");
+        repaired = true;
+      }
+      break;
+    }
     case "list_directory":
       setAlias("directoryPath", "directory", "dir", "path", "filePath");
       break;
@@ -61,6 +78,10 @@ function getMissingRequiredArgs(toolName: string, args: Record<string, unknown>)
   switch (toolName) {
     case "read_file":
       return getStringArg(args.filePath) ? [] : ["filePath"];
+    case "get_skills":
+      return Array.isArray(args.skillNames) && args.skillNames.length > 0
+        ? []
+        : ["skillNames"];
     case "write_file": {
       const missing: string[] = [];
       if (!getStringArg(args.filePath)) missing.push("filePath");
@@ -90,6 +111,8 @@ function getToolArgsExample(toolName: string): string | null {
   switch (toolName) {
     case "read_file":
       return '{"filePath":"src/index.ts"}';
+    case "get_skills":
+      return '{"skillNames":["find-skills"]}';
     case "write_file":
       return '{"filePath":"src/index.ts","content":"..."}';
     case "write_file_patch":

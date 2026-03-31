@@ -157,6 +157,9 @@ export const WelcomeCard: React.FC<WelcomeCardProps> = ({
       <Box gap={1} marginTop={1}>
         <Text dimColor>输入 /model 管理模型</Text>
       </Box>
+      <Box gap={1}>
+        <Text dimColor>输入 /skills 管理技能</Text>
+      </Box>
     </Box>
   );
 };

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "skills": {
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "computedHash": "39403f8f3bade37854da0d67fc53e51b7798a3f98e2595cee0c2e6c3e431a01b"
+    },
+    "create-skills": {
+      "source": "yl-code",
+      "sourceType": "builtin",
+      "computedHash": "8a167eed72d9f38d60e35b212aeaeb6fecaff220054c71b2fd79a4b39769763d"
+    }
+  }
+}

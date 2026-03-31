@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
 import { Box } from "ink";
+import type { Agent } from "@/core/agent/Agent.ts";
 import { scanDirectory } from "@/core/file-scanner.ts";
 import type { AgentModeValue, ContextUsage } from "@/core/types.ts";
 import ComposerFooter from "./ComposerFooter.tsx";
@@ -7,6 +8,7 @@ import ComposerInput from "./ComposerInput.tsx";
 import {
   deriveComposerSuggestionState,
   getFilteredCommands,
+  getFilteredSkills,
 } from "./composer-state.ts";
 import {
   useInputHistory,
@@ -16,6 +18,8 @@ import { useComposerShortcuts } from "./useComposerShortcuts.ts";
 
 /** 输入面板属性 */
 export interface ComposerPanelProps {
+  /** Agent 实例 */
+  agent: Agent;
   /** 是否正在处理中 */
   isProcessing: boolean;
   /** 提交消息回调 */
@@ -40,6 +44,7 @@ export interface ComposerPanelProps {
 
 /** 输入面板 */
 const ComposerPanel: React.FC<ComposerPanelProps> = ({
+  agent,
   isProcessing,
   onSubmit,
   onAbort,
@@ -54,6 +59,7 @@ const ComposerPanel: React.FC<ComposerPanelProps> = ({
   const [inputValue, setInputValue] = useState("");
   const [commandSelectedIndex, setCommandSelectedIndex] = useState(0);
   const [fileSelectedIndex, setFileSelectedIndex] = useState(0);
+  const [skillSelectedIndex, setSkillSelectedIndex] = useState(0);
   const [inputKey, setInputKey] = useState(0);
   const [suggestionState, setSuggestionState] = useState(() => {
     return deriveComposerSuggestionState("");
@@ -65,8 +71,7 @@ const ComposerPanel: React.FC<ComposerPanelProps> = ({
     navigateDown,
     resetNavigation,
     isNavigatingHistory,
-  } =
-    useInputHistory();
+  } = useInputHistory();
 
   /** 过滤后的命令建议 */
   const commandItems = useMemo(() => {
@@ -82,12 +87,22 @@ const ComposerPanel: React.FC<ComposerPanelProps> = ({
     return scanDirectory(process.cwd(), suggestionState.fileFilter);
   }, [suggestionState.fileFilter, suggestionState.showFileSuggestions]);
 
+  /** 过滤后的技能建议 */
+  const skillItems = useMemo(() => {
+    if (!suggestionState.showSkillSuggestions) {
+      return [];
+    }
+
+    return getFilteredSkills(agent.getSkills(), suggestionState.skillFilter);
+  }, [agent, suggestionState.showSkillSuggestions, suggestionState.skillFilter]);
+
   /** 执行命令并重置输入状态 */
   const executeCommand = useCallback(
     (commandValue: string) => {
       setInputValue("");
       setCommandSelectedIndex(0);
       setFileSelectedIndex(0);
+      setSkillSelectedIndex(0);
       setSuggestionState(deriveComposerSuggestionState(""));
       onCommand(commandValue);
     },
@@ -105,6 +120,7 @@ const ComposerPanel: React.FC<ComposerPanelProps> = ({
       setInputValue(result.nextValue);
       setCommandSelectedIndex(0);
       setFileSelectedIndex(0);
+      setSkillSelectedIndex(0);
 
       if (result.nextState.historyIndex !== -1) {
         setSuggestionState(deriveComposerSuggestionState(""));
@@ -123,6 +139,7 @@ const ComposerPanel: React.FC<ComposerPanelProps> = ({
       setSuggestionState(deriveComposerSuggestionState(value));
       setCommandSelectedIndex(0);
       setFileSelectedIndex(0);
+      setSkillSelectedIndex(0);
       if (isApplyingHistoryNavigationRef.current) {
         isApplyingHistoryNavigationRef.current = false;
         return;
@@ -137,8 +154,9 @@ const ComposerPanel: React.FC<ComposerPanelProps> = ({
   const handleSubmit = useCallback(
     (value: string) => {
       if (
-        suggestionState.showCommandSuggestions ||
-        suggestionState.showFileSuggestions
+        suggestionState.showCommandSuggestions
+        || suggestionState.showFileSuggestions
+        || suggestionState.showSkillSuggestions
       ) {
         return;
       }
@@ -167,6 +185,17 @@ const ComposerPanel: React.FC<ComposerPanelProps> = ({
     }));
   }, []);
 
+  /** 取消技能建议 */
+  const clearSkillSuggestions = useCallback(() => {
+    setSkillSelectedIndex(0);
+    setSuggestionState((currentState) => ({
+      ...currentState,
+      showSkillSuggestions: false,
+      skillFilter: "",
+      skillStartIndex: -1,
+    }));
+  }, []);
+
   useComposerShortcuts({
     isProcessing,
     hasOverlay,
@@ -176,14 +205,18 @@ const ComposerPanel: React.FC<ComposerPanelProps> = ({
     commandSelectedIndex,
     fileItems,
     fileSelectedIndex,
+    skillItems,
+    skillSelectedIndex,
     setInputValue,
     setCommandSelectedIndex,
     setFileSelectedIndex,
+    setSkillSelectedIndex,
     setSuggestionState,
     bumpInputKey: () => {
       setInputKey((currentKey) => currentKey + 1);
     },
     clearFileSuggestions,
+    clearSkillSuggestions,
     executeCommand,
     applyHistoryNavigation,
     isNavigatingHistory,
@@ -208,6 +241,9 @@ const ComposerPanel: React.FC<ComposerPanelProps> = ({
         fileItems={fileItems}
         fileSelectedIndex={fileSelectedIndex}
         fileFilter={suggestionState.fileFilter}
+        showSkillSuggestions={suggestionState.showSkillSuggestions}
+        skillItems={skillItems}
+        skillSelectedIndex={skillSelectedIndex}
       />
       <ComposerFooter
         mode={mode}

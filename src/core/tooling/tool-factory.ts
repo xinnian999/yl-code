@@ -12,12 +12,15 @@ import {
   createReadBackgroundLogsTool,
 } from "./command-tools.ts";
 import { createTodoWriteTool } from "./todo-tool.ts";
+import { createGetSkillsTool } from "./skill-tools.ts";
+import type { SkillManager } from "../skills/index.ts";
 
 /** 创建 core 内置工具集合，并标记对应可用模式 */
 export function createTools(
   confirm: ConfirmPort,
   processPort: ProcessPort,
-  todoPort: TodoPort
+  todoPort: TodoPort,
+  skillManager: SkillManager,
 ): ModeTool[] {
   const readFileTool = createReadFileTool();
   const listDirectoryTool = createListDirectoryTool();
@@ -26,10 +29,12 @@ export function createTools(
   const executeCommandTool = createExecuteCommandTool(confirm, processPort);
   const readBackgroundLogsTool = createReadBackgroundLogsTool(processPort);
   const todoWriteTool = createTodoWriteTool(todoPort);
+  const getSkillsTool = createGetSkillsTool(skillManager);
 
   return [
     { tool: readFileTool, modes: [AgentMode.ASK, AgentMode.BUILD, AgentMode.PLAN] },
     { tool: listDirectoryTool, modes: [AgentMode.ASK, AgentMode.BUILD, AgentMode.PLAN] },
+    { tool: getSkillsTool, modes: [AgentMode.ASK, AgentMode.BUILD, AgentMode.PLAN] },
     { tool: writeFileTool, modes: [AgentMode.BUILD] },
     { tool: writeFilePatchTool, modes: [AgentMode.BUILD] },
     { tool: executeCommandTool, modes: [AgentMode.BUILD] },

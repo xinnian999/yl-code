@@ -27,8 +27,11 @@ describe("composer-state", () => {
     expect(state).toEqual({
       showCommandSuggestions: true,
       showFileSuggestions: false,
+      showSkillSuggestions: false,
       fileFilter: "",
       atStartIndex: -1,
+      skillFilter: "",
+      skillStartIndex: -1,
     });
     expect(getFilteredCommands("/mo").some((command) => command.value === "model"))
       .toBe(true);
@@ -39,8 +42,19 @@ describe("composer-state", () => {
 
     expect(state.showCommandSuggestions).toBe(false);
     expect(state.showFileSuggestions).toBe(true);
+    expect(state.showSkillSuggestions).toBe(false);
     expect(state.fileFilter).toBe("src/cli");
     expect(state.atStartIndex).toBe(3);
+  });
+
+  test("存在 $ 技能名时展示技能建议", () => {
+    const state = deriveComposerSuggestionState("使用 $find");
+
+    expect(state.showCommandSuggestions).toBe(false);
+    expect(state.showFileSuggestions).toBe(false);
+    expect(state.showSkillSuggestions).toBe(true);
+    expect(state.skillFilter).toBe("find");
+    expect(state.skillStartIndex).toBe(3);
   });
 
   test("目录建议会继续展开，文件建议会结束补全", () => {

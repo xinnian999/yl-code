@@ -25,6 +25,7 @@ import { McpConfigManager, McpManager } from "../mcp/index.ts";
 import { loadSystemTemplate, buildSystemPrompt } from "./helpers.ts";
 import { createBoundModel } from "./model.ts";
 import { ExecutionStateManager } from "../execution/execution-state.ts";
+import { SkillManager, buildSkillReferenceHint } from "../skills/index.ts";
 import {
   buildFileContext,
   addModel as addModelFn,
@@ -66,6 +67,8 @@ export class Agent {
   readonly mcpConfig = new McpConfigManager();
   /** MCP 连接管理器 */
   readonly mcpManager = new McpManager(this.mcpConfig);
+  /** 技能管理器 */
+  readonly skillManager = new SkillManager();
   /** 后台进程管理器 */
   private processManager = new ProcessManager();
   /** 长任务执行状态管理器 */
@@ -85,6 +88,8 @@ export class Agent {
   mode: AgentModeValue = AGENT_DEFAULT_MODE;
   /** 模型变更事件的取消订阅函数 */
   private unsubModelChange: () => void;
+  /** 技能变更事件的取消订阅函数 */
+  private unsubSkillChange: () => void;
   /** 中断控制器 */
   private abortController: AbortController | null = null;
   /** 调试模式开关 */
@@ -97,9 +102,15 @@ export class Agent {
   constructor() {
     this.systemTemplate = loadSystemTemplate();
     this.chatMessages = [new SystemMessage(this.buildCurrentSystemPrompt())];
-    this.builtinTools = createTools(this.confirmBus, this.processManager, this.todoBus);
+    this.builtinTools = createTools(
+      this.confirmBus,
+      this.processManager,
+      this.todoBus,
+      this.skillManager,
+    );
     this.tools = [...this.builtinTools];
     this.unsubModelChange = this.config.onModelChange(() => { this.currentModel = null; });
+    this.unsubSkillChange = this.bindSkillChange();
   }
 
   /** 获取或创建绑定工具的模型实例 */
@@ -132,8 +143,22 @@ export class Agent {
     return buildSystemPrompt(
       this.systemTemplate,
       this.mode,
-      this.executionState.buildPromptText()
+      this.executionState.buildPromptText(),
+      process.cwd(),
+      this.skillManager.getSkills(),
     );
+  }
+
+  /** 绑定技能变更事件 */
+  private bindSkillChange(): () => void {
+    const handleChange = () => {
+      this.refreshSystemPrompt();
+    };
+
+    this.skillManager.on("skills:change", handleChange);
+    return () => {
+      this.skillManager.off("skills:change", handleChange);
+    };
   }
 
   /** 刷新系统提示词，使动态执行状态进入下一轮模型请求 */
@@ -254,7 +279,15 @@ export class Agent {
   async chat(query: string): Promise<void> {
     this.messageBus.user(query);
     try {
-      await this.run(query, buildFileContext(query));
+      const skillHint = buildSkillReferenceHint(
+        query,
+        this.skillManager.getEnabledSkillNames(),
+      );
+      const nextQuery = skillHint
+        ? `${query}\n\n${skillHint.message}`
+        : query;
+
+      await this.run(nextQuery, buildFileContext(query));
     } catch (error) {
       this.messageBus.createAIMessage();
       this.messageBus.error((error as Error)?.message || String(error));
@@ -313,6 +346,18 @@ export class Agent {
   /** 获取当前工作模式 */
   getMode(): AgentModeValue { return this.mode; }
 
+  /** 获取技能索引列表 */
+  getSkills() { return this.skillManager.getSkills(); }
+
+  /** 获取技能索引摘要 */
+  getSkillIndexSummary(): string { return this.skillManager.getSkillIndexSummary(); }
+
+  /** 切换技能启用状态 */
+  toggleSkill(skillName: string): boolean { return this.skillManager.toggleSkill(skillName); }
+
+  /** 重新扫描技能目录 */
+  reloadSkills(): void { this.skillManager.reload(); }
+
   /** 设置工作模式 */
   setMode(mode: AgentModeValue): void {
     if (this.mode === mode) return;
@@ -344,6 +389,7 @@ export class Agent {
   dispose(): void {
     this.saveSession();
     this.unsubModelChange();
+    this.unsubSkillChange();
     this.modeListeners.clear();
     this.mcpManager.close().catch(() => {});
   }

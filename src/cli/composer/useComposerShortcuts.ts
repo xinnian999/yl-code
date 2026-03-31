@@ -1,9 +1,11 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useInput } from "ink";
 import type { FileItem } from "@/core/file-scanner.ts";
+import type { SkillIndexEntry } from "@/core/skills/index.ts";
 import type { ComposerSuggestionState } from "./composer-state.ts";
 import {
   applyFileSuggestion,
+  applySkillSuggestion,
   deriveComposerSuggestionState,
   getWrappedIndex,
 } from "./composer-state.ts";
@@ -27,18 +29,26 @@ export interface UseComposerShortcutsOptions {
   fileItems: FileItem[];
   /** 文件选中索引 */
   fileSelectedIndex: number;
+  /** 技能建议列表 */
+  skillItems: SkillIndexEntry[];
+  /** 技能选中索引 */
+  skillSelectedIndex: number;
   /** 更新输入值 */
   setInputValue: (value: string) => void;
   /** 更新命令选中索引 */
   setCommandSelectedIndex: Dispatch<SetStateAction<number>>;
   /** 更新文件选中索引 */
   setFileSelectedIndex: Dispatch<SetStateAction<number>>;
+  /** 更新技能选中索引 */
+  setSkillSelectedIndex: Dispatch<SetStateAction<number>>;
   /** 更新建议状态 */
   setSuggestionState: Dispatch<SetStateAction<ComposerSuggestionState>>;
   /** 递增输入组件 key */
   bumpInputKey: () => void;
   /** 取消文件建议 */
   clearFileSuggestions: () => void;
+  /** 取消技能建议 */
+  clearSkillSuggestions: () => void;
   /** 执行命令 */
   executeCommand: (commandValue: string) => void;
   /** 应用历史导航结果 */
@@ -72,6 +82,7 @@ export function shouldHandleHistoryNavigation(
   return (
     !suggestionState.showCommandSuggestions
     && !suggestionState.showFileSuggestions
+    && !suggestionState.showSkillSuggestions
   );
 }
 
@@ -88,12 +99,16 @@ export function useComposerShortcuts(
     commandSelectedIndex,
     fileItems,
     fileSelectedIndex,
+    skillItems,
+    skillSelectedIndex,
     setInputValue,
     setCommandSelectedIndex,
     setFileSelectedIndex,
+    setSkillSelectedIndex,
     setSuggestionState,
     bumpInputKey,
     clearFileSuggestions,
+    clearSkillSuggestions,
     executeCommand,
     applyHistoryNavigation,
     isNavigatingHistory,
@@ -159,8 +174,11 @@ export function useComposerShortcuts(
           setSuggestionState({
             showCommandSuggestions: false,
             showFileSuggestions: result.keepSuggestionsOpen,
+            showSkillSuggestions: false,
             fileFilter: result.nextFileFilter,
             atStartIndex: result.nextAtStartIndex,
+            skillFilter: "",
+            skillStartIndex: -1,
           });
           bumpInputKey();
           return;
@@ -168,6 +186,46 @@ export function useComposerShortcuts(
 
         if (key.escape) {
           clearFileSuggestions();
+          return;
+        }
+      }
+
+      if (suggestionState.showSkillSuggestions) {
+        if (key.upArrow) {
+          setSkillSelectedIndex((currentIndex) => {
+            return getWrappedIndex(currentIndex, skillItems.length, "up");
+          });
+          return;
+        }
+
+        if (key.downArrow) {
+          setSkillSelectedIndex((currentIndex) => {
+            return getWrappedIndex(currentIndex, skillItems.length, "down");
+          });
+          return;
+        }
+
+        if (key.return && skillItems.length > 0) {
+          const selectedSkill = skillItems[skillSelectedIndex];
+          if (!selectedSkill) {
+            return;
+          }
+
+          setInputValue(
+            applySkillSuggestion(
+              inputValue,
+              suggestionState.skillStartIndex,
+              selectedSkill,
+            ),
+          );
+          setSkillSelectedIndex(0);
+          setSuggestionState(deriveComposerSuggestionState(""));
+          bumpInputKey();
+          return;
+        }
+
+        if (key.escape) {
+          clearSkillSuggestions();
           return;
         }
       }
@@ -204,9 +262,10 @@ export function useComposerShortcuts(
       }
 
       if (
-        key.tab &&
-        !suggestionState.showCommandSuggestions &&
-        !suggestionState.showFileSuggestions
+        key.tab
+        && !suggestionState.showCommandSuggestions
+        && !suggestionState.showFileSuggestions
+        && !suggestionState.showSkillSuggestions
       ) {
         onModeSwitch();
       }

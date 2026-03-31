@@ -1,6 +1,7 @@
 import React from "react";
 import { Box, Text } from "ink";
 import type { FileItem } from "@/core/file-scanner.ts";
+import type { SkillIndexEntry } from "@/core/skills/index.ts";
 
 /** 命令建议列表属性 */
 export interface CommandSuggestionsProps {
@@ -33,6 +34,49 @@ export const CommandSuggestions: React.FC<CommandSuggestionsProps> = ({
             >
               {isSelected ? "❯ " : "  "}
               /{command.value}  {command.description}
+            </Text>
+          </Box>
+        );
+      })}
+    </Box>
+  );
+};
+
+/** 技能建议列表属性 */
+export interface SkillSuggestionsProps {
+  /** 过滤后的技能项 */
+  skills: SkillIndexEntry[];
+  /** 当前选中索引 */
+  selectedIndex: number;
+}
+
+/** 技能建议列表 */
+export const SkillSuggestions: React.FC<SkillSuggestionsProps> = ({
+  skills,
+  selectedIndex,
+}) => {
+  if (skills.length === 0) {
+    return (
+      <Box marginBottom={1} paddingLeft={1}>
+        <Text dimColor>没有匹配的 Skill</Text>
+      </Box>
+    );
+  }
+
+  return (
+    <Box flexDirection="column" marginBottom={1} paddingLeft={1}>
+      {skills.map((skill, index) => {
+        const isSelected = index === selectedIndex;
+
+        return (
+          <Box key={skill.name}>
+            <Text
+              color={isSelected ? "cyan" : undefined}
+              dimColor={!isSelected}
+              bold={isSelected}
+            >
+              {isSelected ? "❯ " : "  "}
+              ${skill.name}  {skill.description}
             </Text>
           </Box>
         );

@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { AgentMode } from "../types.ts";
+import type { SkillIndexEntry } from "../skills/index.ts";
 import { buildSystemPrompt, loadSystemTemplate } from "./helpers.ts";
 
 /** 创建临时工作目录 */
@@ -21,6 +22,21 @@ function writeAgentsFile(workspacePath: string, content: string): string {
   mkdirSync(workspacePath, { recursive: true });
   writeFileSync(agentsPath, content, "utf-8");
   return agentsPath;
+}
+
+/** 创建测试技能索引项 */
+function createSkillEntry(): SkillIndexEntry {
+  return {
+    name: "find-skills",
+    description: "帮助查找技能",
+    aliases: ["discover-skills"],
+    directoryPath: "/tmp/find-skills",
+    skillFilePath: "/tmp/find-skills/SKILL.md",
+    sourceKind: "bundled",
+    readonly: true,
+    enabled: true,
+    lockEntry: null,
+  };
 }
 
 describe("helpers", () => {
@@ -85,6 +101,26 @@ describe("helpers", () => {
       expect(firstPrompt).toContain("1. 第一版规则");
       expect(secondPrompt).toContain("1. 第二版规则");
       expect(secondPrompt).not.toContain("1. 第一版规则");
+    } finally {
+      cleanupTempWorkspace(workspacePath);
+    }
+  });
+
+  test("有可用 skills 时会把技能索引注入 prompt", () => {
+    const workspacePath = createTempWorkspace();
+
+    try {
+      const prompt = buildSystemPrompt(
+        loadSystemTemplate(),
+        AgentMode.BUILD,
+        "暂无额外执行状态。",
+        workspacePath,
+        [createSkillEntry()],
+      );
+
+      expect(prompt).toContain("## 可用 Skills 索引");
+      expect(prompt).toContain("find-skills");
+      expect(prompt).toContain("get_skills");
     } finally {
       cleanupTempWorkspace(workspacePath);
     }

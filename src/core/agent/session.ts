@@ -117,6 +117,8 @@ export function executeCommand(command: string, ctx: CommandContext): CommandAct
       return { action: "show_history" };
     case "model":
       return { action: "select_model" };
+    case "skills":
+      return { action: "manage_skills" };
     case "mcp":
       return { action: "manage_mcp" };
     case "debug":

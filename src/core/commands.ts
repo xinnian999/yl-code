@@ -16,6 +16,7 @@ export type CommandAction =
   | { action: "select_model" }
   | { action: "show_history" }
   | { action: "manage_mcp" }
+  | { action: "manage_skills" }
   | { action: "exit" };
 
 /** 所有斜杠命令列表 */

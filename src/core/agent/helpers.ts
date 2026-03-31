@@ -15,6 +15,8 @@ import {
   buildProjectRulesSection,
   loadProjectRules,
 } from "./project-rules.ts";
+import { buildSkillsPromptSection } from "../skills/skill-prompt.ts";
+import type { SkillIndexEntry } from "../skills/index.ts";
 
 // ============ Agent 上下文接口 ============
 
@@ -65,6 +67,7 @@ export interface ToolArgs {
   file?: string;
   path?: string;
   directory?: string;
+  skillNames?: string[];
 }
 
 // ============ 纯辅助函数 ============
@@ -92,6 +95,8 @@ export function getToolArgsPreview(toolCallChunks: ToolCallChunk[]): string | nu
     if (dirPathMatch) return dirPathMatch[1];
     const dirMatch = argsStr.match(/"directory"\s*:\s*"([^"]+)"/);
     if (dirMatch) return dirMatch[1];
+    const skillMatch = argsStr.match(/"skillNames"\s*:\s*\[\s*"([^"]+)"/);
+    if (skillMatch) return skillMatch[1];
     const commandMatch = argsStr.match(/"command"\s*:\s*"([^"]+)"/);
     if (commandMatch) return commandMatch[1];
   } catch {
@@ -118,6 +123,9 @@ export function getToolDescription(toolName: string, args: ToolArgs): string {
   const fileTarget = rawFileTarget ? toDisplayPath(rawFileTarget) : "未提供路径";
   const dirTarget = rawDirTarget ? toDisplayPath(rawDirTarget) : "未提供目录";
   const commandTarget = args.command ? toDisplayCommand(args.command) : "未提供命令";
+  const skillTarget = Array.isArray(args.skillNames) && args.skillNames.length > 0
+    ? args.skillNames.join(", ")
+    : "未提供技能";
 
   switch (toolName) {
     case "read_file":
@@ -134,6 +142,8 @@ export function getToolDescription(toolName: string, args: ToolArgs): string {
       return `查看目录: ${dirTarget}`;
     case "todo_write":
       return "更新任务列表";
+    case "get_skills":
+      return `读取技能: ${skillTarget}`;
     default:
       return `调用工具: ${toolName}`;
   }
@@ -150,13 +160,14 @@ export function getModeInstructions(mode: AgentModeValue): string {
     case AgentMode.ASK:
       return [
         "当前是 **问答模式（Ask）**。",
-        "你只能使用 `read_file` 和 `list_directory` 工具来阅读代码、回答问题。",
+        "你只能使用 `read_file`、`list_directory` 和 `get_skills` 工具来阅读代码、回答问题。",
         "禁止调用 `write_file`、`write_file_patch`、`execute_command`、`todo_write` 和所有 MCP 工具。",
         "如果用户要求修改代码、执行命令或落地实现，请明确告知用户切换到 Build 模式。",
       ].join("\n");
     case AgentMode.BUILD:
       return [
         "当前是 **构建模式（Build）**，你可以使用所有工具来完成编码任务。",
+        "如果当前任务适合某个 skill，先调用 `get_skills` 读取技能正文，再按技能说明执行。",
         "面对从零实现的大任务时，默认按“脚手架初始化 -> 基础类型与状态 -> 单模块或一组强相关文件 -> 联调验证”推进。",
         "一次优先只处理一个模块或一组强相关文件，不要在同一轮里无证据地大面积重写多个无关页面。",
         "完成脚手架后，应尽快运行 `bun run build`；每完成一个模块或一组强相关文件后，也应优先再跑一次 `bun run build`。",
@@ -166,9 +177,10 @@ export function getModeInstructions(mode: AgentModeValue): string {
     case AgentMode.PLAN:
       return [
         "当前是 **计划模式（Plan）**。",
-        "你只能使用 `read_file` 和 `list_directory` 工具进行只读探索，禁止调用 `write_file`、`write_file_patch`、`execute_command`、`todo_write` 和所有 MCP 工具。",
+        "你只能使用 `read_file`、`list_directory` 和 `get_skills` 工具进行只读探索，禁止调用 `write_file`、`write_file_patch`、`execute_command`、`todo_write` 和所有 MCP 工具。",
         "你的目标是先通过阅读代码消除可发现的不确定性，再判断是否还需要向用户提问。",
         "如果信息不足，请继续读代码；只有在无法通过代码确定、且会影响方案的关键问题上，才向用户提问。",
+        "如果用户显式提到了某个 skill，或你判断某个 skill 能帮助产出更准确的方案，应优先调用 `get_skills` 读取技能正文。",
         "当你需要向用户提问时，不要输出普通问题文本，必须只输出一个 `<plan_question>` 块，块内是 JSON 对象，格式为 {\"title\":\"...\",\"question\":\"...\",\"options\":[{\"label\":\"...\",\"description\":\"...\"}]}。",
         "`plan_question` 和 `<proposed_plan>` 都是输出标签，不是工具名，绝对不要把它们作为工具调用。",
         "问题选项只需要提供固定候选项，系统会自动追加最后一个“自定义输入”选项，因此不要自己重复输出自定义选项。",
@@ -187,16 +199,19 @@ export function buildSystemPrompt(
   template: string,
   mode: AgentModeValue,
   executionStateText = "暂无额外执行状态。",
-  workingDirectory = process.cwd()
+  workingDirectory = process.cwd(),
+  skills: SkillIndexEntry[] = [],
 ): string {
   const projectRules = loadProjectRules(workingDirectory);
   const projectRulesSection = buildProjectRulesSection(projectRules.content);
+  const skillsSection = buildSkillsPromptSection(skills);
 
   return template
     .replace("{workingDirectory}", workingDirectory)
     .replace("{workingMode}", mode)
     .replace("{modeInstructions}", getModeInstructions(mode))
     .replace("{projectRulesSection}", projectRulesSection)
+    .replace("{skillsSection}", skillsSection)
     .replace("{executionState}", executionStateText)
     .replace("{os}", platform())
     .replace("{currentTime}", new Date().toLocaleString());

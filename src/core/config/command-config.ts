@@ -3,6 +3,7 @@ export const COMMANDS: Array<{ value: string; description: string }> = [
   { value: "new", description: "开始新对话" },
   { value: "history", description: "查看对话历史" },
   { value: "model", description: "切换 AI 模型" },
+  { value: "skills", description: "管理 Skills" },
   { value: "mcp", description: "管理 MCP 服务器" },
   { value: "debug", description: "开关调试模式" },
   { value: "stream", description: "开关流式输出" },
@@ -17,6 +18,7 @@ export const COMMAND_HELP_TEXT = `📖 可用命令：
 /new     - 开始新对话
 /history - 查看对话历史
 /model   - 切换 AI 模型
+/skills  - 管理 Skills
 /mcp     - 管理 MCP 服务器
 /debug   - 开关调试模式（实时查看流式 chunk）
 /stream  - 开关流式输出

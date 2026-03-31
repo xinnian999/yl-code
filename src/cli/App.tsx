@@ -91,6 +91,9 @@ const App: React.FC<AppProps> = ({ agent }) => {
     if (result.action === "manage_mcp") {
       setOverlayView("mcp");
     }
+    if (result.action === "manage_skills") {
+      setOverlayView("skills");
+    }
     if (result.action === "exit") {
       setTimeout(() => handleExit(), 500);
     }
@@ -169,6 +172,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
           )}
           {!isConfirmPending && (
             <ComposerPanel
+              agent={agent}
               isProcessing={isProcessing}
               onSubmit={handleSubmit}
               onAbort={handleAbort}

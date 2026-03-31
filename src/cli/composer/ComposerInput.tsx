@@ -2,6 +2,7 @@ import React from "react";
 import { Box, Text } from "ink";
 import TextInput from "ink-text-input";
 import type { FileItem } from "@/core/file-scanner.ts";
+import type { SkillIndexEntry } from "@/core/skills/index.ts";
 import { MessageRow } from "../shared/MessageChrome.tsx";
 import {
   USER_SURFACE_ACCENT_COLOR,
@@ -11,6 +12,7 @@ import {
 import {
   CommandSuggestions,
   FileSuggestions,
+  SkillSuggestions,
 } from "./ComposerSuggestions.tsx";
 
 /** 输入框属性 */
@@ -90,6 +92,12 @@ export interface ComposerInputProps {
   fileSelectedIndex: number;
   /** 当前文件过滤词 */
   fileFilter: string;
+  /** 是否显示技能建议 */
+  showSkillSuggestions: boolean;
+  /** 技能建议列表 */
+  skillItems: SkillIndexEntry[];
+  /** 技能建议选中索引 */
+  skillSelectedIndex: number;
 }
 
 /** 组合输入区 */
@@ -106,6 +114,9 @@ const ComposerInput: React.FC<ComposerInputProps> = ({
   fileItems,
   fileSelectedIndex,
   fileFilter,
+  showSkillSuggestions,
+  skillItems,
+  skillSelectedIndex,
 }) => {
   return (
     <>
@@ -120,6 +131,12 @@ const ComposerInput: React.FC<ComposerInputProps> = ({
           files={fileItems}
           selectedIndex={fileSelectedIndex}
           filter={fileFilter}
+        />
+      ) : null}
+      {showSkillSuggestions ? (
+        <SkillSuggestions
+          skills={skillItems}
+          selectedIndex={skillSelectedIndex}
         />
       ) : null}
       <InputBox

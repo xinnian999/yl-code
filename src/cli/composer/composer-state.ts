@@ -1,5 +1,9 @@
 import { commands } from "@/core/commands.ts";
 import { extractAtFilter, type FileItem } from "@/core/file-scanner.ts";
+import {
+  extractSkillFilter,
+  type SkillIndexEntry,
+} from "@/core/skills/index.ts";
 
 /** 输入建议可见性状态 */
 export interface ComposerSuggestionState {
@@ -7,10 +11,16 @@ export interface ComposerSuggestionState {
   showCommandSuggestions: boolean;
   /** 是否展示文件建议 */
   showFileSuggestions: boolean;
+  /** 是否展示技能建议 */
+  showSkillSuggestions: boolean;
   /** 当前文件过滤词 */
   fileFilter: string;
   /** 当前 @ 的起始索引 */
   atStartIndex: number;
+  /** 当前技能过滤词 */
+  skillFilter: string;
+  /** 当前 $ 的起始索引 */
+  skillStartIndex: number;
 }
 
 /** 选择文件建议后的结果 */
@@ -25,31 +35,51 @@ export interface ApplyFileSuggestionResult {
   keepSuggestionsOpen: boolean;
 }
 
+/** 构建空的建议状态 */
+function buildEmptySuggestionState(): ComposerSuggestionState {
+  return {
+    showCommandSuggestions: false,
+    showFileSuggestions: false,
+    showSkillSuggestions: false,
+    fileFilter: "",
+    atStartIndex: -1,
+    skillFilter: "",
+    skillStartIndex: -1,
+  };
+}
+
 /** 根据输入值推导当前建议展示状态 */
 export function deriveComposerSuggestionState(
   value: string,
 ): ComposerSuggestionState {
   if (value.startsWith("/")) {
     return {
+      ...buildEmptySuggestionState(),
       showCommandSuggestions: true,
-      showFileSuggestions: false,
-      fileFilter: "",
-      atStartIndex: -1,
     };
   }
 
   const atInfo = extractAtFilter(value);
-  if (!atInfo) {
+  const skillInfo = extractSkillFilter(value);
+  if (!atInfo && !skillInfo) {
+    return buildEmptySuggestionState();
+  }
+
+  if (skillInfo && (!atInfo || skillInfo.skillStartIndex > atInfo.atIndex)) {
     return {
-      showCommandSuggestions: false,
-      showFileSuggestions: false,
-      fileFilter: "",
-      atStartIndex: -1,
+      ...buildEmptySuggestionState(),
+      showSkillSuggestions: true,
+      skillFilter: skillInfo.filter,
+      skillStartIndex: skillInfo.skillStartIndex,
     };
   }
 
+  if (!atInfo) {
+    return buildEmptySuggestionState();
+  }
+
   return {
-    showCommandSuggestions: false,
+    ...buildEmptySuggestionState(),
     showFileSuggestions: true,
     fileFilter: atInfo.filter,
     atStartIndex: atInfo.atIndex,
@@ -59,6 +89,29 @@ export function deriveComposerSuggestionState(
 /** 获取过滤后的命令列表 */
 export function getFilteredCommands(filter: string) {
   return commands.filter((command) => `/${command.value}`.startsWith(filter));
+}
+
+/** 获取过滤后的技能列表 */
+export function getFilteredSkills(
+  skills: SkillIndexEntry[],
+  filter: string,
+): SkillIndexEntry[] {
+  const normalizedFilter = filter.trim().toLowerCase();
+  const enabledSkills = skills.filter((skill) => skill.enabled);
+
+  if (!normalizedFilter) {
+    return enabledSkills;
+  }
+
+  return enabledSkills.filter((skill) => {
+    if (skill.name.toLowerCase().includes(normalizedFilter)) {
+      return true;
+    }
+
+    return skill.aliases.some((alias) => {
+      return alias.toLowerCase().includes(normalizedFilter);
+    });
+  });
 }
 
 /** 计算循环选择时的下一个索引 */
@@ -102,4 +155,14 @@ export function applyFileSuggestion(
     nextAtStartIndex: -1,
     keepSuggestionsOpen: false,
   };
+}
+
+/** 将技能建议应用到当前输入框内容 */
+export function applySkillSuggestion(
+  inputValue: string,
+  skillStartIndex: number,
+  selectedSkill: SkillIndexEntry,
+): string {
+  const beforeDollar = inputValue.slice(0, skillStartIndex);
+  return `${beforeDollar}$${selectedSkill.name} `;
 }

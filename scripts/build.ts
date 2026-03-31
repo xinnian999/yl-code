@@ -51,6 +51,17 @@ copyFileSync(
   join(root, "dist", "system.md")
 );
 
+// 运行时需要内置 skills 资源与锁文件
+cpSync(
+  join(root, ".agents", "skills"),
+  join(root, "dist", "builtin-skills"),
+  { recursive: true },
+);
+copyFileSync(
+  join(root, "skills-lock.json"),
+  join(root, "dist", "skills-lock.json"),
+);
+
 // cfonts 在打包后会通过 require('../fonts/*.json') 查找字体文件（相对 dist/index.js 解析为项目根目录 fonts/）
 const cfontsDir = join(root, "node_modules", "cfonts", "fonts");
 const fontsDestDir = join(root, "fonts");

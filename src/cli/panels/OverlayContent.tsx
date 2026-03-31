@@ -6,6 +6,7 @@ import type { OverlayView } from "../shared/view-state.ts";
 import HistoryPanel from "./HistoryPanel.tsx";
 import McpPanel from "./McpPanel.tsx";
 import ModelPanel from "./ModelPanel.tsx";
+import SkillsPanel from "./SkillsPanel.tsx";
 
 /** Overlay 面板内容属性 */
 export interface OverlayContentProps {
@@ -56,6 +57,17 @@ const OverlayContent: React.FC<OverlayContentProps> = ({
           agent={agent}
           onSelect={onModelSelect}
           onCancel={onClose}
+        />
+      </Box>
+    );
+  }
+
+  if (overlayView === "skills") {
+    return (
+      <Box paddingX={1}>
+        <SkillsPanel
+          agent={agent}
+          onClose={onClose}
         />
       </Box>
     );
