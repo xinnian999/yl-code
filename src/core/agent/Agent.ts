@@ -17,6 +17,7 @@ import {
   AGENT_DEFAULT_DEBUG_MODE,
   AGENT_DEFAULT_MODE,
   AGENT_DEFAULT_STREAM_ENABLED,
+  AGENT_DURATION_UPDATE_INTERVAL_MS,
   AGENT_MAX_ITERATIONS,
   AGENT_STATUS_TEXT,
 } from "../config/agent-config.ts";
@@ -36,14 +37,9 @@ import {
   restoreSession as restoreSessionFn,
   newSession as newSessionFn,
 } from "./session.ts";
-import {
-  handlePlanModeResponse,
-  normalizePlanModeResponse,
-} from "./plan-mode.ts";
-import {
-  runAgentConversation,
-  type AgentRunLoopContext,
-} from "./run-loop.ts";
+import { compactMessagesForContext } from "../context/compaction.ts";
+import { buildAgentGraph } from "./graph/index.ts";
+import type { AgentGraph, AgentGraphDeps } from "./graph/index.ts";
 
 /**
  * Agent 核心类 - 管理对话、工具调用和子系统
@@ -98,6 +94,10 @@ export class Agent {
   streamEnabled = AGENT_DEFAULT_STREAM_ENABLED;
   /** 模式变更监听器 */
   private modeListeners = new Set<(mode: AgentModeValue) => void>();
+  /** 编译后的 Agent 图实例（首次使用时构建） */
+  private graph: AgentGraph | null = null;
+  /** Agent 图节点共享依赖（首次使用时构建） */
+  private graphDeps: AgentGraphDeps | null = null;
 
   constructor() {
     this.systemTemplate = loadSystemTemplate();
@@ -213,39 +213,6 @@ export class Agent {
     this.todoBus.setCurrentMessageId(aiMessage.id);
   }
 
-  /** 提取模型响应中的文本内容 */
-  private getResponseContent(response: any): string {
-    if (typeof response?.content === "string") return response.content;
-    if (!response?.content) return "";
-    return JSON.stringify(response.content);
-  }
-
-  /** 归一化计划模式响应，兼容模型误输出的计划伪工具调用 */
-  private normalizePlanResponse(response: any): void {
-    normalizePlanModeResponse(
-      {
-        getResponseContent: this.getResponseContent.bind(this),
-      },
-      response
-    );
-  }
-
-  /** 处理计划模式下的模型文本响应 */
-  private async handlePlanModeResponse(response: any): Promise<"continue" | "break"> {
-    return handlePlanModeResponse(
-      {
-        debugMode: this.debugMode,
-        messageBus: this.messageBus,
-        planBus: this.planBus,
-        chatMessages: this.chatMessages,
-        getResponseContent: this.getResponseContent.bind(this),
-        beginAssistantTurn: this.beginAssistantTurn.bind(this),
-        setMode: this.setMode.bind(this),
-      },
-      response
-    );
-  }
-
   /** 通知所有模式监听器 */
   private notifyModeChange(): void {
     for (const listener of this.modeListeners) {
@@ -261,18 +228,91 @@ export class Agent {
     };
   }
 
-  /** 执行一次对话，支持多轮工具调用 */
+  /** 构建或复用 graph 节点依赖端口 */
+  private buildGraphDeps(): AgentGraphDeps {
+    if (this.graphDeps) return this.graphDeps;
+    this.graphDeps = {
+      messageBus: this.messageBus,
+      confirmBus: this.confirmBus,
+      planBus: this.planBus,
+      todoBus: this.todoBus,
+      contextBus: this.contextBus,
+      config: this.config,
+      executionState: this.executionState,
+      getTools: () => this.tools,
+      isDebugMode: () => this.debugMode,
+      isStreamEnabled: () => this.streamEnabled,
+      getModel: () => this.getModel(),
+      getAbortController: () => this.abortController,
+      getMode: () => this.mode,
+      setMode: (mode) => this.setMode(mode),
+      refreshSystemPrompt: () => this.refreshSystemPrompt(),
+      beginAssistantTurn: () => this.beginAssistantTurn(),
+    };
+    return this.graphDeps;
+  }
+
+  /** 获取或构建编译后的 Agent 图实例 */
+  private getGraph(): AgentGraph {
+    if (!this.graph) {
+      this.graph = buildAgentGraph(this.buildGraphDeps());
+    }
+    return this.graph;
+  }
+
+  /** 启动本轮耗时刷新计时器 */
+  private startDurationTimer(startTime: number): NodeJS.Timeout {
+    return setInterval(() => {
+      const wait =
+        this.confirmBus.getCurrentWaitTime() + this.planBus.getCurrentWaitTime();
+      const elapsed = Date.now() - startTime - wait;
+      if (elapsed >= 0) {
+        this.messageBus.setLastAITotalDuration(elapsed);
+      }
+    }, AGENT_DURATION_UPDATE_INTERVAL_MS);
+  }
+
+  /** 主对话流程结束后的收尾：状态清理、收尾压缩、统计 */
+  private finalizeRun(startTime: number): string {
+    this.messageBus.setThinkingStatus(ThinkingStatus.IDLE);
+    if (!this.abortController?.signal.aborted) {
+      this.todoBus.completeAll();
+    }
+    this.reportStats(startTime);
+    compactMessagesForContext(this.chatMessages);
+
+    const lastMessage = this.chatMessages[this.chatMessages.length - 1];
+    return typeof lastMessage?.content === "string" ? lastMessage.content : "";
+  }
+
+  /** 执行一次对话，支持多轮工具调用（驱动 LangGraph 主循环图） */
   async run(
     query: string,
     fileContext = "",
     maxIterations: number | null = AGENT_MAX_ITERATIONS
   ): Promise<string> {
-    return runAgentConversation(
-      this as unknown as AgentRunLoopContext,
-      query,
-      fileContext,
-      maxIterations
-    );
+    const startTime = Date.now();
+    this.abortController = new AbortController();
+    const durationTimer = this.startDurationTimer(startTime);
+
+    try {
+      const finalState = await this.getGraph().invoke(
+        {
+          messages: this.chatMessages,
+          mode: this.mode,
+          userQuery: query,
+          fileContext,
+        },
+        {
+          signal: this.abortController.signal,
+          recursionLimit: maxIterations ?? 250,
+        }
+      );
+      this.chatMessages = finalState.messages;
+      return this.finalizeRun(startTime);
+    } finally {
+      clearInterval(durationTimer);
+    }
   }
 
   /** 完整对话入口：解析文件引用 → 发送消息 → 调用 AI → 处理错误 */
