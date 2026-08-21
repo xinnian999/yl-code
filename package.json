@@ -1,6 +1,7 @@
 {
   "name": "yl-code",
   "version": "1.0.6",
+  "packageManager": "pnpm@11.18.0",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -11,18 +12,23 @@
     "fonts"
   ],
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   },
   "scripts": {
-    "dev": "bun --watch src/cli/index.ts",
-    "start": "bun src/cli/index.ts",
-    "build": "bun run scripts/build.ts",
-    "test": "bun test",
-    "prepublishOnly": "bun run build",
+    "dev": "node scripts/dev.mjs",
+    "start": "pnpm run build && node dist/index.js",
+    "build": "node scripts/build.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "pnpm run build",
     "typecheck": "tsc --noEmit",
-    "verify": "bun run build && node dist/index.js",
-    "verify:pack": "bun run build && npm pack",
-    "release": "bun run build && npm version patch && npm publish"
+    "verify": "pnpm run build && node dist/index.js",
+    "verify:pack": "pnpm run build && pnpm pack",
+    "release": "pnpm run build && pnpm version patch && pnpm publish",
+    "worker:dev": "pnpm --filter @yl-code/model-proxy dev",
+    "worker:test": "pnpm --filter @yl-code/model-proxy test",
+    "worker:typecheck": "pnpm --filter @yl-code/model-proxy typecheck",
+    "worker:deploy": "pnpm --filter @yl-code/model-proxy deploy"
   },
   "keywords": [
     "cli",
@@ -60,7 +66,8 @@
     "@types/ink-spinner": "^3.0.5",
     "@types/node": "^25.2.3",
     "@types/react": "^19.2.13",
-    "bun-types": "^1.3.9",
-    "typescript": "^5.9.3"
+    "esbuild": "^0.25.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.0"
   }
 }

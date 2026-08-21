@@ -1,0 +1,45 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "yl-code-model-proxy",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-21",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "api.elin521.cn",
+      "custom_domain": true
+    },
+    {
+      "pattern": "elin521.cn/api/yl-code/*",
+      "zone_name": "elin521.cn"
+    }
+  ],
+  "vars": {
+    "UPSTREAM_BASE_URL": "https://code0.ai/v1"
+  },
+  "secrets": {
+    "required": ["BUILTIN_API_KEY"]
+  },
+  "ratelimits": [
+    {
+      "name": "RATE_LIMITER",
+      "namespace_id": "52101",
+      "simple": {
+        "limit": 60,
+        "period": 60
+      }
+    }
+  ],
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 0.01
+    }
+  }
+}

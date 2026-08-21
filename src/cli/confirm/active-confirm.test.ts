@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { deriveActiveConfirm, hasActiveConfirm } from "./active-confirm.ts";
 
 describe("active-confirm", () => {

@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import type { FileItem } from "@/core/file-scanner.ts";
 import {
   applyFileSuggestion,

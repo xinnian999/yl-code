@@ -17,6 +17,10 @@ import {
 } from "./project-rules.ts";
 import { buildSkillsPromptSection } from "../skills/skill-prompt.ts";
 import type { SkillIndexEntry } from "../skills/index.ts";
+import {
+  detectPackageManager,
+  getPackageManagerCommands,
+} from "../package-manager.ts";
 
 // ============ Agent 上下文接口 ============
 
@@ -155,7 +159,13 @@ export function loadSystemTemplate(): string {
 }
 
 /** 根据模式生成模式说明文本 */
-export function getModeInstructions(mode: AgentModeValue): string {
+export function getModeInstructions(
+  mode: AgentModeValue,
+  workingDirectory = process.cwd(),
+): string {
+  const packageManager = detectPackageManager(workingDirectory);
+  const commands = getPackageManagerCommands(packageManager);
+
   switch (mode) {
     case AgentMode.ASK:
       return [
@@ -170,7 +180,8 @@ export function getModeInstructions(mode: AgentModeValue): string {
         "如果当前任务适合某个 skill，先调用 `get_skills` 读取技能正文，再按技能说明执行。",
         "面对从零实现的大任务时，默认按“脚手架初始化 -> 基础类型与状态 -> 单模块或一组强相关文件 -> 联调验证”推进。",
         "一次优先只处理一个模块或一组强相关文件，不要在同一轮里无证据地大面积重写多个无关页面。",
-        "完成脚手架后，应尽快运行 `bun run build`；每完成一个模块或一组强相关文件后，也应优先再跑一次 `bun run build`。",
+        `目标项目当前识别为 ${packageManager}；安装和验证时使用它已有的命令与锁文件。`,
+        `完成脚手架后，应尽快运行 \`${commands.build}\`；每完成一个模块或一组强相关文件后，也应优先再跑一次。`,
         "如果最近一次验证失败，先读取报错涉及的文件，再定点修改；没有新的报错证据前，不要扩散到无关文件。",
         "如果同一批错误已经连续失败多次，继续调用工具前，先用简短文本总结根因和下一步修改点。",
       ].join("\n");
@@ -209,7 +220,7 @@ export function buildSystemPrompt(
   return template
     .replace("{workingDirectory}", workingDirectory)
     .replace("{workingMode}", mode)
-    .replace("{modeInstructions}", getModeInstructions(mode))
+    .replace("{modeInstructions}", getModeInstructions(mode, workingDirectory))
     .replace("{projectRulesSection}", projectRulesSection)
     .replace("{skillsSection}", skillsSection)
     .replace("{executionState}", executionStateText)

@@ -118,9 +118,9 @@ function getToolArgsExample(toolName: string): string | null {
     case "write_file_patch":
       return '{"filePath":"src/index.ts","patch":"@@ ..."}';
     case "execute_command":
-      return '{"command":"bun run build","workingDirectory":"project"}';
+      return '{"command":"npm run build","workingDirectory":"project"}';
     case "read_background_logs":
-      return '{"command":"bun run dev","maxChars":4000}';
+      return '{"command":"npm run dev","maxChars":4000}';
     case "list_directory":
       return '{"directoryPath":"src"}';
     case "todo_write":

@@ -1,5 +1,8 @@
 .env
 node_modules
+.pnpm-store
+.wrangler
+worker/.dev.vars
 dist
 .env copy
 gold-miner

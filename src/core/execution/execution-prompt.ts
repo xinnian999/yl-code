@@ -31,7 +31,7 @@ export function buildExecutionPromptText(state: ExecutionStateSnapshot): string 
     lines.push("  - 最近一次验证失败后，优先读取和修改报错相关文件；没有新证据前，不要重写无关模块。");
   }
   if (state.needsValidation) {
-    lines.push("  - 当前已有代码改动尚未验证；完成当前这一组强相关文件后，优先执行 bun run build。");
+    lines.push("  - 当前已有代码改动尚未验证；完成当前这一组强相关文件后，优先执行目标项目定义的构建、类型检查或测试命令。");
   }
   if ((state.lastValidation?.repeatCount ?? 0) >= 2) {
     lines.push("  - 同一批错误已连续失败多次，继续动手前先用简短文本总结根因和下一步修改点。");

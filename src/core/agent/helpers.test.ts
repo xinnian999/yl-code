@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -72,6 +72,28 @@ describe("helpers", () => {
       );
 
       expect(prompt).not.toContain("## 项目规则");
+    } finally {
+      cleanupTempWorkspace(workspacePath);
+    }
+  });
+
+  test("构建模式会注入目标项目识别出的包管理器命令", () => {
+    const workspacePath = createTempWorkspace();
+
+    try {
+      writeFileSync(
+        join(workspacePath, "package.json"),
+        JSON.stringify({ packageManager: "pnpm@10.0.0" }),
+      );
+      const prompt = buildSystemPrompt(
+        loadSystemTemplate(),
+        AgentMode.BUILD,
+        "暂无额外执行状态。",
+        workspacePath,
+      );
+
+      expect(prompt).toContain("目标项目当前识别为 pnpm");
+      expect(prompt).toContain("pnpm run build");
     } finally {
       cleanupTempWorkspace(workspacePath);
     }

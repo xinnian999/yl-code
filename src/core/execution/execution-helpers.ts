@@ -61,17 +61,17 @@ export function hasFailureSignal(text: string): boolean {
 
 /** 判断命令是否为验证类命令 */
 export function isValidationCommand(command: string): boolean {
-  return /\bbun\s+run\s+(build|typecheck|test)\b/i.test(command);
+  return /\b(?:npm|pnpm|bun)\s+(?:run\s+)?(?:build|typecheck|test)\b|\byarn\s+(?:run\s+)?(?:build|typecheck|test)\b/i.test(command);
 }
 
 /** 判断命令是否为开发服务器命令 */
 export function isDevCommand(command: string): boolean {
-  return /\bbun\s+(run\s+)?dev\b/i.test(command);
+  return /\b(?:npm|pnpm|bun)\s+(?:run\s+)?dev\b|\byarn\s+(?:run\s+)?dev\b/i.test(command);
 }
 
 /** 判断命令是否为脚手架初始化命令 */
 export function isScaffoldCommand(command: string): boolean {
-  return /\bbun\s+(create|install)\b/i.test(command);
+  return /\b(?:npm|pnpm|bun)\s+(?:create|install)\b|\byarn\s+(?:create|install)\b/i.test(command);
 }
 
 /** 根据文件路径推断当前更适合的执行阶段和焦点 */
@@ -82,7 +82,7 @@ export function getFileExecutionHint(filePath: string): {
   const normalizedPath = filePath.replace(/\\/g, "/");
   const baseName = path.basename(normalizedPath);
 
-  if (/^(package\.json|bun\.lock|tsconfig|vite\.config|index\.html)/.test(baseName)) {
+  if (/^(package\.json|package-lock\.json|npm-shrinkwrap\.json|pnpm-lock\.yaml|yarn\.lock|bun\.lockb?|tsconfig|vite\.config|index\.html)/.test(baseName)) {
     return {
       phase: ExecutionPhase.SCAFFOLD,
       focusSummary: `正在调整脚手架与工程配置：${toDisplayPath(filePath)}`,

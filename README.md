@@ -5,7 +5,7 @@
 ## 安装
 
 ```bash
-bun add --global yl-code
+pnpm add --global yl-code
 ```
 
 ## 使用
@@ -27,21 +27,38 @@ yl
 
 ```bash
 # 安装依赖
-bun install
+pnpm install
 
 # 开发模式
-bun run dev
+pnpm dev
 
 # 构建
-bun run build
+pnpm build
 
 # 类型检查
-bun run typecheck
+pnpm typecheck
+```
+
+## 免费模型代理
+
+内置免费模型通过 `https://elin521.cn/api/yl-code/v1` 的 Cloudflare Worker 调用，
+上游 API Key 仅保存在 Cloudflare Secret 中，不会被打进 CLI 或 npm 包。
+
+```bash
+# 校验代理
+pnpm worker:typecheck
+pnpm worker:test
+
+# 本地开发
+pnpm worker:dev
+
+# 部署代理（需提前配置 BUILTIN_API_KEY Secret）
+pnpm worker:deploy
 ```
 
 ## 要求
 
-- Node.js >= 18.0.0
+- Node.js >= 20.0.0
 
 ## License
 

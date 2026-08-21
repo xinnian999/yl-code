@@ -17,7 +17,7 @@
     "paths": {
       "@/*": ["./src/*"]
     },
-    "types": ["bun-types", "node"],
+    "types": ["node"],
     "lib": ["ESNext"],
     "noEmit": true,
     "allowImportingTsExtensions": true

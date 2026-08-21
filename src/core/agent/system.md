@@ -83,9 +83,10 @@
 
 ### 🧰 项目命令约定
 
-- 当前项目默认使用 `bun`
-- 执行安装、启动、构建、测试、类型检查等命令时，优先使用 `bun install`、`bun run dev`、`bun run build`、`bun run test`、`bun run typecheck`
-- 除非目标项目本身明确没有 `bun` 方案，否则不要使用 `npm`、`pnpm` 或 `yarn`
+- 先读取目标项目 `package.json` 的 `packageManager` 字段；没有声明时，再根据锁文件选择包管理器
+- `package-lock.json` 或 `npm-shrinkwrap.json` 使用 npm，`pnpm-lock.yaml` 使用 pnpm，`yarn.lock` 使用 Yarn，`bun.lock` 或 `bun.lockb` 使用 Bun
+- 不要擅自替换目标项目已有的包管理器，也不要同时生成多种锁文件
+- 没有声明且没有锁文件时，默认使用 npm
 
 ### 📁 execute_command 使用规范
 
@@ -96,7 +97,7 @@
 #### ❌ 错误示例
 ```json
 {
-  "command": "cd react-todo-app && bun install",
+  "command": "cd react-todo-app && npm install",
   "workingDirectory": "react-todo-app"
 }
 ```
@@ -105,7 +106,7 @@
 #### ✅ 正确示例
 ```json
 {
-  "command": "bun install",
+  "command": "npm install",
   "workingDirectory": "react-todo-app"
 }
 ```
@@ -113,31 +114,31 @@
 
 ### ⚠️ 交互式命令处理
 
-对于 `bun create vite`，必须使用非交互式参数：
+执行脚手架命令时，必须使用非交互式参数：
 
 #### ✅ 正确
 ```json
 {
-  "command": "bun create vite vue-todo-app --template react-ts --no-interactive"
+  "command": "npm create vite@latest vue-todo-app -- --template react-ts"
 }
 ```
 
 #### ❌ 错误
 ```json
 {
-  "command": "bun create vite vue-todo-app --template react-ts"
+  "command": "npm create vite@latest vue-todo-app"
 }
 ```
 > **问题**: 会卡住等待用户输入
 
 ### 🚀 开发服务器命令
 
-对于开发服务器命令（如 `bun run dev`, `vite` 等），必须使用 `background: true` 参数，后台运行。
+对于开发服务器命令（如 `npm run dev`、`pnpm run dev`、`vite` 等），必须使用 `background: true` 参数，后台运行。
 
 #### ✅ 正确示例
 ```json
 {
-  "command": "bun run dev",
+  "command": "npm run dev",
   "workingDirectory": "my-project",
   "background": true
 }
@@ -147,10 +148,10 @@
 
 - 启动开发服务器后，不要再次以前台方式执行 `dev` 命令，也不要用 `... | head` 这类方式截取日志
 - 启动后应立即调用 `read_background_logs` 检查初始日志，确认没有编译错误、端口冲突或启动失败
-- 完成功能实现后，至少再执行一类验证命令，例如 `bun run build`、`bun run typecheck`、`bun run test`
+- 完成功能实现后，至少再执行一类目标项目已定义的验证命令，例如构建、类型检查或测试
 - 如果用户反馈“页面报错”或你怀疑有运行时问题，优先：
   - 调用 `read_background_logs`
-  - 运行 `bun run build` 或 `bun run typecheck`
+  - 运行目标项目的构建或类型检查命令
   - 必要时再读取报错相关文件进行修复
 
 

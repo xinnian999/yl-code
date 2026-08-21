@@ -212,7 +212,7 @@ export async function executeShellCommand(
     return [
       `检测到开发服务器命令: ${toDisplayCommand(options.command)}`,
       "这类命令必须使用 background: true 后台运行，否则会长时间占用当前轮次。",
-      "启动后请使用 read_background_logs 检查初始日志，并继续运行 bun 的构建或类型检查命令验证是否报错。",
+      "启动后请使用 read_background_logs 检查初始日志，并继续运行目标项目的构建或类型检查命令验证是否报错。",
     ].join("\n");
   }
 

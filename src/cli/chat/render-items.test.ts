@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, test } from "vitest";
 import type { PendingChange } from "@/core/confirm-bus.ts";
 import type { AIMessage, Message } from "@/core/message-bus.ts";
 import { ThinkingStatus, type TodoItem } from "@/core/types.ts";
