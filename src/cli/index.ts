@@ -3,7 +3,14 @@
 import React from "react";
 import { render } from "ink";
 import { Agent } from "@/core/agent/Agent.ts";
+import { APP_VERSION } from "@/version.ts";
 import App from "./App.tsx";
+
+// 版本查询不依赖交互终端，方便在脚本和管道中调用
+if (process.argv.includes("-v") || process.argv.includes("--version")) {
+  console.log(APP_VERSION);
+  process.exit(0);
+}
 
 // 检查是否在 TTY 环境下运行
 if (!process.stdin.isTTY) {
