@@ -1,9 +1,16 @@
 import { build } from "esbuild";
-import { copyFileSync, cpSync, mkdirSync, rmSync } from "node:fs";
+import { copyFileSync, cpSync, mkdirSync, readFileSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const rootDirectory = join(fileURLToPath(new URL(".", import.meta.url)), "..");
+
+/** 读取发布包版本，作为 CLI 界面版本号的唯一来源 */
+function readPackageVersion() {
+  const packagePath = join(rootDirectory, "package.json");
+  const packageJson = JSON.parse(readFileSync(packagePath, "utf-8"));
+  return packageJson.version;
+}
 
 /** 构建可由 Node 直接执行的 CLI 发布产物 */
 export async function buildProject() {
@@ -19,6 +26,9 @@ export async function buildProject() {
     platform: "node",
     format: "esm",
     target: "node20",
+    define: {
+      __YL_CODE_VERSION__: JSON.stringify(readPackageVersion()),
+    },
     banner: {
       js: 'import { createRequire as __nodeCreateRequire } from "node:module"; const require = __nodeCreateRequire(import.meta.url);',
     },

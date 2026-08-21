@@ -14,6 +14,7 @@ import { hasOverlayView, type OverlayView } from "./shared/view-state.ts";
 import { AGENT_MODES } from "@/core/types.ts";
 import type { ModelConfig, AgentModeValue } from "@/core/types.ts";
 import type { Agent } from "@/core/agent/Agent.ts";
+import { APP_VERSION } from "@/version.ts";
 
 /** 主应用组件属性 */
 export interface AppProps {
@@ -159,7 +160,7 @@ const App: React.FC<AppProps> = ({ agent }) => {
             }
             pendingPlanInteraction={pendingPlanInteraction}
             modelId={agent.getCurrentModelName()}
-            version="1.0.11"
+            version={APP_VERSION}
             hasProjectRules={hasProjectRules}
           />
           {isConfirmPending && (

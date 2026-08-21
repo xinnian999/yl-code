@@ -1,6 +1,6 @@
 {
   "name": "yl-code",
-  "version": "1.0.6",
+  "version": "1.0.12",
   "packageManager": "pnpm@11.18.0",
   "type": "module",
   "main": "dist/index.js",
