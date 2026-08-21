@@ -94,7 +94,7 @@ export interface AgentModeConfig {
 
 /** 所有可用模式列表 */
 export const AGENT_MODES: AgentModeConfig[] = [
-  { value: "ask",   label: "Ask",   description: "问答模式" },
+  { value: "ask", label: "Ask", description: "问答模式" },
   { value: "build", label: "Build", description: "构建模式" },
   { value: "plan",  label: "Plan",  description: "计划模式" },
 ];
