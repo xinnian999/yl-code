@@ -4,7 +4,7 @@
  */
 import { EventEmitter } from "events";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
-import { MCP_CONFIG_FILE, NIUMA_CONFIG_DIR } from "../config/storage-config.ts";
+import { MCP_CONFIG_FILE, YL_CONFIG_DIR } from "../config/storage-config.ts";
 
 // ============ 类型定义 ============
 
@@ -78,8 +78,8 @@ export class McpConfigManager extends EventEmitter {
     super();
     this.configPath = MCP_CONFIG_FILE;
 
-    if (!existsSync(NIUMA_CONFIG_DIR)) {
-      mkdirSync(NIUMA_CONFIG_DIR, { recursive: true });
+    if (!existsSync(YL_CONFIG_DIR)) {
+      mkdirSync(YL_CONFIG_DIR, { recursive: true });
     }
 
     this.config = this.loadConfig();

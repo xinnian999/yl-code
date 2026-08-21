@@ -1,12 +1,12 @@
 import fs from "fs";
-import { HISTORY_FILE, MAX_HISTORY, NIUMA_CONFIG_DIR } from "./config/storage-config.ts";
+import { HISTORY_FILE, MAX_HISTORY, YL_CONFIG_DIR } from "./config/storage-config.ts";
 
 /**
  * 确保配置目录存在
  */
 const ensureConfigDir = (): void => {
-  if (!fs.existsSync(NIUMA_CONFIG_DIR)) {
-    fs.mkdirSync(NIUMA_CONFIG_DIR, { recursive: true });
+  if (!fs.existsSync(YL_CONFIG_DIR)) {
+    fs.mkdirSync(YL_CONFIG_DIR, { recursive: true });
   }
 };
 

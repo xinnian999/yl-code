@@ -2,19 +2,19 @@ import { homedir } from "os";
 import { join } from "path";
 
 /** 全局配置目录 */
-export const NIUMA_CONFIG_DIR = join(homedir(), ".yl");
+export const YL_CONFIG_DIR = join(homedir(), ".yl");
 
 /** 主配置文件路径 */
-export const APP_CONFIG_FILE = join(NIUMA_CONFIG_DIR, "config.json");
+export const APP_CONFIG_FILE = join(YL_CONFIG_DIR, "config.json");
 
 /** MCP 配置文件路径 */
-export const MCP_CONFIG_FILE = join(NIUMA_CONFIG_DIR, "mcp.json");
+export const MCP_CONFIG_FILE = join(YL_CONFIG_DIR, "mcp.json");
 
 /** 历史记录文件路径 */
-export const HISTORY_FILE = join(NIUMA_CONFIG_DIR, "history.json");
+export const HISTORY_FILE = join(YL_CONFIG_DIR, "history.json");
 
 /** 会话目录路径 */
-export const SESSIONS_DIR = join(NIUMA_CONFIG_DIR, "sessions");
+export const SESSIONS_DIR = join(YL_CONFIG_DIR, "sessions");
 
 /** 会话索引文件路径 */
 export const SESSION_INDEX_FILE = join(SESSIONS_DIR, "index.json");

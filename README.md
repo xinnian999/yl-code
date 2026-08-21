@@ -1,17 +1,17 @@
-# Niuma Code
+# yl-code
 
-终端内 AI 助手 CLI，输入 `niuma` 即可召唤使用。
+终端内 AI 助手 CLI，输入 `yl` 即可召唤使用。
 
 ## 安装
 
 ```bash
-npm install -g niuma-code
+bun add --global yl-code
 ```
 
 ## 使用
 
 ```bash
-niuma
+yl
 ```
 
 ## 功能
